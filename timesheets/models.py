@@ -20,7 +20,7 @@ class Auditlog(models.Model):
     timestamp = models.DateTimeField(db_column='Timestamp')  # Field name made lowercase.
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'AuditLog'
 
 
@@ -30,7 +30,7 @@ class Crews(models.Model):
     isactive = models.IntegerField(db_column='IsActive')  # Field name made lowercase.
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'Crews'
 
 
@@ -49,7 +49,7 @@ class Timesheetentry(models.Model):
     supervisornote = models.TextField(db_column='SupervisorNote', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'TimesheetEntry'
 
 
@@ -62,7 +62,7 @@ class Timesheetheader(models.Model):
     submittedat = models.DateTimeField(db_column='SubmittedAt', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'TimesheetHeader'
 
 
@@ -73,7 +73,7 @@ class Workcategory(models.Model):
     isactive = models.IntegerField(db_column='IsActive')  # Field name made lowercase.
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'WorkCategory'
 
 
@@ -85,5 +85,5 @@ class Workordercache(models.Model):
     sap_completiondate = models.DateField(db_column='SAP_CompletionDate', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'WorkOrderCache'

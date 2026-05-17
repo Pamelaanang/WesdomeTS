@@ -7,7 +7,7 @@ class Accesslevel(models.Model):
     accessdescription = models.CharField(db_column='AccessDescription', max_length=500, blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'AccessLevel'
 
 
@@ -17,7 +17,7 @@ class Department(models.Model):
     isactive = models.IntegerField(db_column='IsActive')  # Field name made lowercase.
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'Department'
 
 
@@ -29,7 +29,7 @@ class Roles(models.Model):
     isuniqueassignment = models.IntegerField(db_column='IsUniqueAssignment', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'Roles'
 
 
@@ -89,7 +89,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = ['phonenumber', 'firstname', 'lastname']
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'Employee'
 
     @property
