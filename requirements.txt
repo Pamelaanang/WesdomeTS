@@ -1,0 +1,14 @@
+# Core Framework
+Django>=5.2,<6.0
+
+# MySQL Database Driver
+mysqlclient>=2.2.0
+
+# Twilio (SMS for password reset)
+twilio>=9.0.0
+
+# Environment variable management (store secrets outside settings.py)
+python-dotenv>=1.0.0
+
+# Django TailwindCSS integration
+django-tailwind>=3.8.0
