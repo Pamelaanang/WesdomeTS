@@ -1,0 +1,45 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wesdome SAP Timesheet</title>
+    <link rel="stylesheet" href="{% static 'dist/output.css' %}" />
+    <link rel="icon" href="data:,">
+  </head>
+  <body class="bg-gray-100 font-sans">
+    <nav class="sidenav flex flex-col justify-between">
+      <div>
+        <div class="flex justify-center mb-8 px-4">
+            <img src="{% static 'images/wesdome_logo.png' %}" alt="Wesdome" class="w-28">
+        </div>
+        <a href="" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'profile' %}active{% endif %}">
+            <i class="lucide-user"></i> My Profile
+        </a>
+        <a href="" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'drafts' %}active{% endif %}">
+            <i class="lucide-file-text"></i> Drafts
+        </a>
+        <a href="" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'approved' %}active{% endif %}">
+            <i class="lucide-check-circle"></i> Approved
+        </a>
+        <a href="" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'rejected' %}active{% endif %}">
+            <i class="lucide-x-circle"></i> Rejected
+        </a>
+        <a href="" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'all' %}active{% endif %}">
+            <i class="lucide-list"></i> All
+        </a>
+    </div>
+
+    <div class="pb-8">
+        <a href="" class="text-sm text-blue-400 text-center">Sign Out</a>
+    </div>
+    </nav>
+
+    <main class="main-content container mx-auto mt-10 p-4">
+      {% block content %} {% endblock content %}
+    </main>
+
+    <script ></script>
+  </body>
+</html>
