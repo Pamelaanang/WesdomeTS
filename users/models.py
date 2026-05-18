@@ -14,7 +14,7 @@ class Accesslevel(models.Model):
 class Department(models.Model):
     departmentid = models.AutoField(db_column='DepartmentID', primary_key=True)  # Field name made lowercase.
     departmentname = models.CharField(db_column='DepartmentName', max_length=255)  # Field name made lowercase.
-    isactive = models.IntegerField(db_column='IsActive')  # Field name made lowercase.
+    isactive = models.IntegerField(db_column='IsActive', default=1)  # Field name made lowercase.
 
     class Meta:
         managed = True
@@ -113,3 +113,15 @@ class User(AbstractBaseUser, PermissionsMixin):
     def is_active(self):
         #Connects Django's is_active to localized isactive to required for login to avoid a clash and permit login
         return self.isactive
+
+
+class CrewAssignment(models.Model):
+    assignmentid = models.AutoField(db_column='AssignmentID', primary_key=True)  # Field name made lowercase.
+    shifter = models.ForeignKey(User, models.DO_NOTHING, db_column='ShifterID' , related_name='crew_led') 
+    employee = models.ForeignKey('User', models.DO_NOTHING, db_column='EmployeeID', related_name='crew_assignments') # Field name made lowercase.
+    startdate = models.DateField(db_column='StartDate')
+    enddate = models.DateField(db_column='EndDate', blank=True, null=True)
+
+    class Meta:
+        managed = True
+        db_table = 'CrewAssignment'
