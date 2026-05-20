@@ -1,0 +1,75 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signed Out | Wesdome Timesheet</title>
+    <link rel="stylesheet" href="{% static 'dist/output.css' %}">
+    <link rel="icon" href="data:,">
+</head>
+
+<body class="h-screen flex">
+
+    <!-- Left:Image Slider -->
+    <div class="w-1/2 relative overflow-hidden">
+        <!-- Slides -->
+        <div class="slider h-full w-full">
+            <img src="{% static 'images/slide_img/payroll_slide1.jpg' %}" alt="Image1"
+                class="slide absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-1000">
+            <img src="{% static 'images/slide_img/longhole_slide2.jpg' %}" alt="Image2"
+                class="slide absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-1000">
+            <img src="{% static 'images/slide_img/gold_slide3.jpg' %}" alt="Image3"
+                class="slide absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-1000">
+            <img src="{% static 'images/slide_img/truck_slide4.jpg' %}" alt="Image4"
+                class="slide absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-1000">
+            <img src="{% static 'images/slide_img/minerug_slide5.jpg' %}" alt="Image5"
+                class="slide absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-1000">
+            <img src="{% static 'images/slide_img/toyota_slide6.jpg' %}" alt="Image6"
+                class="slide absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-1000">
+        </div>
+    </div>
+    <!-- Right:Login Form -->
+    <div class="-mt-10 w-1/2 flex flex-col bg-white pl-50 pt-1 pb-12 ">
+        <div class="flex justify-end mb-3">
+            <a href="{% url 'login' %}">
+                <img src="{% static 'images/wesdome_logo.png' %}" alt="Wesdome" class="w-50">
+            </a>
+        </div>
+        <div>
+            <p class="text-sm text-black mb-2 text-center"> Hello User,</p>
+            <p class="justify-center text-sm text-black mb-2 flex items-center gap-2">
+                Thanks for Visiting Us. You're all Signed Out Now.
+            </p>
+            <p class="justify-center text-sm text-black mb-6 flex items-center gap-2">
+                Come Back Again Soon!
+            </p>
+            <h3 class="text-2xl font-bold text-black text-center mb-6">Have A Good Day!</h3>
+            <div class="flex justify-center mt-4">
+                <a href="{% url 'login' %}" class="text-sm text-blue-500 underline">
+                    Sign In Again?
+                </a>
+            </div>
+        </div>
+        <div class="mt-auto pt-8 text-center text-xs text-black">
+            <p>Legal and Privacy | &copy; 2026 Wesdome Gold Mines Ltd.</p>
+            <p>V1.0.4 | All Rights Reserved. Powered By Inc.</p>
+        </div>
+    </div>
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        let current = 0;
+
+        slides[current].classList.replace('opacity-0', 'opacity-100');
+
+        setInterval(() => {
+            slides[current].classList.replace('opacity-100', 'opacity-0');
+            current = (current + 1) % slides.length;
+            slides[current].classList.replace('opacity-0', 'opacity-100');
+        }, 4000);
+    </script>
+
+</body>
+
+</html>

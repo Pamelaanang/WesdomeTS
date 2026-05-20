@@ -1,0 +1,114 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login</title>
+    <link rel="stylesheet" href="{% static 'dist/output.css' %}" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="icon" href="data:,">
+</head>
+
+<body class="h-screen flex">
+
+    <!-- Left:Image Slider -->
+    <div class="w-1/2 relative overflow-hidden">
+        <!-- Slides -->
+        <div class="slider h-full w-full">
+            <img src="{% static 'images/slide_img/payroll_slide1.jpg' %}" alt="Image1"
+                class="slide absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-1000">
+            <img src="{% static 'images/slide_img/longhole_slide2.jpg' %}" alt="Image2"
+                class="slide absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-1000">
+            <img src="{% static 'images/slide_img/gold_slide3.jpg' %}" alt="Image3"
+                class="slide absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-1000">
+            <img src="{% static 'images/slide_img/truck_slide4.jpg' %}" alt="Image4"
+                class="slide absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-1000">
+            <img src="{% static 'images/slide_img/minerug_slide5.jpg' %}" alt="Image5"
+                class="slide absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-1000">
+            <img src="{% static 'images/slide_img/toyota_slide6.jpg' %}" alt="Image6"
+                class="slide absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-1000">
+        </div>
+    </div>
+    <!-- Right:Login Form -->
+    <div class="-mt-10 w-1/2 flex flex-col bg-white pl-50 pt-1 pb-12 ">
+        <div class="flex justify-end mb-3">
+            <img src="{% static 'images/wesdome_logo.png' %}" alt="Wesdome" class="w-50">
+        </div>
+        <div>
+            <p class="text-sm text-black">Welcome to</p>
+            <h1 class="text-2xl font-bold text-black mb-2">Wesdome Timesheet App</h1>
+            <p class="text-sm text-black mb-6 flex items-center gap-2">
+                Here you may submit, view and track timesheets.
+                <span class="relative group cursor-pointer text-black">
+                    &#9432;
+                    <span
+                        class="absolute left-6 top-0 w-56 bg-black text-white text-xs rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                        If your password is temporary you will have to reset before proceeding.
+                    </span>
+                </span>
+            </p>
+        </div>
+        <!-- Form -->
+        <div>
+            <form method="POST" class="mb-10 md:mb-24 lg:mb-40">
+                {% csrf_token %}
+                {% if form.errors %}
+                <div
+                    class="w-100 flex items-center gap-2 bg-red-50 border border-red-300 text-red-600 text-sm rounded-lg px-4 py-3 mb-4">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <span>Incorrect Payroll ID or password. Please try again.</span>
+                </div>
+                {% endif %}
+                <div class="flex justify-start mb-3">
+                    <div class="w-100 mb-4">
+                        <label class="block text-sm text-gray-600 mb-1">{{ form.username.label }}</label>
+                        <div class="flex items-center h-13 border border-gray-400 rounded-lg px-3 py-2 gap-2">
+                            <span class="text-gray-400 text-sm pl-8">ID</span>
+                            {{ form.username }}
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-start mb-5">
+                    <div class="w-100 mb-6">
+                        <label class="block text-sm text-gray-600 mb-1">{{ form.password.label }}</label>
+                        <div class="flex items-center h-13 border border-gray-400 rounded-lg px-3 py-2 gap-2">
+                            <span class="text-gray-400 text-sm pl-8"><i class="fa-solid fa-lock"></i></span>
+                            {{ form.password }}
+                        </div>
+                    </div>
+                </div>
+                <div class="flex mb-2 px-40">
+                    <button type="submit"
+                        class="w-35 bg-[#28348A] text-white py-4 rounded-lg font-medium hover:opacity-90 transition-colors">
+                        Sign In
+                    </button>
+                </div>
+                <div class="flex justify-start px-43">
+                    <a href="#" class="text-sm text-blue-500 hover:underline">Forgot Password?</a>
+                </div>
+
+            </form>
+        </div>
+        <div class="mt-auto pt-8 text-center text-xs text-black">
+            <p>Legal and Privacy | &copy; 2026 Wesdome Gold Mines Ltd.</p>
+            <p>V1.0.4 | All Rights Reserved. Powered By Inc.</p>
+        </div>
+    </div>
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        let current = 0;
+
+        slides[current].classList.replace('opacity-0', 'opacity-100');
+
+        setInterval(() => {
+            slides[current].classList.replace('opacity-100', 'opacity-0');
+            current = (current + 1) % slides.length;
+            slides[current].classList.replace('opacity-0', 'opacity-100');
+        }, 4000);
+    </script>
+
+</body>
+
+</html>

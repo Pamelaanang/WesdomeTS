@@ -20,8 +20,7 @@ from users import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # This makes http://127.0.0.1:8000/ show your base.html
-    path('', views.design_tester, name='home'),
+    path('', views.login_view, name='home'),
     path('', include('users.urls')),
 
 ]

@@ -4,17 +4,17 @@ from django.contrib.auth.forms import AuthenticationForm
 
 class UserLoginForm(AuthenticationForm):
     username = forms.CharField(
-        label = "Payroll ID",
+        label = "Enter Payroll ID",
         max_length=255,
         widget = forms.TextInput(attrs={
-            'placeholder': 'Enter Payroll ID',
-            'class': 'w-full px-4 py-2 border rounded-lg focus:outline-none'
+            'placeholder': '123456',
+            'class': 'w-full bg-transparent outline-none border-none px-4'
             })
     )
     password = forms.CharField(
-        label = "Password",
+        label = "Enter Password",
         widget = forms.PasswordInput(attrs={
-            'placeholder': 'Enter Your Password',
-            'class': 'w-full px-4 py-2 border rounded-lg focus:outline-none'
+            'placeholder': 'Password',
+            'class': 'w-full bg-transparent outline-none border-none px-4'
             })
     )

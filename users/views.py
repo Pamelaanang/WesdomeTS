@@ -3,11 +3,6 @@ from django.contrib.auth import authenticate, login, logout
 from users.forms import UserLoginForm
 from users.models import User
 
-# Create your views here.
-def design_tester(request):
-    # This renders your base.html directly so you can see the CSS/Nav
-    return render(request, "base.html")
-
 def login_view(request):
     if request.method == 'POST':
         form = UserLoginForm(request, data=request.POST)
@@ -21,3 +16,7 @@ def login_view(request):
         form = UserLoginForm(request)
     
     return render(request, 'login.html', {'form': form})
+
+def logout_view(request):
+    logout(request)
+    return render(request, 'logout.html')

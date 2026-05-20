@@ -29,6 +29,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = True
 
 ALLOWED_HOSTS = []
+CSRF_TRUSTED_ORIGINS = ['https://*.app.github.dev', 'https://friendly-potato-x6q9jp6vx9jfpr9r-8000.app.github.dev', 'http://localhost:8000', 'https://localhost:8000',]
 
 
 # Application definition

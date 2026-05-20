@@ -6,11 +6,11 @@
   "scripts": {
     "css:build": "npx @tailwindcss/cli -i ./static/src/input.css -o ./static/dist/output.css --minify",
     "css:watch": "npx @tailwindcss/cli -i ./static/src/input.css -o ./static/dist/output.css --watch",
-    "format": "prettier --write \"templates/**/*.html\" \"static/src/**/*.css\" \"js/**/*.js\""
+    "format": "prettier --write \"templates/**/*.html\" \"static/src/**/*.css\" \"static/js/**/*.js\""
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.0.0",
-    "tailwindcss": "^4.0.0",
-    "prettier": "^3.0.0"
+    "prettier": "^3.0.0",
+    "tailwindcss": "^4.3.0"
   }
 }
