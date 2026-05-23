@@ -25,11 +25,11 @@
   }
 
   .sidenav a:hover {
-    @apply bg-[#efefef] text-black;
+    @apply bg-[#fafbfc] text-black;
   }
 
   .sidenav a.active {
-    @apply bg-[#28348A] text-white;
+    @apply bg-[#d3d2d1] text-black;
   }
 
   .signout-link {
@@ -45,6 +45,19 @@
   .sidenav .signout-link:active {
     @apply text-blue-400;
     background: none !important;
+  }
+
+  .sidenav .accordion-btn {
+    @apply px-6 py-4 text-lg text-gray-800 flex items-center justify-between w-full font-medium transition-all duration-200;
+    background: none;
+  }
+
+  .sidenav .accordion-btn:hover {
+    @apply bg-[#fafbfc] text-black;
+  }
+
+  .sidenav .accordion-btn.active {
+    @apply bg-[#d3d2d1] text-black;
   }
 
   .main-content {
