@@ -34,9 +34,9 @@ class Crews(models.Model):
         db_table = 'Crews'
 
 
-class MaintenanceEntry(models.Model):
+class MainEntry(models.Model):
     mainentryid = models.AutoField(db_column='MainEntryID', primary_key=True)  # Field name made lowercase.
-    mainheaderid = models.ForeignKey('MaintenanceHeader', models.DO_NOTHING, db_column='MainHeaderID')  # Field name made lowercase.
+    mainheaderid = models.ForeignKey('MainHeader', models.DO_NOTHING, db_column='MainHeaderID')  # Field name made lowercase.
     workorderid = models.ForeignKey('Workordercache', models.DO_NOTHING, db_column='WorkOrderID', blank=True, null=True)  # Field name made lowercase.
     workcategoryid = models.ForeignKey('Workcategory', models.DO_NOTHING, db_column='WorkCategoryID')  # Field name made lowercase.
     shifttype = models.CharField(db_column='ShiftType', max_length=5,  choices=[('Day', 'Day'), ('Night', 'Night')])  # Field name made lowercase.
@@ -46,14 +46,15 @@ class MaintenanceEntry(models.Model):
     enddate = models.DateField(db_column='EndDate', blank=True, null=True)  # Field name made lowercase.
     linestatus = models.CharField(db_column='LineStatus', max_length=15, default='Draft')  # Field name made lowercase.
     approvedat = models.DateTimeField(db_column='ApprovedAt', blank=True, null=True)  # Field name made lowercase.
+    approvedby = models.ForeignKey('users.User', models.DO_NOTHING, db_column='ApprovedBy', blank=True, null=True, related_name='approved_%(class)s')
     supervisornote = models.TextField(db_column='SupervisorNote', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         managed = True
-        db_table = 'MaintenanceEntry'
+        db_table = 'MainEntry'
 
 
-class MaintenanceHeader(models.Model):
+class MainHeader(models.Model):
     mainheaderid = models.AutoField(db_column='MainHeaderID', primary_key=True)  # Field name made lowercase.
     employeeid = models.ForeignKey('users.User', models.DO_NOTHING, db_column='EmployeeID')  # Field name made lowercase.
     crewid = models.ForeignKey(Crews, models.DO_NOTHING, db_column='CrewID', blank=True, null=True)  # Field name made lowercase.
@@ -63,7 +64,7 @@ class MaintenanceHeader(models.Model):
     
     class Meta:
         managed = True
-        db_table = 'MaintenanceHeader'
+        db_table = 'MainHeader'
 
 
 class Workcategory(models.Model):
@@ -137,6 +138,7 @@ class OperationsEntry(models.Model):
     entrydescription = models.TextField(db_column='EntryDescription', blank=True, null=True)
     linestatus = models.CharField(db_column='LineStatus', max_length=15, default='Draft')
     approvedat = models.DateTimeField(db_column='ApprovedAt', blank=True, null=True)
+    approvedby = models.ForeignKey('users.User', models.DO_NOTHING, db_column='ApprovedBy', blank=True, null=True, related_name='approved_%(class)s')
     captainnote = models.TextField(db_column='CaptainNote', blank=True, null=True)
     superintendentnote = models.TextField(db_column='SuperintendentNote', blank=True, null=True)
 

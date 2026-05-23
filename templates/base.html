@@ -4,42 +4,135 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Wesdome SAP Timesheet</title>
+    <title>Wesdome Timesheet Navbar</title>
     <link rel="stylesheet" href="{% static 'dist/output.css' %}" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="icon" href="data:,">
   </head>
   <body class="bg-gray-100 font-sans">
-    <nav class="sidenav flex flex-col justify-between">
-      <div>
-        <div class="flex justify-center mb-8 px-4">
+    <nav class="sidenav flex flex-col">
+        <!-- Pinned logo -->
+        <div class="flex justify-center py-6 px-4">
             <img src="{% static 'images/wesdome_logo.png' %}" alt="Wesdome" class="w-28">
         </div>
-        <a href="" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'profile' %}active{% endif %}">
-            <i class="lucide-user"></i> My Profile
-        </a>
-        <a href="" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'drafts' %}active{% endif %}">
-            <i class="lucide-file-text"></i> Drafts
-        </a>
-        <a href="" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'approved' %}active{% endif %}">
-            <i class="lucide-check-circle"></i> Approved
-        </a>
-        <a href="" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'rejected' %}active{% endif %}">
-            <i class="lucide-x-circle"></i> Rejected
-        </a>
-        <a href="" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'all' %}active{% endif %}">
-            <i class="lucide-list"></i> All
-        </a>
-    </div>
 
-    <div class="pb-8">
-        <a href="{% url 'logout' %}" class="text-sm text-blue-400 text-center">Sign Out</a>
-    </div>
+        <!-- Scrollable nav items -->
+        <div class="flex-1 min-h-0">
+            {% if user.is_authenticated %}
+            {% with al=request.user.access_level %}
+
+            <!-- All users: My Profile -->
+            <a href="#" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'profile' %}active{% endif %}">
+                <i class="fa-solid fa-user"></i> My Profile
+            </a>
+
+            <!-- System Admin (1) only -->
+            {% if al == 1 %}
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-users-gear"></i> User Management</a>
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-file-lines"></i> All Timesheets</a>
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-chart-bar"></i> Reports</a>
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-gear"></i> Settings</a>
+            {% endif %}
+
+            <!-- My Employees accordion: Superintendent (2), Supervisor (3), Mine Captain (4) -->
+            {% if al == 2 or al == 3 or al == 4 %}
+            <button onclick="toggleAccordion('menu-employees')" class="accordion-btn flex items-center justify-between w-full px-6 py-4 text-xl font-medium text-gray-800 hover:bg-gray-200 hover:translate-x-1 transition-all duration-200">
+                <span class="flex items-center gap-3"><i class="fa-solid fa-people-group"></i> My Employees</span>
+                <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
+            </button>
+            <div id="menu-employees" class="hidden flex flex-col">
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 hover:bg-gray-200"><i class="fa-solid fa-clock-rotate-left"></i> Pending</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 hover:bg-gray-200"><i class="fa-solid fa-circle-check"></i> Approved</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 hover:bg-gray-200"><i class="fa-solid fa-circle-xmark"></i> Rejected</a>
+            </div>
+            {% endif %}
+
+            <!-- Shifter timesheets accordion: Superintendent (2nd level) and Mine Captain (1st level) -->
+            {% if al == 2 or al == 4 %}
+            <button onclick="toggleAccordion('menu-shifter')" class="accordion-btn flex items-center justify-between w-full px-6 py-4 text-xl font-medium text-gray-800 hover:bg-gray-200 hover:translate-x-1 transition-all duration-200">
+                <span class="flex items-center gap-3">
+                    <i class="fa-solid fa-hard-hat"></i>
+                    {% if al == 4 %}My Shifters{% else %}Shifters{% endif %}
+                </span>
+                <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
+            </button>
+            <div id="menu-shifter" class="hidden flex flex-col">
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 hover:bg-gray-200"><i class="fa-solid fa-clock-rotate-left"></i> Pending</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 hover:bg-gray-200"><i class="fa-solid fa-circle-check"></i> Approved</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 hover:bg-gray-200"><i class="fa-solid fa-circle-xmark"></i> Rejected</a>
+            </div>
+
+            <!-- Daily crew timesheets accordion: Superintendent (2nd level) and Mine Captain (1st level) -->
+            <button onclick="toggleAccordion('menu-daily')" class="accordion-btn flex items-center justify-between w-full px-6 py-4 text-xl font-medium text-gray-800 hover:bg-gray-200 hover:translate-x-1 transition-all duration-200">
+                <span class="flex items-center gap-3"><i class="fa-solid fa-calendar-days"></i> Daily Timesheets</span>
+                <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
+            </button>
+            <div id="menu-daily" class="hidden flex flex-col">
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 hover:bg-gray-200"><i class="fa-solid fa-clock-rotate-left"></i> Pending</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 hover:bg-gray-200"><i class="fa-solid fa-circle-check"></i> Approved</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 hover:bg-gray-200"><i class="fa-solid fa-circle-xmark"></i> Rejected</a>
+            </div>
+            {% endif %}
+
+            <!-- Shifter (5): crew management and daily sheet submission -->
+            {% if al == 5 %}
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-hard-hat"></i> My Crew</a>
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-pen-to-square"></i> Submit Daily Sheets</a>
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-circle-check"></i> Daily Approvals</a>
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-circle-xmark"></i> Daily Rejections</a>
+            {% endif %}
+
+            <!-- Payroll (7) only -->
+            {% if al == 7 %}
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-building"></i> Departments</a>
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-users"></i> Employees</a>
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-chart-bar"></i> Reports</a>
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-magnifying-glass"></i> Search</a>
+            {% endif %}
+
+            <!-- Personal timesheets: everyone except Admin (1) and Payroll (7) -->
+            {% if al != 1 and al != 7 %}
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-circle-check"></i> My Approved</a>
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-circle-xmark"></i> My Rejected</a>
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-magnifying-glass"></i> Search</a>
+            {% endif %}
+
+            {% endwith %}
+            {% endif %}
+        </div>
+
+        <!-- Pinned Sign Out -->
+        <div class="py-4 flex justify-center">
+            <a href="{% url 'logout' %}" class="signout-link">
+                <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+            </a>
+        </div>
     </nav>
 
     <main class="main-content container mx-auto mt-10 p-4">
       {% block content %} {% endblock content %}
     </main>
 
-    <script ></script>
+    <script>
+        function toggleAccordion(id) {
+            const menu = document.getElementById(id);
+            const isOpen = !menu.classList.contains('hidden');
+
+            // Close all accordions first
+            document.querySelectorAll('[id^="menu-"]').forEach(el => {
+                el.classList.add('hidden');
+                const btn = el.previousElementSibling;
+                if (btn) btn.querySelector('.accordion-icon')?.classList.remove('rotate-90');
+            });
+
+            // If it was closed, open it
+            if (!isOpen) {
+                menu.classList.remove('hidden');
+                const btn = menu.previousElementSibling;
+                if (btn) btn.querySelector('.accordion-icon')?.classList.add('rotate-90');
+            }
+        }
+    </script>
   </body>
 </html>
