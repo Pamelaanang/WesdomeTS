@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+
+{% regroup users by roleid.departmentid.departmentname as department_list %}
+
+{% for dept in department_list %}
+<div class="mb-4">
+    <button onclick="toggleDept('dept-{{ forloop.counter }}')" 
+            class="w-full flex items-center justify-between bg-[#28348A] text-white px-5 py-3 rounded font-semibold text-sm hover:bg-blue-900 transition-all duration-200">
+        <span>{{ dept.grouper }}</span>
+        <i class="fa-solid fa-chevron-down dept-icon transition-transform duration-200"></i>
+    </button>
+
+    <div id="dept-{{ forloop.counter }}" class="hidden">
+        <table class="w-full bg-white shadow text-sm table-fixed">
+            <thead class="bg-gray-200 text-gray-600 uppercase text-xs">
+                <tr>
+                    <th class="px-4 py-3 text-left w-[10%]">ID</th>
+                    <th class="px-4 py-3 text-left w-[20%]">Name</th>
+                    <th class="px-4 py-3 text-left w-[35%]">Role</th>
+                    <th class="px-4 py-3 text-left w-[15%]">Status</th>
+                    <th class="px-4 py-3 text-left w-[20%]">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in dept.list %}
+                <tr class="border-t border-gray-100 hover:bg-gray-50">
+                    <td class="px-4 py-3">{{ user.employeeid }}</td>
+                    <td class="px-4 py-3">{{ user.firstname }} {{ user.lastname }}</td>
+                    <td class="px-4 py-3">{{ user.roleid.rolename }}</td>
+                    <td class="px-4 py-3">{% if user.is_temporary %}Temporary{% else %}Active{% endif %}</td>
+                    <td class="px-4 py-3">
+                        <form method="post" action="{% url 'reset_password' user.employeeid %}">
+                            {% csrf_token %}
+                            <button class="bg-[#28348A] text-white text-xs px-3 py-1 rounded hover:bg-blue-800 w-35">Reset Password</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+
+<script>
+function toggleDept(id) {
+    const panel = document.getElementById(id);
+    const btn = panel.previousElementSibling;
+    const icon = btn.querySelector('.dept-icon');
+    const isOpen = !panel.classList.contains('hidden');
+    panel.classList.toggle('hidden');
+    icon.classList.toggle('rotate-180', !isOpen);
+}
+</script>
+
+{% endblock content %}

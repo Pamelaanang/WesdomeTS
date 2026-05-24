@@ -9,9 +9,10 @@
     <link rel="stylesheet" href="{% static 'dist/output.css' %}" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="icon" href="data:,">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 
-<body class="h-screen flex">
+<body class="h-screen flex font-sans">
 
     <!-- Left:Image Slider -->
     <div class="w-1/2 relative overflow-hidden">
@@ -61,7 +62,7 @@
                     <span>Incorrect Payroll ID or password. Please try again.</span>
                 </div>
                 {% endif %}
-                <div class="flex justify-start mb-3">
+                <div class="flex justify-center mb-3">
                     <div class="w-100 mb-4">
                         <label class="block text-sm text-gray-600 mb-1">{{ form.username.label }}</label>
                         <div class="flex items-center h-13 border border-gray-400 rounded-lg px-3 py-2 gap-2">
@@ -70,7 +71,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="flex justify-start mb-5">
+                <div class="flex justify-center mb-5">
                     <div class="w-100 mb-6">
                         <label class="block text-sm text-gray-600 mb-1">{{ form.password.label }}</label>
                         <div class="flex items-center h-13 border border-gray-400 rounded-lg px-3 py-2 gap-2">
@@ -79,13 +80,13 @@
                         </div>
                     </div>
                 </div>
-                <div class="flex mb-2 px-40">
+                <div class="flex justify-center mb-2 px-40">
                     <button type="submit"
                         class="w-35 bg-[#28348A] text-white py-4 rounded-lg font-medium hover:opacity-90 transition-colors">
                         Sign In
                     </button>
                 </div>
-                <div class="flex justify-start px-43">
+                <div class="flex justify-center px-43">
                     <a href="#" class="text-sm text-blue-500 hover:underline">Forgot Password?</a>
                 </div>
 

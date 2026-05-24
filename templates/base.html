@@ -28,7 +28,7 @@
 
             <!-- System Admin (1) only -->
             {% if al == 1 %}
-            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-users-gear"></i> User Management</a>
+            <a href="{% url 'user_list' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}"><i class="fa-solid fa-users-gear"></i> User Management</a>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-file-lines"></i> All Timesheets</a>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-chart-bar"></i> Reports</a>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-gear"></i> Settings</a>
@@ -110,7 +110,7 @@
         </div>
     </nav>
 
-    <main class="main-content container mx-auto mt-10 p-4">
+    <main class="main-content">
       {% block content %} {% endblock content %}
     </main>
 
