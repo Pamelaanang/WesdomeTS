@@ -22,5 +22,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.login_view, name='home'),
     path('', include('users.urls')),
+    path('', include('timesheets.urls')),
 
 ]

@@ -14,7 +14,7 @@
 /* Customizing Tailwind v4 components using standard CSS nested under @utility or native layers */
 @layer components {
   .sidenav {
-    @apply h-screen fixed z-10 top-0 left-0 bg-wesdome-gray w-[280px] border-r border-gray-300 shadow-xl;
+    @apply h-screen fixed z-10 top-0 left-0 bg-wesdome-gray w-[200px] md:w-[280px] border-r border-gray-300 shadow-xl;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -61,6 +61,6 @@
   }
 
   .main-content {
-    @apply ml-[280px] p-8;
+    @apply ml-[200px] md:ml-[280px] p-4 md:p-8;
   }
 }

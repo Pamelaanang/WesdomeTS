@@ -7,6 +7,7 @@ import random
 import string
 from django.utils import timezone
 from django.contrib.auth import update_session_auth_hash
+from timesheets.models import MainHeader, MainEntry
 
 
 def login_view(request):
@@ -74,3 +75,31 @@ def password_reset_view(request):
             error_message = "Passwords do not match."
             return render(request, 'password_reset.html', {'error_message': error_message})
     return render(request, 'password_reset.html')
+
+
+@login_required(login_url='login')
+def profile(request):
+    user =request.user
+
+    draft_count = MainHeader.objects.filter(employeeid=user, overallstatus='Draft').count()
+
+    pending_count = MainHeader.objects.filter(employeeid=user, overallstatus='Submitted').count()
+
+    latest_header = MainHeader.objects.filter(employeeid=user, overallstatus='Submitted').order_by('-mainheaderid').first()
+
+    approved_count = 0 
+    rejected_count = 0
+
+    if latest_header:
+        approved_count = MainEntry.objects.filter(mainheaderid=latest_header, linestatus='Approved').count()
+        rejected_count = MainEntry.objects.filter(mainheaderid=latest_header, linestatus='Rejected').count()
+
+    return render(request, 'users/profile.html', {
+        'today': timezone.now().date(),
+        'draft_count': draft_count,
+        'pending_count': pending_count,
+        'approved_count': approved_count,
+        'rejected_count': rejected_count,
+    })
+
+

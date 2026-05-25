@@ -14,7 +14,8 @@
     </button>
 
     <div id="dept-{{ forloop.counter }}" class="hidden">
-        <table class="w-full bg-white shadow text-sm table-fixed">
+        <div class="overflow-x-auto">
+        <table class="w-full min-w-[560px] bg-white shadow text-sm">
             <thead class="bg-gray-200 text-gray-600 uppercase text-xs">
                 <tr>
                     <th class="px-4 py-3 text-left w-[10%]">ID</th>
@@ -41,6 +42,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
 </div>
 {% endfor %}

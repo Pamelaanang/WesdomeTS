@@ -14,9 +14,8 @@
 
 <body class="h-screen flex font-sans">
 
-    <!-- Left:Image Slider -->
-    <div class="w-1/2 relative overflow-hidden">
-        <!-- Slides -->
+    <!-- Left: Image Slider (hidden on small screens) -->
+    <div class="hidden md:block md:w-1/2 relative overflow-hidden">
         <div class="slider h-full w-full">
             <img src="{% static 'images/slide_img/payroll_slide1.jpg' %}" alt="Image1"
                 class="slide absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-1000">
@@ -32,10 +31,10 @@
                 class="slide absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-1000">
         </div>
     </div>
-    <!-- Right:Login Form -->
-    <div class="-mt-10 w-1/2 flex flex-col bg-white pl-50 pt-1 pb-12 ">
+    <!-- Right: Login Form -->
+    <div class="w-full md:w-1/2 flex flex-col bg-white px-8 md:px-12 lg:px-20 pt-6 pb-12">
         <div class="flex justify-end mb-3">
-            <img src="{% static 'images/wesdome_logo.png' %}" alt="Wesdome" class="w-50">
+            <img src="{% static 'images/wesdome_logo.png' %}" alt="Wesdome" class="w-32 md:w-40 lg:w-50">
         </div>
         <div>
             <p class="text-sm text-black">Welcome to</p>
@@ -52,47 +51,41 @@
             </p>
         </div>
         <!-- Form -->
-        <div>
-            <form method="POST" class="mb-10 md:mb-24 lg:mb-40">
+        <div class="w-full max-w-sm">
+            <form method="POST" class="mb-10">
                 {% csrf_token %}
                 {% if form.errors %}
-                <div
-                    class="w-100 flex items-center gap-2 bg-red-50 border border-red-300 text-red-600 text-sm rounded-lg px-4 py-3 mb-4">
+                <div class="flex items-center gap-2 bg-red-50 border border-red-300 text-red-600 text-sm rounded-lg px-4 py-3 mb-4">
                     <i class="fa-solid fa-circle-exclamation"></i>
                     <span>Incorrect Payroll ID or password. Please try again.</span>
                 </div>
                 {% endif %}
-                <div class="flex justify-center mb-3">
-                    <div class="w-100 mb-4">
-                        <label class="block text-sm text-gray-600 mb-1">{{ form.username.label }}</label>
-                        <div class="flex items-center h-13 border border-gray-400 rounded-lg px-3 py-2 gap-2">
-                            <span class="text-gray-400 text-sm pl-8">ID</span>
-                            {{ form.username }}
-                        </div>
+                <div class="mb-4">
+                    <label class="block text-sm text-gray-600 mb-1">{{ form.username.label }}</label>
+                    <div class="flex items-center h-13 border border-gray-400 rounded-lg px-3 py-2 gap-2">
+                        <span class="text-gray-400 text-sm pl-2">ID</span>
+                        {{ form.username }}
                     </div>
                 </div>
-                <div class="flex justify-center mb-5">
-                    <div class="w-100 mb-6">
-                        <label class="block text-sm text-gray-600 mb-1">{{ form.password.label }}</label>
-                        <div class="flex items-center h-13 border border-gray-400 rounded-lg px-3 py-2 gap-2">
-                            <span class="text-gray-400 text-sm pl-8"><i class="fa-solid fa-lock"></i></span>
-                            {{ form.password }}
-                        </div>
+                <div class="mb-6">
+                    <label class="block text-sm text-gray-600 mb-1">{{ form.password.label }}</label>
+                    <div class="flex items-center h-13 border border-gray-400 rounded-lg px-3 py-2 gap-2">
+                        <span class="text-gray-400 text-sm pl-2"><i class="fa-solid fa-lock"></i></span>
+                        {{ form.password }}
                     </div>
                 </div>
-                <div class="flex justify-center mb-2 px-40">
+                <div class="flex justify-center mb-2">
                     <button type="submit"
                         class="w-35 bg-[#28348A] text-white py-4 rounded-lg font-medium hover:opacity-90 transition-colors">
                         Sign In
                     </button>
                 </div>
-                <div class="flex justify-center px-43">
+                <div class="flex justify-center">
                     <a href="#" class="text-sm text-blue-500 hover:underline">Forgot Password?</a>
                 </div>
-
             </form>
         </div>
-        <div class="mt-auto pt-8 ms-1 text-center text-xs text-black">
+        <div class="mt-auto pt-8 text-center text-xs text-black">
             <p>Legal and Privacy | &copy; 2026 Wesdome Gold Mines Ltd.</p>
             <p>V1.0.4 | All Rights Reserved. Powered By Inc.</p>
         </div>
