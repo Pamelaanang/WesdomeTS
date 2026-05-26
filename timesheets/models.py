@@ -36,8 +36,9 @@ class Crews(models.Model):
 
 class MainEntry(models.Model):
     mainentryid = models.AutoField(db_column='MainEntryID', primary_key=True)  # Field name made lowercase.
-    mainheaderid = models.ForeignKey('MainHeader', models.DO_NOTHING, db_column='MainHeaderID')  # Field name made lowercase.
+    mainheaderid = models.ForeignKey('MainHeader', models.CASCADE, db_column='MainHeaderID')  # Field name made lowercase.
     workorderid = models.ForeignKey('Workordercache', models.DO_NOTHING, db_column='WorkOrderID', blank=True, null=True)  # Field name made lowercase.
+    sapworkid = models.CharField(db_column='SAPWorkID', max_length=100, blank=True, null=True)  # manual entry for now
     workcategoryid = models.ForeignKey('Workcategory', models.DO_NOTHING, db_column='WorkCategoryID')  # Field name made lowercase.
     shifttype = models.CharField(db_column='ShiftType', max_length=5,  choices=[('Day', 'Day'), ('Night', 'Night')])  # Field name made lowercase.
     hoursworked = models.DecimalField(db_column='HoursWorked', max_digits=5, decimal_places=2)  # Field name made lowercase.
@@ -79,9 +80,10 @@ class Workcategory(models.Model):
 
 
 class Workordercache(models.Model):
-    workorderid = models.CharField(db_column='WorkOrderID', primary_key=True, max_length=100)  # Field name made lowercase.
+    workorderid = models.AutoField(db_column='WorkOrderID', primary_key=True)  # Field name made lowercase.
     description = models.CharField(db_column='Description', max_length=255, blank=True, null=True)  # Field name made lowercase.
     functionalgroup = models.CharField(db_column='FunctionalGroup', max_length=255, blank=True, null=True)  # Field name made lowercase.
+    sap_workorder = models.CharField(db_column='SAP_WorkOrder', max_length=255, blank=True, null=True)  # Field name made lowercase.
     sap_startdate = models.DateField(db_column='SAP_StartDate')  # Field name made lowercase.
     sap_completiondate = models.DateField(db_column='SAP_CompletionDate', blank=True, null=True)  # Field name made lowercase.
 

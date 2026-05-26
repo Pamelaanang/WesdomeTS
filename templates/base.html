@@ -1,15 +1,17 @@
 {% load static %}
 <!doctype html>
 <html lang="en">
-  <head>
+
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Wesdome Timesheet Navbar</title>
     <link rel="stylesheet" href="{% static 'dist/output.css' %}" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="icon" href="data:,">
-  </head>
-  <body class="bg-gray-100 font-sans">
+</head>
+
+<body class="bg-gray-100 font-sans">
     <nav class="sidenav flex flex-col">
         <!-- Pinned logo -->
         <div class="flex justify-center py-6 px-4">
@@ -22,13 +24,16 @@
             {% with al=request.user.access_level %}
 
             <!-- All users: My Profile -->
-            <a href="#" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'profile' %}active{% endif %}">
+            <a href="{% url 'profile' %}"
+                class="flex items-center gap-3 {% if request.resolver_match.url_name == 'profile' %}active{% endif %}">
                 <i class="fa-solid fa-user"></i> My Profile
             </a>
 
             <!-- System Admin (1) only -->
             {% if al == 1 %}
-            <a href="{% url 'user_list' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}"><i class="fa-solid fa-users-gear"></i> User Management</a>
+            <a href="{% url 'user_list' %}"
+                class="flex items-center gap-3 {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}"><i
+                    class="fa-solid fa-users-gear"></i> User Management</a>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-file-lines"></i> All Timesheets</a>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-chart-bar"></i> Reports</a>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-gear"></i> Settings</a>
@@ -41,9 +46,12 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-employees" class="hidden flex flex-col">
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-clock-rotate-left"></i> Pending</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> Approved</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-xmark"></i> Rejected</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
+                        class="fa-solid fa-clock-rotate-left"></i> Pending</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
+                        class="fa-solid fa-circle-check"></i> Approved</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
+                        class="fa-solid fa-circle-xmark"></i> Rejected</a>
             </div>
             {% endif %}
 
@@ -57,9 +65,12 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-shifter" class="hidden flex flex-col">
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-clock-rotate-left"></i> Pending</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> Approved</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-xmark"></i> Rejected</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
+                        class="fa-solid fa-clock-rotate-left"></i> Pending</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
+                        class="fa-solid fa-circle-check"></i> Approved</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
+                        class="fa-solid fa-circle-xmark"></i> Rejected</a>
             </div>
 
             <!-- Daily crew timesheets accordion: Superintendent (2nd level) and Mine Captain (1st level) -->
@@ -68,16 +79,20 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-daily" class="hidden flex flex-col">
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-clock-rotate-left"></i> Pending</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> Approved</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-xmark"></i> Rejected</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
+                        class="fa-solid fa-clock-rotate-left"></i> Pending</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
+                        class="fa-solid fa-circle-check"></i> Approved</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
+                        class="fa-solid fa-circle-xmark"></i> Rejected</a>
             </div>
             {% endif %}
 
             <!-- Shifter (5): crew management and daily sheet submission -->
             {% if al == 5 %}
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-hard-hat"></i> My Crew</a>
-            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-pen-to-square"></i> Submit Daily Sheets</a>
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-pen-to-square"></i> Submit Daily
+                Sheets</a>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-circle-check"></i> Daily Approvals</a>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-circle-xmark"></i> Daily Rejections</a>
             {% endif %}
@@ -101,6 +116,14 @@
             {% endwith %}
             {% endif %}
         </div>
+        <div class="py-4 flex justify-center">
+            <div class="w-20 h-20 rounded-full bg-black flex items-center justify-center -mt-10">
+                <i class="fa-solid fa-user text-[3rem] text-white"></i>
+            </div>
+        </div>
+        <div class="py-4 flex justify-center">
+            <p class="font-semibold -mt-5">{{ request.user.firstname }} {{ request.user.lastname }}</p>
+        </div>
 
         <!-- Pinned Sign Out -->
         <div class="py-4 flex justify-center">
@@ -111,7 +134,7 @@
     </nav>
 
     <main class="main-content">
-      {% block content %} {% endblock content %}
+        {% block content %} {% endblock content %}
     </main>
 
     <script>
@@ -140,5 +163,6 @@
             }
         }
     </script>
-  </body>
+</body>
+
 </html>

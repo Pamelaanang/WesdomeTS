@@ -28,12 +28,6 @@ def logout_view(request):
     logout(request)
     return render(request, 'logout.html')
 
-
-@login_required(login_url='login')
-def home_view(request):
-    return render(request, 'base.html')
-
-
 @login_required(login_url='login')
 def user_list_view(request):
     if request.user.access_level != 1:
@@ -101,5 +95,3 @@ def profile(request):
         'approved_count': approved_count,
         'rejected_count': rejected_count,
     })
-
-
