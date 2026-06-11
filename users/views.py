@@ -18,7 +18,7 @@ def login_view(request):
             login(request, user)
             if user.is_temporary:
                 return redirect('password_reset')
-            return redirect('home')
+            return redirect('profile')
     else:
         form = UserLoginForm(request)
     
@@ -38,7 +38,7 @@ def user_list_view(request):
 
 
 @login_required(login_url='login')
-def reset_password_view(request, employeeid):
+def generate_password(request, employeeid):
     if request.user.access_level != 1:
         return redirect('home')
     

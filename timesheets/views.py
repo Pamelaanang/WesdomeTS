@@ -1,8 +1,9 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
+from users.models import User
 from .models import MainHeader, MainEntry, Crews, Workcategory
 from django.utils import timezone
-from django.db.models import Sum
+from django.db.models import Sum, Count, Min, Max
 
 # Create your views here.
 @login_required
@@ -77,3 +78,21 @@ def add_entry(request, pk):
         'hours': hours,
         'days_remaining': days_remaining
     })
+
+@login_required(login_url='login')
+def approval_inbox(request):
+    if request.user.access_level not in [2, 3, 4]:
+        return redirect('home')
+    
+    subordinates = User.objects.filter(supervisorid=request.user)
+    pending = MainHeader.objects.filter(
+        employeeid__in=subordinates,
+        overallstatus='Submitted'
+    ).select_related('employeeid__roleid').annotate(
+        entry_count=Count('mainentry'),
+        date_from=Min('mainentry__startdate'),
+        date_to=Max('mainentry__startdate')
+    ).order_by('employeeid__lastname', 'employeeid__firstname', 'date_from')
+    cards_waiting = pending.count()
+                     
+    return render(request, 'timesheets/approval_inbox.html', {'pending': pending, 'cards_waiting': cards_waiting})

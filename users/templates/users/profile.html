@@ -80,7 +80,7 @@
                 <p class="text-black flex items-center gap-2">
                     <!-- 2. Increased size using text-lg and removed conflicting fixed h-5/w-5 -->
                     <i class="fa-solid fa-building text-lg w-5 text-center"></i>
-                    <span class="font-medium mb-2">Department</span>
+                    <span class="font-bold mb-2">Department</span>
                 </p>
                 <!-- 3. Added pl-7 (padding-left) to shift the text exactly past the icon layout boundary -->
                 <p class="text-black pl-7">
@@ -89,22 +89,22 @@
 
                 <p class="text-black flex items-center gap-2 mt-4">
                     <i class="fa-solid fa-id-card text-lg w-5 text-center"></i>
-                    <span class="font-medium mb-2">Payroll ID</span>
+                    <span class="font-bold mb-2">Payroll ID</span>
                 </p>
                 <p class="text-black pl-7">{{ request.user.employeeid }}</p>
             </div>
 
-            <div class="text-right">
-                <p class="text-black flex items-center gap-2">
+            <div class="text-left">
+                <p class="text-black flex items-center justify-start gap-2">
                     <i class="fa-solid fa-book-open-reader text-lg w-5 text-center"></i>
-                    <span class="font-medium mb-2">Supervisor</span>
+                    <span class="font-bold mb-2">Supervisor</span>
                 </p>
-                <p class="text-black pl-7">{{ request.user.supervisorid.firstname }}
-                    {{ request.user.supervisorid.lastname }}</p>
+                <p class="text-black pl-7">
+                    {{ request.user.supervisorid.firstname }} {{ request.user.supervisorid.lastname }}</p>
 
-                <p class="text-black flex items-center gap-2 mt-4">
+                <p class="text-black flex items-center justify-start gap-2 mt-4">
                     <i class="fa-solid fa-briefcase text-lg w-5 text-center"></i>
-                    <span class="font-medium mb-2">Position</span>
+                    <span class="font-bold mb-2">Position</span>
                 </p>
                 <p class="text-black pl-7">{{ request.user.roleid.rolename }}</p>
             </div>
