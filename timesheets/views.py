@@ -109,6 +109,7 @@ def review_timesheet(request, pk):
     
     subordinates = User.objects.filter(supervisorid=request.user)
     header = get_object_or_404(MainHeader, mainheaderid=pk, employeeid__in=subordinates)
+    empdate_submitted = header.submittedat
 
     if header.overallstatus == 'Completed':
         return redirect('approval_inbox')
@@ -150,6 +151,6 @@ def review_timesheet(request, pk):
     
         return redirect('review_timesheet', pk=header.mainheaderid)
     
-    return render(request, 'timesheets/review_timesheet.html', {'header': header, 'entries': entries})
+    return render(request, 'timesheets/review_timesheet.html', {'header': header, 'entries': entries, 'empdate_submitted': empdate_submitted})
 
 
