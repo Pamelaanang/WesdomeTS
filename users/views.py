@@ -36,7 +36,6 @@ def user_list_view(request):
     return render(request, 'user_list.html', {'users': users})
 
 
-
 @login_required(login_url='login')
 def generate_password(request, employeeid):
     if request.user.access_level != 1:
