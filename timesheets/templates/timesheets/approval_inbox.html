@@ -5,40 +5,41 @@
     <div class="mb-1">
         <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
         <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
-        <p class="text-center text-sm text-gray-500 mt-1">This is Shows Submissions Awaiting Your Approval.
+        <p class="text-center text-sm text-gray-500 mt-1">This Shows Submissions Awaiting Your Approval.
         </p>
         <div class="flex flex-wrap justify-end mt-4 text-sm gap-y-2 px-4">
-            <p class="text-center text-sm mt-1">You have {{cards_waiting}} Header Submissio{{cards_waiting|pluralize:"n, s" }} Waiting Your Approval.
+            {% if cards_waiting == 0 %}
+            <p class="text-center text-sm mt-1"> You have No Header Submission To Review, Thank You!</p>
+            {% else %}
+            <p class="text-center text-sm mt-1"> You Have <span class="font-bold"> {{ cards_waiting }} </span>
+                 Header Submission {{ cards_waiting | pluralize }} Waiting For Your Review.</p>
             </p>
+            {% endif %}
         </div>
     </div>
 </div>
 
-{% regroup pending by employeeid as employee_groups %}
-{% for group in employee_groups %}
-
 <div class="container mx-auto mb-8">
     <div class="flex flex-wrap gap-4">
-        {% for header in group.list %}
+        {% for header in pending %}
         <a href="{% url 'review_timesheet' pk=header.mainheaderid %}"
             class="bg-white rounded-xl shadow p-5 w-52 flex flex-col items-center gap-2 hover:shadow-md hover:border hover:border-[#28348A] transition-all">
-            <p class="text-xs font-normal text-center mb-4">{{ header.date_from|date:"M j" }} – {{ header.date_to|date:"M j, Y" }}</p>
+            <p class="text-xs font-normal text-center mb-4">{{ header.date_from|date:"M j" }} – {{
+                header.date_to|date:"M j, Y" }}</p>
             <div class="w-20 h-20 rounded-full bg-black flex items-center justify-center mb-4">
                 <i class="fa-solid fa-user text-white text-2xl"></i>
             </div>
             <p class="font-semibold text-sm mb-1">
-                {{ group.grouper.firstname }} {{ group.grouper.lastname }}
+                {{ header.employeeid.firstname }} {{ header.employeeid.lastname }}
             </p>
-            <p class="font-normal text-xs mb-1">{{ group.grouper.roleid.rolename }}</p>
+            <p class="font-normal text-xs mb-1">{{ header.employeeid.roleid.rolename }}</p>
 
             <p class="text-xs">{{ header.entry_count }} entr{{ header.entry_count|pluralize:"y,ies" }}</p>
         </a>
+        {% empty %}
+        <div class="mx-auto text-black text-sm">No Pending Submissions</div>
         {% endfor %}
     </div>
 </div>
-{% empty %}
-<div class="mx-10 text-gray-400 text-sm">No pending submissions.</div>
-{% endfor %}
-
 
 {% endblock content %}

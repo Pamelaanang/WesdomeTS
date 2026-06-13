@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Wesdome Timesheet Navbar</title>
+    <title>Wesdome Timesheet Application</title>
     <link rel="stylesheet" href="{% static 'dist/output.css' %}" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="icon" href="data:,">
@@ -19,7 +19,7 @@
         </div>
 
         <!-- Scrollable nav items -->
-        <div class="flex-1 min-h-0">
+        <div class="flex-1 min-h-0 overflow-y-auto">
             {% if user.is_authenticated %}
             {% with al=request.user.access_level %}
 
@@ -46,7 +46,7 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-employees" class="hidden flex flex-col">
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
+                <a href="{% url 'approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
                         class="fa-solid fa-clock-rotate-left"></i> Pending</a>
                 <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
                         class="fa-solid fa-circle-check"></i> Approved</a>
@@ -60,7 +60,7 @@
             <button onclick="toggleAccordion('menu-shifter')" class="accordion-btn">
                 <span class="flex items-center gap-3">
                     <i class="fa-solid fa-hard-hat"></i>
-                    {% if al == 4 %}My Shifters{% else %}Shifters{% endif %}
+                    {% if al == 4 %} My Shifters {% else %} Shifters {% endif %}
                 </span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
@@ -106,24 +106,33 @@
             {% endif %}
 
             <!-- Personal timesheets: everyone except Admin (1) and Payroll (7) -->
-            {% if al != 1 and al != 7 %}
+            {% if al == 4 or al == 5 or al == 6 %}
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-circle-check"></i> My Approved</a>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-circle-xmark"></i> My Rejected</a>
-            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-magnifying-glass"></i> Search</a>
             {% endif %}
+
+            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-magnifying-glass"></i> Search</a>
 
             {% endwith %}
             {% endif %}
         </div>
-        <div class="py-4 flex justify-center">
-            <div class="w-20 h-20 rounded-full bg-black flex items-center justify-center -mt-10">
-                <i class="fa-solid fa-user text-[3rem] text-white"></i>
+
+               
+            <div class="py-4 flex justify-center">
+                <div class="w-25 h-25 rounded-full bg-black overflow-hidden border-4 border-white flex items-center justify-center -mt-10">
+                 {% if request.user.profilepic %}
+                    <img src="/media/{{ request.user.profilepic }}" class="w-full h-full object-cover"
+                        alt="Profile Photo">
+                    {% else %}
+                    <i class="fa-solid fa-user text-[3rem] text-white"></i>
+                    {% endif %}
+                </div>
             </div>
-        </div>
-        <div class="py-4 flex justify-center">
-            <p class="font-semibold -mt-5">{{ request.user.firstname }} {{ request.user.lastname }}</p>
-        </div>
+            <div class="py-4 flex justify-center">
+               <a href="{% url 'profile' %}"  class="hover:bg-transparent -mt-9" ><p class="text-base font-semibold">{{ request.user.firstname }} {{ request.user.lastname }}</p>
+            </div></a> 
+
 
         <!-- Pinned Sign Out -->
         <div class="py-4 flex justify-center">

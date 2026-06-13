@@ -139,9 +139,11 @@ class OperationsEntry(models.Model):
     hoursworked = models.DecimalField(db_column='HoursWorked', max_digits=5, decimal_places=2)
     entrydescription = models.TextField(db_column='EntryDescription', blank=True, null=True)
     linestatus = models.CharField(db_column='LineStatus', max_length=15, default='Draft')
-    approvedat = models.DateTimeField(db_column='ApprovedAt', blank=True, null=True)
-    approvedby = models.ForeignKey('users.User', models.DO_NOTHING, db_column='ApprovedBy', blank=True, null=True, related_name='approved_%(class)s')
+    approvedat_capt = models.DateTimeField(db_column='ApprovedAt_Capt', blank=True, null=True)
+    approvedby_capt = models.ForeignKey('users.User', models.DO_NOTHING, db_column='ApprovedBy_Capt', blank=True, null=True, related_name='captain_approved_%(class)s')
     captainnote = models.TextField(db_column='CaptainNote', blank=True, null=True)
+    approvedat_sup = models.DateTimeField(db_column='ApprovedAt_Sup', blank=True, null=True)
+    approvedby_sup = models.ForeignKey('users.User', models.DO_NOTHING, db_column='ApprovedBy_Sup', blank=True, null=True, related_name='supervisor_approved_%(class)s')
     superintendentnote = models.TextField(db_column='SuperintendentNote', blank=True, null=True)
 
     class Meta:

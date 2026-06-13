@@ -1,13 +1,16 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
+from django.conf import settings
 from users.forms import UserLoginForm
 from users.models import User
 from django.contrib.auth.decorators import login_required
 import random
 import string
+import os
 from django.utils import timezone
 from django.contrib.auth import update_session_auth_hash
-from timesheets.models import MainHeader, MainEntry
+from timesheets.models import MainHeader, MainEntry, OperationsHeader
+
 
 
 def login_view(request):
@@ -72,25 +75,133 @@ def password_reset_view(request):
 
 @login_required(login_url='login')
 def profile(request):
-    user =request.user
+    user = request.user
+    al = user.access_level
+    today = timezone.now().date()
 
-    draft_count = MainHeader.objects.filter(employeeid=user, overallstatus='Draft').count()
+    if al == 3:  # Supervisor
+        subordinates = User.objects.filter(supervisorid=user)
+        awaiting_count = MainHeader.objects.filter(employeeid__in=subordinates, overallstatus='Submitted').count()
+        in_progress_count = MainHeader.objects.filter(employeeid__in=subordinates, overallstatus='In Progress').count()
+        completed_count = MainHeader.objects.filter(employeeid__in=subordinates, overallstatus='Completed').count()
+        oldest_waiting = MainHeader.objects.filter(
+            employeeid__in=subordinates, overallstatus='Submitted'
+        ).order_by('submittedat').first()
 
-    pending_count = MainHeader.objects.filter(employeeid=user, overallstatus='Submitted').count()
+        return render(request, 'users/profile.html', {
+            'today': today,
+            'awaiting_count': awaiting_count,
+            'in_progress_count': in_progress_count,
+            'completed_count': completed_count,
+            'oldest_waiting': oldest_waiting,
+        })
 
-    latest_header = MainHeader.objects.filter(employeeid=user, overallstatus='Submitted').order_by('-mainheaderid').first()
+    elif al == 2:  # Superintendent
+        direct_reports = User.objects.filter(supervisorid=user)
+        personal_pending = MainHeader.objects.filter(
+            employeeid__in=direct_reports, overallstatus__in=['Submitted', 'In Progress']
+        ).count()
+        personal_completed = MainHeader.objects.filter(
+            employeeid__in=direct_reports, overallstatus='Completed'
+        ).count()
+        shifters = User.objects.filter(supervisorid__in=direct_reports)
+        ops_pending_super = OperationsHeader.objects.filter(
+            shifterid__in=shifters, overallstatus='In Progress'
+        ).count()
+        ops_completed = OperationsHeader.objects.filter(
+            shifterid__in=shifters, overallstatus='Completed'
+        ).count()
 
-    approved_count = 0 
-    rejected_count = 0
+        return render(request, 'users/profile.html', {
+            'today': today,
+            'personal_pending': personal_pending,
+            'personal_completed': personal_completed,
+            'ops_pending_super': ops_pending_super,
+            'ops_completed': ops_completed,
+        })
 
-    if latest_header:
-        approved_count = MainEntry.objects.filter(mainheaderid=latest_header, linestatus='Approved').count()
-        rejected_count = MainEntry.objects.filter(mainheaderid=latest_header, linestatus='Rejected').count()
+    elif al == 4:  # Mine Captain
+        draft_count = MainHeader.objects.filter(employeeid=user, overallstatus='Draft').count()
+        pending_count = MainHeader.objects.filter(employeeid=user, overallstatus='Submitted').count()
+        latest_header = MainHeader.objects.filter(
+            employeeid=user, overallstatus='Submitted'
+        ).order_by('-mainheaderid').first()
+        approved_count = MainEntry.objects.filter(mainheaderid=latest_header, linestatus='Approved').count() if latest_header else 0
+        rejected_count = MainEntry.objects.filter(mainheaderid=latest_header, linestatus='Rejected').count() if latest_header else 0
+        shifters = User.objects.filter(supervisorid=user)
+        ops_pending_captain = OperationsHeader.objects.filter(
+            shifterid__in=shifters, overallstatus='Submitted'
+        ).count()
+        ops_forwarded = OperationsHeader.objects.filter(
+            shifterid__in=shifters, overallstatus='In Progress'
+        ).count()
 
-    return render(request, 'users/profile.html', {
-        'today': timezone.now().date(),
-        'draft_count': draft_count,
-        'pending_count': pending_count,
-        'approved_count': approved_count,
-        'rejected_count': rejected_count,
-    })
+        return render(request, 'users/profile.html', {
+            'today': today,
+            'draft_count': draft_count,
+            'pending_count': pending_count,
+            'approved_count': approved_count,
+            'rejected_count': rejected_count,
+            'ops_pending_captain': ops_pending_captain,
+            'ops_forwarded': ops_forwarded,
+        })
+
+    elif al == 5:  # Shifter
+        draft_count = MainHeader.objects.filter(employeeid=user, overallstatus='Draft').count()
+        pending_count = MainHeader.objects.filter(employeeid=user, overallstatus='Submitted').count()
+        latest_header = MainHeader.objects.filter(
+            employeeid=user, overallstatus='Submitted'
+        ).order_by('-mainheaderid').first()
+        approved_count = MainEntry.objects.filter(mainheaderid=latest_header, linestatus='Approved').count() if latest_header else 0
+        rejected_count = MainEntry.objects.filter(mainheaderid=latest_header, linestatus='Rejected').count() if latest_header else 0
+        ops_draft = OperationsHeader.objects.filter(shifterid=user, overallstatus='Draft').count()
+        ops_submitted = OperationsHeader.objects.filter(shifterid=user, overallstatus='Submitted').count()
+        ops_in_progress = OperationsHeader.objects.filter(shifterid=user, overallstatus='In Progress').count()
+        ops_completed = OperationsHeader.objects.filter(shifterid=user, overallstatus='Completed').count()
+        
+        return render(request, 'users/profile.html', {
+            'today': today,
+            'draft_count': draft_count,
+            'pending_count': pending_count,
+            'approved_count': approved_count,
+            'rejected_count': rejected_count,
+            'ops_draft': ops_draft,
+            'ops_submitted': ops_submitted,
+            'ops_in_progress': ops_in_progress,
+            'ops_completed': ops_completed,
+        })
+
+    else:  # Employee (6) and anyone else
+        draft_count = MainHeader.objects.filter(employeeid=user, overallstatus='Draft').count()
+        pending_count = MainHeader.objects.filter(employeeid=user, overallstatus='Submitted').count()
+        latest_header = MainHeader.objects.filter(
+            employeeid=user, overallstatus='Submitted'
+        ).order_by('-mainheaderid').first()
+        approved_count = MainEntry.objects.filter(mainheaderid=latest_header, linestatus='Approved').count() if latest_header else 0
+        rejected_count = MainEntry.objects.filter(mainheaderid=latest_header, linestatus='Rejected').count() if latest_header else 0
+        return render(request, 'users/profile.html', {
+            'today': today,
+            'draft_count': draft_count,
+            'pending_count': pending_count,
+            'approved_count': approved_count,
+            'rejected_count': rejected_count,
+        })
+
+@login_required(login_url='login')
+def upload_profile_photo(request):
+    if request.method == 'POST' and request.FILES.get('profile_photo'):
+        profile_photo = request.FILES['profile_photo']
+        ext = profile_photo.name.rsplit('.', 1)[-1].lower()
+
+        if ext in ['jpg', 'jpeg', 'png', 'webp']:
+            filename = f"profile_{request.user.employeeid}.{ext}"
+            save_path = os.path.join(settings.MEDIA_ROOT, 'profile_photos', filename)
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            with open(save_path, 'wb+') as destination:
+                for chunk in profile_photo.chunks(): 
+                    destination.write(chunk)
+            
+            request.user.profilepic = f"profile_photos/{filename}"
+            request.user.save()
+    
+    return redirect('profile')

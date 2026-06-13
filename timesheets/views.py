@@ -115,6 +115,8 @@ def review_timesheet(request, pk):
         return redirect('approval_inbox')
 
     entries = MainEntry.objects.filter(mainheaderid=header)
+    total_hours = entries.aggregate(Sum('hoursworked'))['hoursworked__sum'] or 0
+    hours_approved = entries.filter(linestatus='Approved').aggregate(Sum('hoursworked'))['hoursworked__sum'] or 0
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -151,6 +153,6 @@ def review_timesheet(request, pk):
     
         return redirect('review_timesheet', pk=header.mainheaderid)
     
-    return render(request, 'timesheets/review_timesheet.html', {'header': header, 'entries': entries, 'empdate_submitted': empdate_submitted})
+    return render(request, 'timesheets/review_timesheet.html', {'header': header, 'entries': entries, 'empdate_submitted': empdate_submitted, 'total_hours': total_hours, 'hours_approved': hours_approved})
 
 

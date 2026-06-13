@@ -8,4 +8,6 @@ urlpatterns = [
     path('users/reset/<str:employeeid>/', views.generate_password, name='reset_password'),
     path('password_reset/', views.password_reset_view, name='password_reset'),
     path('profile/', views.profile, name='profile'),
+    path('profile/upload-photo/', views.upload_profile_photo, name='upload_profile_photo'),
+
 ]
