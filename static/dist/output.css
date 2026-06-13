@@ -365,6 +365,9 @@
   .ml-10 {
     margin-left: calc(var(--spacing) * 10);
   }
+  .ml-\[200px\] {
+    margin-left: 200px;
+  }
   .block {
     display: block;
   }
