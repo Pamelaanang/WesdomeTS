@@ -62,6 +62,7 @@ class MainHeader(models.Model):
     overallstatus = models.CharField(db_column='OverallStatus', max_length=25, default='Draft')  # Field name made lowercase.
     startedat = models.DateTimeField(db_column='StartedAt', auto_now_add=True)  # Field name made lowercase.
     submittedat = models.DateTimeField(db_column='SubmittedAt', blank=True, null=True)  # Field name made lowercase.
+    completedat = models.DateTimeField(db_column='CompletedAt', blank=True, null=True)
     
     class Meta:
         managed = True
@@ -124,6 +125,10 @@ class OperationsHeader(models.Model):
     overallstatus = models.CharField(db_column='OverallStatus', max_length=25, default='Draft')
     startedat = models.DateTimeField(db_column='StartedAt', auto_now_add=True)
     submittedat = models.DateTimeField(db_column='SubmittedAt', blank=True, null=True)
+    ohapprovedby_capt = models.ForeignKey('users.User', models.DO_NOTHING, db_column='OpsHApprovedBy_Capt', blank=True, null=True, related_name='captain_headerapproved_%(class)s')
+    ohapprovedat_capt = models.DateTimeField(db_column='OHApprovedAt_Capt', blank=True, null=True)
+    ohapprovedby_sup = models.ForeignKey('users.User', models.DO_NOTHING, db_column='OpsHApprovedBy_Sup', blank=True, null=True, related_name='supervisor_headerapproved_%(class)s')
+    ohapprovedat_sup = models.DateTimeField(db_column='OHApprovedAt_Sup', blank=True, null=True)
 
     class Meta:
         managed = True

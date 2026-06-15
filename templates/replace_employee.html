@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="mx-10">
+
+    <div class="flex gap-6 items-start">
+
+        <!-- Left column: departing employee + impact -->
+        <div class="flex flex-col gap-4 w-[38%] min-w-[280px]">
+            <a href="{% url 'user_list' %}" class="text-xs font-bold text-[#28348A] hover:underline flex items-center gap-1">
+             <i class="fa-solid fa-arrow-left"></i> Back to Employee List </a>
+            <!-- Departing employee card -->
+            <div class="bg-white rounded-2xl shadow p-6">
+               
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Departing Employee</p>
+                <div class="flex items-center gap-5">
+                    <div class="w-16 h-16 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center flex-shrink-0">
+                        {% if leaving.profilepic %}
+                            <img src="/media/{{ leaving.profilepic }}" class="w-full h-full object-cover" alt="Profile">
+                        {% else %}
+                            <span class="text-gray-600 font-bold text-xl">{{ leaving.firstname|first }}{{ leaving.lastname|first }}</span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <p class="font-bold text-gray-900 text-lg">{{ leaving.firstname }} {{ leaving.lastname }}</p>
+                        <p class="text-sm text-gray-700 mt-0.5">{{ leaving.roleid.rolename }}</p>
+                        <p class="text-sm text-gray-500">{{ leaving.roleid.departmentid.departmentname }}</p>
+                        <p class="text-xs text-gray-400 mt-1">ID: {{ leaving.employeeid }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Impact summary -->
+            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-3">
+                <p class="text-sm font-bold text-gray-900 mb-1">Replacement Impact</p>
+                {% if subordinate_count > 0 %}
+                <div class="flex items-start gap-2 text-sm text-amber-800">
+                    <i class="fa-solid fa-users mt-0.5 flex-shrink-0"></i>
+                    <span>
+                        <strong>{{ subordinate_count }} direct report{{ subordinate_count|pluralize }}</strong> will be reassigned to the new hire:<br>
+                        <span class="text-gray-700">{% for s in subordinates %}{{ s.firstname }} {{ s.lastname }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+                    </span>
+                </div>
+                {% else %}
+                <div class="flex items-center gap-2 text-sm text-amber-800">
+                    <i class="fa-solid fa-circle-check flex-shrink-0"></i>
+                    <span>No direct reports to reassign.</span>
+                </div>
+                {% endif %}
+                {% if is_shifter %}
+                <div class="flex items-start gap-2 text-sm text-amber-800">
+                    <i class="fa-solid fa-hard-hat mt-0.5 flex-shrink-0"></i>
+                    <span>
+                        <strong>{{ crew_count }} crew member{{ crew_count|pluralize }}</strong> currently assigned:<br>
+                        <span class="text-gray-700">{% for ca in active_crew %}{{ ca.employee.firstname }} {{ ca.employee.lastname }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+
+        </div>
+
+        <!-- Right column: new hire form -->
+        <div class="flex-1 bg-white rounded-2xl shadow p-6">
+            <p class="font-bold text-gray-900 text-lg mb-5">New Hire Details</p>
+
+            {% if error %}
+            <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-5">
+                <i class="fa-solid fa-circle-exclamation mr-1"></i> {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="space-y-5">
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Employee ID</label>
+                        <input type="text" name="new_employeeid" required
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]"
+                            placeholder="e.g. EMP-0042">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">First Name</label>
+                            <input type="text" name="firstname" required
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Last Name</label>
+                            <input type="text" name="lastname" required
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Phone Number</label>
+                        <input type="text" name="phonenumber" required
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]"
+                            placeholder="+1 (555) 000-0000">
+                    </div>
+
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700">
+                        <i class="fa-solid fa-info-circle mr-1 text-[#28348A]"></i>
+                        Role will be set to <strong class="text-gray-900">{{ leaving.roleid.rolename }}</strong> — same as the departing employee.
+                        A temporary password will be generated and sent to the new hire.
+                    </div>
+
+                    {% if is_shifter and crew_count > 0 %}
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" name="transfer_crew" checked
+                            class="w-4 h-4 accent-[#28348A]">
+                        <span class="text-sm font-medium text-gray-800">Transfer all {{ crew_count }} crew member{{ crew_count|pluralize }} to new hire</span>
+                    </label>
+                    {% endif %}
+
+                </div>
+
+                <div class="mt-8 flex justify-center gap-4">
+                    <button type="submit"
+                        class="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-8 py-2.5 rounded-lg transition">
+                        Replace & Deactivate {{ leaving.firstname }} {{ leaving.lastname }}
+                    </button>
+                    <a href="{% url 'user_list' %}"
+                        class="bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold px-8 py-2.5 rounded-lg transition">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+
+    </div>
+</div>
+{% endblock content %}

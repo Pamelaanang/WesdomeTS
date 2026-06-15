@@ -68,7 +68,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     #Status Flags
     # 1 yes, temporary and 0 is No permanent (Django Boolean handles this)
     is_temporary = models.BooleanField(db_column='is_temporary', default=True)
-    isactive = models.BooleanField(db_column='IsActive')  # Field name made lowercase.
+    isactive = models.BooleanField(db_column='IsActive')
+    hasaccess = models.BooleanField(db_column='HasAccess', default=True)
 
     #Foreign key to roles table
     roleid = models.ForeignKey('Roles', models.DO_NOTHING, db_column='RoleID')  # Field name made lowercase.

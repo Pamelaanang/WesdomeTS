@@ -44,10 +44,60 @@
 
 <div class="mx-10 flex gap-6 flex-wrap">
 
+{% if al == 1 %} <!-- System Admin: two cards, no quick actions -->
+    <div class="flex-1 min-w-[240px] bg-white rounded-2xl shadow p-6">
+        <p class="font-semibold mb-4">People</p>
+        <div class="space-y-3">
+            <div class="flex items-center justify-between text-sm">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-users text-[#28348A]"></i> Active Employees</span>
+                <span class="font-semibold">{{ total_active }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-user-slash text-gray-400"></i> Inactive / Replaced</span>
+                <span class="font-semibold">{{ total_inactive }}</span>
+            </div>
+            {% for dept in dept_breakdown %}
+            <div class="flex items-center justify-between text-sm">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-building text-gray-400"></i> {{ dept.roleid__departmentid__departmentname }}</span>
+                <span class="font-semibold">{{ dept.user_count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="flex-1 min-w-[240px] bg-white rounded-2xl shadow p-6">
+        <p class="font-semibold mb-4">Timesheet Activity — {{ today|date:"F Y" }}</p>
+        <p class="text-xs font-medium text-gray-400 uppercase mb-2">Maintenance</p>
+        <div class="space-y-3 mb-4">
+            <div class="flex items-center justify-between text-sm">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Submitted</span>
+                <span class="font-semibold">{{ maintenance_submitted }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF914D]"></i> Pending</span>
+                <span class="font-semibold">{{ maintenance_pending }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Completed</span>
+                <span class="font-semibold">{{ maintenance_completed }}</span>
+            </div>
+        </div>
+        <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">Operations Crew</p>
+        <div class="space-y-3">
+            <div class="flex items-center justify-between text-sm">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Submitted</span>
+                <span class="font-semibold">{{ ops_submitted }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Completed</span>
+                <span class="font-semibold">{{ ops_completed }}</span>
+            </div>
+        </div>
+    </div>
+
+{% else %} <!-- All other roles: stats card + quick actions -->
     <div class="flex-1 min-w-[240px] bg-white rounded-2xl shadow p-6">
         <p class="font-semibold mb-4">Dashboard Statistics</p>
-
-        {% if al == 3 %}
+        {% if al == 3 %} <!-- Supervisor -->
         <div class="space-y-3">
             <div class="flex items-center justify-between text-sm">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Awaiting
@@ -65,12 +115,12 @@
                 <span class="font-semibold">{{ completed_count }}</span>
             </div>
             {% if oldest_waiting %}
-            <p class="text-xs text-gray-400 mt-2 pt-2 border-t">Oldest waiting: {{ oldest_waiting.submittedat|date:"M j, Y" }} 
+            <p class="text-xs text-gray-400 mt-2 pt-2 border-t"> Oldest Still Waiting: {{ oldest_waiting.submittedat|date:"M j, Y" }} 
                 — {{ oldest_waiting.employeeid.firstname }} {{ oldest_waiting.employeeid.lastname }}</p>
             {% endif %}
         </div>
 
-        {% elif al == 2 %}
+        {% elif al == 2 %} <!-- Superintendent -->
         <p class="text-xs font-medium text-gray-400 uppercase mb-2">Personal Submissions</p>
         <div class="space-y-3 mb-4">
             <div class="flex items-center justify-between text-sm">
@@ -98,7 +148,7 @@
             </div>
         </div>
 
-        {% elif al == 4 %}
+        {% elif al == 4 %} <!-- Mine Captain-->
         <p class="text-xs font-medium text-gray-400 uppercase mb-2">My Timesheet</p>
         <div class="space-y-3 mb-4">
             <div class="flex items-center justify-between text-sm">
@@ -136,7 +186,7 @@
             </div>
         </div>
 
-        {% elif al == 5 %}
+        {% elif al == 5 %} <!-- Shifter -->
         <p class="text-xs font-medium text-gray-400 uppercase mb-2">My Timesheet</p>
         <div class="space-y-3 mb-4">
             <div class="flex items-center justify-between text-sm">
@@ -183,7 +233,23 @@
             </div>
         </div>
 
-        {% else %}
+        {% elif al == 7 %} <!-- Payroll -->
+            <p class="text-xs font-medium text-gray-400 uppercase mb-2">Maintenance</p>
+            <div class="space-y-3 mb-4">
+                <div class="flex items-center justify-between text-sm">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Personal Headers Completed</span>
+                    <span class="font-semibold">{{ maintenance_completed }}</span>
+                </div>
+            </div>
+            <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">Operations</p>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between text-sm">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Daily Crew Sheets Completed</span>
+                    <span class="font-semibold">{{ ops_crew_completed }}</span>
+                </div>
+            </div>
+
+        {% else %} <!-- Employee -->
         <div class="space-y-3">
             <div class="flex items-center justify-between text-sm">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF914D]"></i> Draft
@@ -261,6 +327,7 @@
             {% endif %}
         </div>
     </div>
+{% endif %}
 </div>
 
 <div id="photoModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center">

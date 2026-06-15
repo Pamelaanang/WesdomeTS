@@ -148,6 +148,7 @@ def review_timesheet(request, pk):
 
         elif action == 'finish_review':
             header.overallstatus = 'Completed'
+            header.completedat = timezone.now()
             header.save()
             return redirect('approval_inbox')
     
