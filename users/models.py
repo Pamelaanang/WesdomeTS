@@ -24,6 +24,7 @@ class Department(models.Model):
 class Roles(models.Model):
     roleid = models.AutoField(db_column='RoleID', primary_key=True)  # Field name made lowercase.
     rolename = models.CharField(db_column='RoleName', max_length=100)  # Field name made lowercase.
+    vacationhours = models.IntegerField(db_column='VacationHours', blank=True, null=True)  # Field name made lowercase.
     departmentid = models.ForeignKey(Department, models.DO_NOTHING, db_column='DepartmentID')  # Field name made lowercase.
     accessid = models.ForeignKey(Accesslevel, models.DO_NOTHING, db_column='AccessID')  # Field name made lowercase.
     isuniqueassignment = models.IntegerField(db_column='IsUniqueAssignment', blank=True, null=True)  # Field name made lowercase.

@@ -52,7 +52,7 @@
                     <thead>
                         <tr class="text-black text-center">
                             <th class="p-2 w-30">Work Order</th>
-                            <th class="p-2 w-30">Work Category</th>
+                            <th class="p-2 w-30">Category</th>
                             <th class="p-2 w-30">Shift</th>
                             <th class="p-2 w-30">Hours Worked</th>
                             <th class="p-2 w-30">Description</th>
@@ -66,7 +66,7 @@
                         {% for entry in entries %}
                         <tr class="border-b hover:bg-gray-50 text-center">
                             <td class="p-2">{{ entry.sapworkid }}</td>
-                            <td class="p-2">{{ entry.workcategoryid.categoryname }}</td>
+                            <td class="p-2">{{ entry.workcategoryid.categoryname | default:entry.leavetypeid.leavetypename }}</td>
                             <td class="p-2">{{ entry.shifttype }}</td>
                             <td class="p-2">{{ entry.hoursworked }}</td>
                             <td class="p-2">{{ entry.entrydescription|default:"-" }}</td>
@@ -74,7 +74,8 @@
                             <td class="p-2 flex items-center gap-5">
                                 <button type="button" data-entryid="{{ entry.mainentryid }}"
                                     data-sapworkid="{{ entry.sapworkid|default:'' }}"
-                                    data-categoryid="{{ entry.workcategoryid_id }}"
+                                    data-categoryid="{{ entry.workcategoryid_id | default:'' }}" 
+                                    data-leavetypeid="{{ entry.leavetypeid_id | default:'' }}"
                                     data-shifttype="{{ entry.shifttype }}" data-hoursworked="{{ entry.hoursworked }}"
                                     data-description="{{ entry.entrydescription|default:'' }}"
                                     data-startdate="{{ entry.startdate | date:'Y-m-d' }}" onclick="editEntry(this)"
@@ -98,11 +99,18 @@
                                     class="border rounded px-1 py-1 w-full text-xs">
                             </td>
                             <td class="p-2">
-                                <select name="workcategoryid" class="border rounded px-1 py-1 w-full text-xs">
-                                    <option value="">-- Select --</option>
-                                    {% for cat in workcategories %}
-                                    <option value="{{ cat.categoryid }}">{{ cat.categoryname }}</option>
-                                    {% endfor %}
+                                <select name="category_selection" class="border rounded px-1 py-1 w-full text-xs">
+                                     <option value="">-- Select Category --</option>
+                                     <optgroup label="Work Categories">
+                                        {% for cat in workcategories %}
+                                        <option value="wc_{{ cat.categoryid }}">{{ cat.categoryname }}</option>
+                                        {% endfor %}
+                                    </optgroup>
+                                    <optgroup label="Leave">
+                                        {% for lt in leavetypes %}
+                                        <option value="lt_{{ lt.leavetypeid }}">{{ lt.leavetypename }}</option>
+                                        {% endfor %}
+                                    </optgroup>
                                 </select>
                             </td>
                             <td class="p-2">
@@ -149,7 +157,7 @@
         }
 
         function saveEntry() {
-            const category = document.querySelector('[name="workcategoryid"]').value;
+            const category = document.querySelector('[name="category_selection"]').value;
             const date = document.querySelector('[name="startdate"]').value;
             if (!category || !date) {
                 alert('Work Category and Date Worked are required.');
@@ -173,7 +181,9 @@
         function editEntry(btn) {
             document.getElementById('form-entryid').value = btn.dataset.entryid;
             document.querySelector('[name="sapworkid"]').value = btn.dataset.sapworkid;
-            document.querySelector('[name="workcategoryid"]').value = btn.dataset.categoryid;
+            const sel = document.querySelector('[name="category_selection"]');
+            if (btn.dataset.categoryid) sel.value = 'wc_' + btn.dataset.categoryid;
+            else if (btn.dataset.leavetypeid) sel.value = 'lt_' + btn.dataset.leavetypeid;
             document.querySelector('[name="shifttype"]').value = btn.dataset.shifttype;
             document.querySelector('[name="hoursworked"]').value = btn.dataset.hoursworked;
             document.querySelector('[name="entrydescription"]').value = btn.dataset.description;

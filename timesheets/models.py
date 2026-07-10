@@ -34,12 +34,63 @@ class Crews(models.Model):
         db_table = 'Crews'
 
 
+class LeaveType(models.Model):
+    leavetypeid = models.AutoField(db_column='LeaveTypeID', primary_key=True)  # Field name made lowercase.
+    leavetypename = models.CharField(db_column='LeaveTypeName', max_length=255)  # Field name made lowercase.
+    isactive = models.IntegerField(db_column='IsActive', default=1)  # Field name made lowercase.
+
+    class Meta:
+        managed = True
+        db_table = 'LeaveType'
+
+
+class LeaveAllocation(models.Model):
+    allocationid = models.AutoField(db_column='AllocationID', primary_key=True)  # Field name made lowercase.
+    employeeid = models.ForeignKey('users.User', models.DO_NOTHING, db_column='EmployeeID')  # Field name made lowercase.
+    leavetypeid = models.ForeignKey(LeaveType, models.DO_NOTHING, db_column='LeaveTypeID')  # Field name made lowercase.
+    year = models.IntegerField(db_column='Year')  # Field name made lowercase.
+    allocatedhours = models.DecimalField(db_column='AllocatedHours', max_digits=5, decimal_places=2)  # Field name made lowercase.
+    isprorated = models.IntegerField(db_column='IsProrated', default=0)  # Field name made lowercase.
+
+    class Meta:
+        managed = True
+        db_table = 'LeaveAllocation'
+
+
+class StatHoliday(models.Model):
+    statid = models.AutoField(db_column='StatID', primary_key=True)  # Field name made lowercase.
+    statname = models.CharField(db_column='StatName', max_length=255)  # Field name made lowercase.
+    statdate = models.DateField(db_column='StatDate')  # Field name made lowercase.
+    isactive = models.IntegerField(db_column='IsActive', default=1)  # Field name made lowercase.
+
+    class Meta:
+        managed = True
+        db_table = 'StatHoliday'
+
+
+class MainHeader(models.Model):
+    mainheaderid = models.AutoField(db_column='MainHeaderID', primary_key=True)  # Field name made lowercase.
+    employeeid = models.ForeignKey('users.User', models.DO_NOTHING, db_column='EmployeeID')  # Field name made lowercase.
+    crewid = models.ForeignKey(Crews, models.DO_NOTHING, db_column='CrewID', blank=True, null=True)  # Field name made lowercase.
+    overallstatus = models.CharField(db_column='OverallStatus', max_length=25, default='Draft')  # Field name made lowercase.
+    startedat = models.DateTimeField(db_column='StartedAt', auto_now_add=True)  # Field name made lowercase.
+    submittedat = models.DateTimeField(db_column='SubmittedAt', blank=True, null=True)  # Field name made lowercase.
+    completedat = models.DateTimeField(db_column='CompletedAt', blank=True, null=True)
+    paidat = models.DateTimeField(db_column='PaidAt', blank=True, null=True)
+    paidby = models.ForeignKey('users.User', models.DO_NOTHING, db_column='PaidBy', blank=True, null=True, related_name='paid_%(class)s')
+    
+    class Meta:
+        managed = True
+        db_table = 'MainHeader'
+
+
 class MainEntry(models.Model):
     mainentryid = models.AutoField(db_column='MainEntryID', primary_key=True)  # Field name made lowercase.
     mainheaderid = models.ForeignKey('MainHeader', models.CASCADE, db_column='MainHeaderID')  # Field name made lowercase.
     workorderid = models.ForeignKey('Workordercache', models.DO_NOTHING, db_column='WorkOrderID', blank=True, null=True)  # Field name made lowercase.
     sapworkid = models.CharField(db_column='SAPWorkID', max_length=100, blank=True, null=True)  # manual entry for now
-    workcategoryid = models.ForeignKey('Workcategory', models.DO_NOTHING, db_column='WorkCategoryID')  # Field name made lowercase.
+    workcategoryid = models.ForeignKey('Workcategory', models.DO_NOTHING, db_column='WorkCategoryID',  blank=True, null=True)  # Field name made lowercase.
+    leavetypeid = models.ForeignKey('LeaveType', models.DO_NOTHING, db_column='LeaveTypeID', blank=True, null=True)  # Field name made lowercase.
     shifttype = models.CharField(db_column='ShiftType', max_length=5,  choices=[('Day', 'Day'), ('Night', 'Night')])  # Field name made lowercase.
     hoursworked = models.DecimalField(db_column='HoursWorked', max_digits=5, decimal_places=2)  # Field name made lowercase.
     entrydescription = models.TextField(db_column='EntryDescription', blank=True, null=True)  # Field name made lowercase.
@@ -55,20 +106,6 @@ class MainEntry(models.Model):
         db_table = 'MainEntry'
 
 
-class MainHeader(models.Model):
-    mainheaderid = models.AutoField(db_column='MainHeaderID', primary_key=True)  # Field name made lowercase.
-    employeeid = models.ForeignKey('users.User', models.DO_NOTHING, db_column='EmployeeID')  # Field name made lowercase.
-    crewid = models.ForeignKey(Crews, models.DO_NOTHING, db_column='CrewID', blank=True, null=True)  # Field name made lowercase.
-    overallstatus = models.CharField(db_column='OverallStatus', max_length=25, default='Draft')  # Field name made lowercase.
-    startedat = models.DateTimeField(db_column='StartedAt', auto_now_add=True)  # Field name made lowercase.
-    submittedat = models.DateTimeField(db_column='SubmittedAt', blank=True, null=True)  # Field name made lowercase.
-    completedat = models.DateTimeField(db_column='CompletedAt', blank=True, null=True)
-    
-    class Meta:
-        managed = True
-        db_table = 'MainHeader'
-
-
 class Workcategory(models.Model):
     categoryid = models.AutoField(db_column='CategoryID', primary_key=True)  # Field name made lowercase.
     categoryname = models.CharField(db_column='CategoryName', max_length=255)  # Field name made lowercase.
@@ -78,6 +115,56 @@ class Workcategory(models.Model):
     class Meta:
         managed = True
         db_table = 'WorkCategory'
+
+
+class Businesscategory(models.Model):
+    businesscategoryid = models.AutoField(db_column='CategoryID', primary_key=True)  # Field name made lowercase.
+    categoryname = models.CharField(db_column='CategoryName', max_length=255)  # Field name made lowercase.
+    isproductive = models.IntegerField(db_column='IsProductive')  # Field name made lowercase.
+    isactive = models.IntegerField(db_column='IsActive', default=1)  # Field name made lowercase.
+
+    class Meta:
+        managed = True
+        db_table = 'BusinessCategory'
+   
+
+MONTH_CHOICES = [(1, 'January'), (2, 'February'), (3, 'March'), (4, 'April'), (5, 'May'), (6, 'June'), (7, 'July'), (8, 'August'), (9, 'September'), (10, 'October'), (11, 'November'), (12, 'December')]
+
+class BusinessHeader(models.Model):
+    businessheaderid = models.AutoField(db_column='BusinessHeaderID', primary_key=True)
+    employeeid = models.ForeignKey('users.User', models.DO_NOTHING, db_column='EmployeeID')  # Field name made lowercase.
+    crewid = models.ForeignKey(Crews, models.DO_NOTHING, db_column='CrewID', blank=True, null=True)  # Field name made lowercase.
+    periodmonth = models.IntegerField(db_column='PeriodMonth', choices=MONTH_CHOICES)
+    periodyear = models.IntegerField(db_column='PeriodYear')  # Field name made lowercase.
+    overallstatus = models.CharField(db_column='OverallStatus', max_length=25, default='Draft')  # Field name made lowercase.
+    startedat = models.DateTimeField(db_column='StartedAt', auto_now_add=True)  # Field name made lowercase.
+    submittedat = models.DateTimeField(db_column='SubmittedAt', blank=True, null=True)  # Field name made lowercase.
+    completedat = models.DateTimeField(db_column='CompletedAt', blank=True, null=True)
+    paidat = models.DateTimeField(db_column='PaidAt', blank=True, null=True)
+    paidby = models.ForeignKey('users.User', models.DO_NOTHING, db_column='PaidBy', blank=True, null=True, related_name='paid_%(class)s')
+
+    class Meta:
+        managed = True
+        db_table = 'BusinessHeader'
+
+
+class BusinessEntry(models.Model):
+    businessentryid = models.AutoField(db_column='BusinessEntryID', primary_key=True)  # Field name made lowercase.
+    businessheaderid = models.ForeignKey('BusinessHeader', models.CASCADE, db_column='BusinessHeaderID')  # Field name made lowercase.
+    businesscategoryid = models.ForeignKey('BusinessCategory', models.DO_NOTHING, db_column='BusinessCategoryID', blank=True, null=True)  # Field name made lowercase.
+    leavetypeid = models.ForeignKey('LeaveType', models.DO_NOTHING, db_column='LeaveTypeID', blank=True, null=True)  # Field name made lowercase.
+    shifttype = models.CharField(db_column='ShiftType', max_length=5,  choices=[('Day', 'Day'), ('Night', 'Night')], blank=True, null=True)  # Field name made lowercase.
+    hoursworked = models.DecimalField(db_column='HoursWorked', max_digits=5, decimal_places=2)  # Field name made lowercase.
+    entrydescription = models.TextField(db_column='EntryDescription', blank=True, null=True)  # Field name made lowercase.
+    entrydate = models.DateField(db_column='EntryDate')  # Field name made lowercase.
+    linestatus = models.CharField(db_column='LineStatus', max_length=15, default='Draft')  # Field name made lowercase.
+    approvedat = models.DateTimeField(db_column='ApprovedAt', blank=True, null=True)  # Field name made lowercase.
+    approvedby = models.ForeignKey('users.User', models.DO_NOTHING, db_column='ApprovedBy', blank=True, null=True, related_name='approved_%(class)s')
+    supervisornote = models.TextField(db_column='SupervisorNote', blank=True, null=True)  # Field name made lowercase.
+
+    class Meta:
+        managed = True
+        db_table = 'BusinessEntry'
 
 
 class Workordercache(models.Model):
@@ -129,7 +216,7 @@ class OperationsHeader(models.Model):
     ohapprovedat_capt = models.DateTimeField(db_column='OHApprovedAt_Capt', blank=True, null=True)
     ohapprovedby_sup = models.ForeignKey('users.User', models.DO_NOTHING, db_column='OpsHApprovedBy_Sup', blank=True, null=True, related_name='supervisor_headerapproved_%(class)s')
     ohapprovedat_sup = models.DateTimeField(db_column='OHApprovedAt_Sup', blank=True, null=True)
-
+  
     class Meta:
         managed = True
         db_table = 'OperationsHeader'
@@ -141,9 +228,12 @@ class OperationsEntry(models.Model):
     employeeid = models.ForeignKey('users.User', models.DO_NOTHING, db_column='EmployeeID')
     contractid = models.ForeignKey(Contract, models.DO_NOTHING, db_column='ContractID')
     accountid = models.ForeignKey(Account, models.DO_NOTHING, db_column='AccountID')
+    leavetypeid = models.ForeignKey('LeaveType', models.DO_NOTHING, db_column='LeaveTypeID', blank=True, null=True)  # Field name made lowercase.
     hoursworked = models.DecimalField(db_column='HoursWorked', max_digits=5, decimal_places=2)
     entrydescription = models.TextField(db_column='EntryDescription', blank=True, null=True)
     linestatus = models.CharField(db_column='LineStatus', max_length=15, default='Draft')
+    paidat = models.DateTimeField(db_column='PaidAt', blank=True, null=True)
+    paidby = models.ForeignKey('users.User', models.DO_NOTHING, db_column='PaidBy', blank=True, null=True, related_name='paid_%(class)s')
     approvedat_capt = models.DateTimeField(db_column='ApprovedAt_Capt', blank=True, null=True)
     approvedby_capt = models.ForeignKey('users.User', models.DO_NOTHING, db_column='ApprovedBy_Capt', blank=True, null=True, related_name='captain_approved_%(class)s')
     captainnote = models.TextField(db_column='CaptainNote', blank=True, null=True)

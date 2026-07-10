@@ -25,8 +25,12 @@
         <a href="{% url 'review_timesheet' pk=header.mainheaderid %}"
             class="bg-white rounded-xl shadow p-5 w-52 flex flex-col items-center gap-2 hover:shadow-md hover:border hover:border-[#28348A] transition-all">
             <p class="text-xs font-normal text-center mb-4">{{ header.date_from|date:"M j" }} – {{ header.date_to|date:"M j, Y" }}</p>
-            <div class="w-20 h-20 rounded-full bg-black flex items-center justify-center mb-4">
+            <div class="w-40 h-40 rounded-full bg-black overflow-hidden flex items-center justify-center mb-4">
+                {% if header.employeeid.profilepic %}
+                <img src="/media/{{ header.employeeid.profilepic }}" class="w-full h-full object-cover" alt="Profile Photo">
+                {% else %}
                 <i class="fa-solid fa-user text-white text-2xl"></i>
+                {% endif %}
             </div>
             <p class="font-semibold text-sm mb-1">
                 {{ header.employeeid.firstname }} {{ header.employeeid.lastname }}

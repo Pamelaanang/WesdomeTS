@@ -98,13 +98,28 @@
             {% endif %}
 
             <!-- Payroll (7) only -->
-            {% if al == 7 %}
+          {% if al == 7 %}
+          <button onclick="toggleAccordion('menu-unprocessed')" class="accordion-btn w-full flex items-center justify-between px-4 py-2 text-sm hover:bg-gray-100">
+                <span class="flex items-center gap-3"><i class="fa-solid fa-clock-rotate-left"></i> Unprocessed</span>
+                <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
+            </button>
+            <div id="menu-unprocessed" class="hidden flex flex-col">
+                <a href="{% url 'payroll_unprocessed' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-building"></i> Maintenance</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-hard-hat"></i> Crew</a>
+            </div>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-building"></i> Departments</a>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-users"></i> Employees</a>
+            <button onclick="toggleAccordion('menu-crew')" class="accordion-btn">
+                <span class="flex items-center gap-3"><i class="fa-solid fa-hard-hat"></i> Crew</span>
+                <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
+            </button>
+            <div id="menu-crew" class="hidden flex flex-col">
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-calendar-days"></i> Daily</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-person"></i> Members</a>
+            </div>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-chart-bar"></i> Reports</a>
-            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-magnifying-glass"></i> Search</a>
             {% endif %}
-
+            
             <!-- Personal timesheets: everyone except Admin (1) and Payroll (7) -->
             {% if al == 4 or al == 5 or al == 6 %}
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-file-pen"></i> My Drafts</a>

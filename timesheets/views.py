@@ -3,10 +3,10 @@ from urllib import request
 
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
-from users.models import User
-from .models import MainHeader, MainEntry, Crews, Workcategory
+from users.models import User, Department
+from .models import MainHeader, MainEntry, Crews, Workcategory, LeaveType
 from django.utils import timezone
-from django.db.models import Sum, Count, Min, Max
+from django.db.models import Sum, Count, Min, Max, Q
 
 # Create your views here.
 @login_required(login_url = 'login')
@@ -29,26 +29,36 @@ def add_entry(request, pk):
         action = request.POST.get('action')
 
         if action == 'save_entry':
-            entryid = request.POST.get('entryid')
-            if entryid:
-                entry = get_object_or_404(MainEntry, mainentryid=entryid, mainheaderid=header)
-                entry.workcategoryid_id = request.POST.get('workcategoryid')
-                entry.sapworkid = request.POST.get('sapworkid') or None
-                entry.shifttype = request.POST.get('shifttype')
-                entry.hoursworked = request.POST.get('hoursworked')
-                entry.startdate = request.POST.get('startdate')
-                entry.entrydescription = request.POST.get('entrydescription') or None
-                entry.save()
-            else:
-                MainEntry.objects.create(
-                    mainheaderid = header,
-                    workcategoryid_id = request.POST.get('workcategoryid'),
-                    sapworkid = request.POST.get('sapworkid') or None,
-                    shifttype = request.POST.get('shifttype'),
-                    hoursworked = request.POST.get('hoursworked'),
-                    startdate = request.POST.get('startdate'),
-                    entrydescription = request.POST.get('entrydescription') or None
-                )
+                category_selection = request.POST.get('category_selection', '')
+                workcategoryid = None
+                leavetypeid = None
+                if category_selection.startswith('wc_'):
+                    workcategoryid = category_selection[3:]  # Extract the ID after 'wc_'
+                elif category_selection.startswith('lt_'):
+                    leavetypeid = category_selection[3:]  # Extract the ID after 'lt_'
+
+                entryid = request.POST.get('entryid')
+                if entryid:
+                    entry = get_object_or_404(MainEntry, mainentryid=entryid, mainheaderid=header)
+                    entry.workcategoryid_id = workcategoryid
+                    entry.leavetypeid_id = leavetypeid
+                    entry.sapworkid = request.POST.get('sapworkid') or None
+                    entry.shifttype = request.POST.get('shifttype')
+                    entry.hoursworked = request.POST.get('hoursworked')
+                    entry.startdate = request.POST.get('startdate')
+                    entry.entrydescription = request.POST.get('entrydescription') or None
+                    entry.save()
+                else:
+                    MainEntry.objects.create(
+                        mainheaderid = header,
+                        workcategoryid_id = workcategoryid,
+                        leavetypeid_id = leavetypeid,
+                        sapworkid = request.POST.get('sapworkid') or None,
+                        shifttype = request.POST.get('shifttype'),
+                        hoursworked = request.POST.get('hoursworked'),
+                        startdate = request.POST.get('startdate'),
+                        entrydescription = request.POST.get('entrydescription') or None
+                    )
 
         elif action == 'update_crew':
             header.crewid_id = request.POST.get('crewid') or None
@@ -66,10 +76,11 @@ def add_entry(request, pk):
             return redirect('profile')
         
         return redirect('add_entry', pk=header.mainheaderid)
-    
+        
     entries = MainEntry.objects.filter(mainheaderid=header)
     crews = Crews.objects.all()
     workcategories = Workcategory.objects.all()
+    leavetypes = LeaveType.objects.filter(isactive=1)
     hours = entries.aggregate(Sum('hoursworked'))['hoursworked__sum'] or 0
 
     return render(request, 'timesheets/add_entry.html',{
@@ -77,6 +88,7 @@ def add_entry(request, pk):
         'entries': entries,
         'crews': crews,
         'workcategories': workcategories,
+        'leavetypes': leavetypes,
         'today': timezone.now().date(),
         'hours': hours,
         'days_remaining': days_remaining
@@ -157,3 +169,56 @@ def review_timesheet(request, pk):
     return render(request, 'timesheets/review_timesheet.html', {'header': header, 'entries': entries, 'empdate_submitted': empdate_submitted, 'total_hours': total_hours, 'hours_approved': hours_approved})
 
 
+@login_required(login_url='login')
+def payroll_unprocessed(request):
+    if request.user.access_level != 7:
+        return redirect('profile')
+ 
+    departments = Department.objects.filter(isactive=1).annotate(
+    unpaid_count=Count(
+        'roles__user__mainheader', 
+            filter=Q(
+                roles__user__mainheader__overallstatus='Completed',
+                roles__user__mainheader__paidat__isnull=True
+                ),
+                distinct=True
+            )
+    )
+
+    
+    return render(request, 'timesheets/payroll_unprocessed.htmls.html', {'departments': departments})
+
+
+@login_required(login_url='login')
+def payroll_unprocessed_dept(request, dept_id):
+    if request.user.access_level != 7:
+        return redirect('profile')
+
+    dept = get_object_or_404(Department, departmentid=dept_id)
+    employees = User.objects.filter(roleid__departmentid=dept_id, isactive=True)
+
+    submissions = MainHeader.objects.filter(
+        employeeid__in=employees,
+        overallstatus='Completed',
+        paidat__isnull=True
+    ).select_related('employeeid').annotate(
+        entry_count=Count('mainentry'),
+        total_hours=Sum('mainentry__hoursworked'),
+        date_from=Min('mainentry__startdate'),
+        date_to=Max('mainentry__startdate')
+    ).order_by('employeeid__lastname', '-submittedat')
+
+    return render(request, 'timesheets/payroll_unprocessed_dept.html', {
+        'dept': dept,
+        'submissions': submissions
+    })
+  
+
+@login_required(login_url='login')
+def payroll_departments(request):
+    if request == request.user.access_level != 4:
+        return redirect('profile')
+    else:
+        departments = Department.objects.filter(isactive=1)
+
+        return render(request, 'timesheets/payroll_departments.html', {'departments': departments})

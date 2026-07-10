@@ -13,7 +13,8 @@
     <div class="bg-[#28348A] h-40 w-full relative">
         <div class="absolute -bottom-12 left-1/2 -translate-x-1/2">
             <div class="relative group cursor-pointer" onclick="openPhotoModal()">
-                <div class="w-40 h-40 rounded-full bg-gray-800 border-4 border-white overflow-hidden flex items-center justify-center">
+                <div
+                    class="w-40 h-40 rounded-full bg-gray-800 border-4 border-white overflow-hidden flex items-center justify-center">
                     {% if request.user.profilepic %}
                     <img src="/media/{{ request.user.profilepic }}" class="w-full h-full object-cover"
                         alt="Profile Photo">
@@ -44,16 +45,18 @@
 
 <div class="mx-10 flex gap-6 flex-wrap">
 
-{% if al == 1 %} <!-- System Admin: two cards, no quick actions -->
+    {% if al == 1 %} <!-- System Admin: two cards, no quick actions -->
     <div class="flex-1 min-w-[240px] bg-white rounded-2xl shadow p-6">
         <p class="font-semibold mb-4">People</p>
         <div class="space-y-3">
             <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-users text-[#28348A]"></i> Active Employees</span>
+                <span class="flex items-center gap-2"><i class="fa-solid fa-users text-[#28348A]"></i> Active
+                    Employees</span>
                 <span class="font-semibold">{{ total_active }}</span>
             </div>
             <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-user-slash text-gray-400"></i> Inactive / Replaced</span>
+                <span class="flex items-center gap-2"><i class="fa-solid fa-user-slash text-gray-400"></i> Inactive /
+                    Replaced</span>
                 <span class="font-semibold">{{ total_inactive }}</span>
             </div>
             {% for dept in dept_breakdown %}
@@ -69,32 +72,37 @@
         <p class="text-xs font-medium text-gray-400 uppercase mb-2">Maintenance</p>
         <div class="space-y-3 mb-4">
             <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Submitted</span>
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i>
+                    Submitted</span>
                 <span class="font-semibold">{{ maintenance_submitted }}</span>
             </div>
             <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF914D]"></i> Pending</span>
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF914D]"></i>
+                    Pending</span>
                 <span class="font-semibold">{{ maintenance_pending }}</span>
             </div>
             <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Completed</span>
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i>
+                    Completed</span>
                 <span class="font-semibold">{{ maintenance_completed }}</span>
             </div>
         </div>
         <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">Operations Crew</p>
         <div class="space-y-3">
             <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Submitted</span>
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i>
+                    Submitted</span>
                 <span class="font-semibold">{{ ops_submitted }}</span>
             </div>
             <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Completed</span>
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i>
+                    Completed</span>
                 <span class="font-semibold">{{ ops_completed }}</span>
             </div>
         </div>
     </div>
 
-{% else %} <!-- All other roles: stats card + quick actions -->
+    {% else %} <!-- All other roles: stats card + quick actions -->
     <div class="flex-1 min-w-[240px] bg-white rounded-2xl shadow p-6">
         <p class="font-semibold mb-4">Dashboard Statistics</p>
         {% if al == 3 %} <!-- Supervisor -->
@@ -115,8 +123,7 @@
                 <span class="font-semibold">{{ completed_count }}</span>
             </div>
             {% if oldest_waiting %}
-            <p class="text-xs text-gray-400 mt-2 pt-2 border-t"> Oldest Still Waiting: {{ oldest_waiting.submittedat|date:"M j, Y" }} 
-                — {{ oldest_waiting.employeeid.firstname }} {{ oldest_waiting.employeeid.lastname }}</p>
+            <p class="text-xs text-gray-400 mt-2 pt-2 border-t"> Oldest Still Waiting: {{ oldest_waiting.submittedat|date:"M j, Y" }} — {{ oldest_waiting.employeeid.firstname }} {{ oldest_waiting.employeeid.lastname }}</p>
             {% endif %}
         </div>
 
@@ -234,21 +241,22 @@
         </div>
 
         {% elif al == 7 %} <!-- Payroll -->
-            <p class="text-xs font-medium text-gray-400 uppercase mb-2">Maintenance</p>
-            <div class="space-y-3 mb-4">
-                <div class="flex items-center justify-between text-sm">
-                    <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Personal Headers Completed</span>
-                    <span class="font-semibold">{{ maintenance_completed }}</span>
-                </div>
+        <p class="text-xs font-medium text-gray-400 uppercase mb-2">Maintenance</p>
+        <div class="space-y-3 mb-4">
+            <div class="flex items-center justify-between text-sm">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Personal
+                    Timesheets Completed</span>
+                <span class="font-semibold">{{ maintenance_completed }}</span>
             </div>
-            <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">Operations</p>
-            <div class="space-y-3">
-                <div class="flex items-center justify-between text-sm">
-                    <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Daily Crew Sheets Completed</span>
-                    <span class="font-semibold">{{ ops_crew_completed }}</span>
-                </div>
+        </div>
+        <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">Operations</p>
+        <div class="space-y-3">
+            <div class="flex items-center justify-between text-sm">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Daily Crew
+                    Timesheets Completed</span>
+                <span class="font-semibold">{{ ops_crew_completed }}</span>
             </div>
-
+        </div>
         {% else %} <!-- Employee -->
         <div class="space-y-3">
             <div class="flex items-center justify-between text-sm">
@@ -275,6 +283,7 @@
         {% endif %}
     </div>
 
+    {% if al != 7 %} <!-- Payroll doesn't have quick actions -->
     <div class="flex-1 min-w-[240px] bg-white rounded-2xl shadow p-6">
         <p class="font-semibold mb-4">Quick Actions</p>
         <div class="flex flex-col gap-3">
@@ -327,7 +336,8 @@
             {% endif %}
         </div>
     </div>
-{% endif %}
+    {% endif %}
+    {% endif %}
 </div>
 
 <div id="photoModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
@@ -338,9 +348,11 @@
         </div>
         <form method="POST" action="{% url 'upload_profile_photo' %}" enctype="multipart/form-data">
             {% csrf_token %}
-            <input type="file" name="profile_photo" accept="image/jpeg,image/png,image/webp" class="cursor-pointer w-full text-sm mb-4">
+            <input type="file" name="profile_photo" accept="image/jpeg,image/png,image/webp"
+                class="cursor-pointer w-full text-sm mb-4">
             <div class="flex gap-3 justify-end">
-                <button type="submit" class="px-4 py-2 text-sm rounded-lg bg-[#28348A] text-white cursor-pointer">Upload</button>
+                <button type="submit"
+                    class="px-4 py-2 text-sm rounded-lg bg-[#28348A] text-white cursor-pointer">Upload</button>
             </div>
         </form>
     </div>
