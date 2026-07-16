@@ -1,6 +1,7 @@
 from email import header
 from urllib import request
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from users.models import User, Department
@@ -179,14 +180,15 @@ def payroll_unprocessed(request):
         'roles__user__mainheader', 
             filter=Q(
                 roles__user__mainheader__overallstatus='Completed',
-                roles__user__mainheader__paidat__isnull=True
+                roles__user__mainheader__paidat__isnull=True,
+                roles__user__mainheader__mainentry__linestatus='Approved'
                 ),
                 distinct=True
             )
     )
 
     
-    return render(request, 'timesheets/payroll_unprocessed.htmls.html', {'departments': departments})
+    return render(request, 'timesheets/payroll_unprocessed.html', {'departments': departments})
 
 
 @login_required(login_url='login')
@@ -202,11 +204,11 @@ def payroll_unprocessed_dept(request, dept_id):
         overallstatus='Completed',
         paidat__isnull=True
     ).select_related('employeeid').annotate(
-        entry_count=Count('mainentry'),
-        total_hours=Sum('mainentry__hoursworked'),
-        date_from=Min('mainentry__startdate'),
-        date_to=Max('mainentry__startdate')
-    ).order_by('employeeid__lastname', '-submittedat')
+        entry_count=Count('mainentry', filter=Q(mainentry__linestatus='Approved')),
+        total_hours=Sum('mainentry__hoursworked', filter=Q(mainentry__linestatus='Approved')),
+        date_from=Min('mainentry__startdate', filter=Q(mainentry__linestatus='Approved')),
+        date_to=Max('mainentry__startdate', filter=Q(mainentry__linestatus='Approved'))
+    ).filter(entry_count__gt=0).order_by('employeeid__lastname', '-submittedat')
 
     return render(request, 'timesheets/payroll_unprocessed_dept.html', {
         'dept': dept,
@@ -216,9 +218,95 @@ def payroll_unprocessed_dept(request, dept_id):
 
 @login_required(login_url='login')
 def payroll_departments(request):
-    if request == request.user.access_level != 4:
+    if request.user.access_level != 7:
         return redirect('profile')
     else:
         departments = Department.objects.filter(isactive=1)
 
         return render(request, 'timesheets/payroll_departments.html', {'departments': departments})
+    
+
+@login_required(login_url='login')
+def payroll_unprocessed_review(request, dept_id, pk):
+    if request.user.access_level != 7:
+        return redirect('profile')
+
+    dept = get_object_or_404(Department, departmentid=dept_id)
+    header = get_object_or_404(
+        MainHeader, 
+        mainheaderid=pk, 
+        employeeid__roleid__departmentid=dept_id
+        )
+
+    if header.overallstatus != 'Completed':
+        return redirect('payroll_unprocessed_dept', dept_id=dept_id)
+
+    entries = MainEntry.objects.filter(mainheaderid=header, linestatus='Approved').select_related('workcategoryid', 'leavetypeid')
+    total_hours = entries.aggregate(Sum('hoursworked'))['hoursworked__sum'] or 0
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'mark_as_paid':
+            header.paidat = timezone.now()
+            header.paidby = request.user
+            header.save()
+            messages.success(request, f'Payment for {header.employeeid.firstname} {header.employeeid.lastname} marked as complete.')
+            return redirect('payroll_unprocessed_dept', dept_id=dept_id)
+
+        elif action == 'mark_as_unpaid':
+            header.paidat = None
+            header.paidby = None
+            header.save()
+            return redirect('payroll_unprocessed_dept', dept_id=dept_id)
+
+    return render(request, 'timesheets/payroll_unprocessed_review.html', {
+        'dept': dept,
+        'header': header,
+        'entries': entries,
+        'total_hours': total_hours
+    })
+
+
+
+@login_required(login_url='login')
+def payroll_processed(request):
+    if request.user.access_level != 7:
+        return redirect('profile')
+
+    six_months_ago = timezone.now() - timezone.timedelta(days=180)
+
+    employees = User.objects.filter(
+    mainheader__paidat__gte=six_months_ago,
+    mainheader__paidat__isnull=False,
+    isactive=True
+    ).distinct().select_related('roleid__departmentid')
+
+    return render(request, 'timesheets/payroll_processed.html', {
+        'employees': employees
+    })
+
+
+@login_required(login_url='login')
+def payroll_processed_employee(request, employee_id):
+    if request.user.access_level != 7:
+        return redirect('profile')
+
+    employee = get_object_or_404(User, employeeid=employee_id, isactive=True)
+    six_months_ago = timezone.now() - timezone.timedelta(days=180)
+
+    processed_timesheets = MainHeader.objects.filter(
+        employeeid=employee,
+        paidat__gte=six_months_ago,
+        paidat__isnull=False
+    ).select_related('employeeid').annotate(
+        entry_count=Count('mainentry', filter=Q(mainentry__linestatus='Approved')),
+        total_hours=Sum('mainentry__hoursworked', filter=Q(mainentry__linestatus='Approved')),
+        date_from=Min('mainentry__startdate', filter=Q(mainentry__linestatus='Approved')),
+        date_to=Max('mainentry__startdate', filter=Q(mainentry__linestatus='Approved'))
+    ).filter(entry_count__gt=0).order_by('-paidat')
+
+    return render(request, 'timesheets/payroll_processed_employee.html', {
+        'employee': employee,
+        'processed_timesheets': processed_timesheets
+    })

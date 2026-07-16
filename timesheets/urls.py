@@ -9,8 +9,7 @@ urlpatterns = [
     path('payroll/unprocessed/', views.payroll_unprocessed, name='payroll_unprocessed'),
     path('payroll/unprocessed/<int:dept_id>/', views.payroll_unprocessed_dept, name='payroll_unprocessed_dept'),
     path('payroll/unprocessed/<int:dept_id>/timesheet/<int:pk>/', views.payroll_unprocessed_review, name='payroll_unprocessed_review'),
-    # path('payroll/departments/', views.payroll_departments, name='payroll_departments'),
-    # path('payroll/departments/<int:dept_id>/', views.payroll_department_details, name='payroll_department_details'),
-    # path('payroll/submissions/<int:dept_id>/timesheet/<int:pk>/', views.payroll_review_timesheet, name='payroll_review_timesheet'),
+    path('payroll/processed/', views.payroll_processed, name='payroll_processed'),
+    path('payroll/processed/employee/<str:employee_id>/', views.payroll_processed_employee, name='payroll_processed_employee')
 
 ]

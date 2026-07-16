@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
+    <button onclick="history.back()"
+        class="flex items-center gap-2 text-sm text-gray-500 hover:text-black cursor-pointer mb-3">
+        <i class="fa-solid fa-arrow-left"></i>
+    </button>
+    <div class="flex flex-wrap justify-between items-start">
+        <div class="flex items-center gap-4">
+            <div class="w-16 h-16 rounded-full bg-black overflow-hidden flex-shrink-0 flex items-center justify-center">
+                {% if header.employeeid.profilepic %}
+                <img src="/media/{{ header.employeeid.profilepic }}" class="w-full h-full object-cover"
+                    alt="Profile Photo">
+                {% else %}
+                <i class="fa-solid fa-user text-white text-2xl"></i>
+                {% endif %}
+            </div>
+            <div>
+                <h2 class="text-xl font-bold">{{ header.employeeid.firstname }} {{ header.employeeid.lastname }}</h2>
+                <p class="text-sm text-gray-500 mt-1">{{ dept.departmentname }} &mdash; {{ header.submittedat|date:"M j, Y" }}</p>
+            </div>
+        </div>
+        {% if header.paidat %}
+        <div class="text-right text-sm">
+            <span class="inline-block bg-green-100 text-green-700 font-semibold px-3 py-1 rounded-full">Paid</span>
+            <p class="text-gray-500 mt-1">{{ header.paidat|date:"M j, Y" }} by {{ header.paidby.firstname }} {{ header.paidby.lastname }}</p>
+        </div>
+        {% else %}
+        <span
+            class="inline-block bg-yellow-100 text-yellow-700 font-semibold px-3 py-1 rounded-full text-sm">Unpaid</span>
+        {% endif %}
+    </div>
+</div>
+
+<div class="container mx-auto bg-white rounded-2xl shadow mb-6 overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-600 text-left">
+            <tr>
+                <th class="px-4 py-3">Date</th>
+                <th class="px-4 py-3">Category</th>
+                <th class="px-4 py-3">Shift</th>
+                <th class="px-4 py-3">Hours</th>
+                <th class="px-4 py-3">Work Order</th>
+                <th class="px-4 py-3">Description</th>
+                <th class="px-4 py-3">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in entries %}
+            <tr class="border-t">
+                <td class="px-4 py-3">{{ entry.startdate|date:"M j, Y" }}</td>
+                <td class="px-4 py-3">{{ entry.workcategoryid.categoryname|default:entry.leavetypeid.leavetypename }}
+                </td>
+                <td class="px-4 py-3">{{ entry.shifttype }}</td>
+                <td class="px-4 py-3">{{ entry.hoursworked }} hrs</td>
+                <td class="px-4 py-3 text-gray-500">{{ entry.sapworkid|default:"—" }}</td>
+                <td class="px-4 py-3 text-gray-500">{{ entry.entrydescription|default:"—" }}</td>
+                <td class="px-4 py-3">
+                    {% if entry.linestatus == 'Approved' %}
+                    <span class="text-green-600 font-medium">Approved</span>
+                    {% elif entry.linestatus == 'Rejected' %}
+                    <span class="text-red-500 font-medium">Rejected</span>
+                    {% else %}
+                    <span class="text-gray-400">{{ entry.linestatus }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="container mx-auto flex flex-wrap justify-between items-center">
+    <p class="text-sm text-gray-700">Total Hours: <span class="font-bold">{{ total_hours }}</span></p>
+    <form method="POST">
+        {% csrf_token %}
+        {% if header.paidat %}
+        <input type="hidden" name="action" value="mark_as_unpaid">
+        <button type="submit" class="cursor-pointer px-4 py-2 text-sm bg-yellow-500 text-white rounded-lg">Mark as
+            Unpaid</button>
+        {% else %}
+        <input type="hidden" name="action" value="mark_as_paid">
+        <button type="submit" class="cursor-pointer px-4 py-2 text-sm bg-green-600 text-white rounded-lg">Mark as
+            Paid</button>
+        {% endif %}
+    </form>
+</div>
+
+{% endblock content %}

@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+
+<div class="mb-4">
+    <div class="bg-white shadow mb-8 w-full flex px-5 justify-center py-3 rounded font-semibold text-sm">
+      <p class="text-center">View History of Processed Payment for Employees in Their Various Departments</p>
+    </div>
+</div>
+
+{% regroup employees by roleid.departmentid.departmentname as department_list %}
+
+{% for dept in department_list %}
+<div class="mb-4">
+    <div class="w-full flex items-center justify-between bg-[#28348A] text-white px-5 py-3 rounded font-semibold text-sm">
+        <div class="flex items-center gap-2 cursor-pointer flex-1" onclick="toggleDept('dept-{{ forloop.counter }}')">
+            <span>{{ dept.grouper }}</span>
+            <i class="fa-solid fa-chevron-down dept-icon transition-transform duration-200"></i>
+        </div>
+    </div>
+
+    <div id="dept-{{ forloop.counter }}" class="hidden">
+        <div class="overflow-x-auto">
+        <table class="w-full min-w-[560px] bg-white shadow text-sm">
+            <thead class="bg-gray-200 text-gray-600 uppercase text-xs">
+                <tr>
+                    <th class="px-4 py-3 text-left w-[10%]">ID</th>
+                    <th class="px-4 py-3 text-left w-[20%]">Name</th>
+                    <th class="px-4 py-3 text-left w-[30%]">Role</th>
+                    <th class="px-4 py-3 text-left w-[15%]">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in dept.list %}
+                <tr class="border-t border-gray-100 hover:bg-gray-50 cursor-pointer" onclick="window.location='{% url 'payroll_processed_employee' user.pk %}'">
+                    <td class="px-4 py-3">{{ user.employeeid }}</td>
+                    <td class="px-4 py-3">{{ user.firstname }} {{ user.lastname }}</td>
+                    <td class="px-4 py-3">{{ user.roleid.rolename }}</td>
+                    <td class="px-4 py-3">
+                        {% if not user.isactive %}
+                            <span class="text-xs text-gray-400">Inactive</span>
+                        {% elif user.is_temporary %}
+                            <span class="text-xs text-amber-600">Temporary</span>
+                        {% else %}
+                            <span class="text-xs text-green-600">Active</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+
+
+
+<!-- Roles data for JS filtering -->
+<script>
+function toggleDept(id) {
+    const panel = document.getElementById(id);
+    const btn = panel.previousElementSibling;
+    const icon = btn.querySelector('.dept-icon');
+    const isOpen = !panel.classList.contains('hidden');
+    panel.classList.toggle('hidden');
+    icon.classList.toggle('rotate-180', !isOpen);
+}
+</script>
+
+{% endblock content %}
