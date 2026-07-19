@@ -128,7 +128,7 @@
         </div>
 
         {% elif al == 2 %} <!-- Superintendent -->
-        <p class="text-xs font-medium text-gray-400 uppercase mb-2">Personal Submissions</p>
+        <p class="text-xs font-medium text-gray-400 uppercase mb-2">Personal Employee Submissions</p>
         <div class="space-y-3 mb-4">
             <div class="flex items-center justify-between text-sm">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Pending
@@ -295,11 +295,11 @@
             {% elif al == 2 %}
             <a href="#"
                 class="flex items-center gap-3 px-4 py-3 bg-[#28348A] text-white rounded-xl text-sm font-medium hover:opacity-90">
-                <i class="fa-solid fa-inbox"></i> Personal Submissions Inbox
+                <i class="fa-solid fa-inbox"></i> Employee Submissions Inbox
             </a>
             <a href="#"
                 class="flex items-center gap-3 px-4 py-3 bg-[#8A6B28] text-white rounded-xl text-sm font-medium hover:opacity-90">
-                <i class="fa-solid fa-clipboard-list"></i> Daily Sheets Inbox
+                <i class="fa-solid fa-clipboard-list"></i> Crew Daily Sheets Inbox
             </a>
             {% elif al == 4 %}
             <form method="POST" action="{% url 'new_timesheet' %}">
@@ -309,6 +309,10 @@
                     <i class="fa-solid fa-plus"></i> Create Timesheet
                 </button>
             </form>
+            <a href="{% url 'my_drafts' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#FFBB7C] text-gray-700 rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-file-pen"></i> Continue Draft
+            </a>
             <a href="#"
                 class="flex items-center gap-3 px-4 py-3 bg-[#8A6B28] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-inbox"></i> Crew Daily Sheets Inbox
@@ -321,6 +325,10 @@
                     <i class="fa-solid fa-plus"></i> Create Timesheet
                 </button>
             </form>
+            <a href="{% url 'my_drafts' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#FFBB7C] text-gray-700 rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-file-pen"></i> Continue Draft
+            </a>
             <a href="#"
                 class="flex items-center gap-3 px-4 py-3 bg-[#8A6B28] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-clipboard-list"></i> Create Daily Sheet
@@ -333,6 +341,10 @@
                     <i class="fa-solid fa-plus"></i> Create Timesheet
                 </button>
             </form>
+            <a href="{% url 'my_drafts' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#FFBB7C] text-gray-700 rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-file-pen"></i> Continue Draft
+            </a>
             {% endif %}
         </div>
     </div>

@@ -48,7 +48,7 @@
                 <p class="font-semibold text-slate-700">{{ entry.startdate|date:"M j, Y" }}</p>
                 <p class="text-slate-500 text-xs">{{ entry.shifttype }}</p>
                 <p class="font-bold text-slate-800">{{ entry.hoursworked }} hrs</p>
-                <p class="text-slate-500 truncate">{{ entry.workcategoryid.categoryname | default:entry.leavetypeid.leavetypename }}</p>
+                <p class="text-slate-500 truncate">{% if entry.workcategoryid %}{{ entry.workcategoryid.categoryname }}{% else %}{{ entry.leavetypeid.leavetypename }}{% endif %}</p>
             </div>
 
             <!-- Status Color Bar pinned cleanly to the bottom edge -->
@@ -75,8 +75,14 @@
         <form action="" method="POST">
             {% csrf_token %}
             <input type="hidden" name="action" value="finish_review">
+            {% if has_unreviewed %}
+            <button type="button" disabled
+                class="px-4 py-2 text-sm bg-gray-300 text-gray-500 rounded-lg border cursor-not-allowed"
+                title="All entries must be reviewed before finishing.">Finish</button>
+            {% else %}
             <button type="submit"
                 class="cursor-pointer px-4 py-2 text-sm bg-green-600 text-white rounded-lg border">Finish</button>
+            {% endif %}
         </form>
     </div>
 </div>
@@ -121,7 +127,7 @@
     "{{ entry.mainentryid }}": {
         date: "{{ entry.startdate|date:'M j, Y' }}",
             hours: "{{ entry.hoursworked }}",
-                category: "{{ entry.workcategoryid.categoryname|default:entry.leavetypeid.leavetypename|escapejs }}",
+                category: "{% if entry.workcategoryid %}{{ entry.workcategoryid.categoryname }}{% else %}{{ entry.leavetypeid.leavetypename }}{% endif %}",
                     shift: "{{ entry.shifttype|escapejs }}",
                         sapworkid: "{{ entry.sapworkid|default:''|escapejs }}",
                             description: "{{ entry.entrydescription|default:''|escapejs }}",

@@ -11,7 +11,7 @@ from django.utils import timezone
 from django.contrib.auth import update_session_auth_hash
 from django.contrib import messages
 from timesheets.models import MainHeader, MainEntry, OperationsHeader
-from django.db.models import Count
+from django.db.models import Count, Q
 
 
 def login_view(request):
@@ -377,3 +377,72 @@ def replace_employee(request, employeeid):
         'crew_count': len(active_crew) if is_shifter else 0,
         'error': error,
     })
+
+
+@login_required(login_url='login')
+def crew_assignments(request):
+    if request.user.access_level != 2:
+        return redirect('profile')
+
+    shifters = User.objects.filter(
+        roleid__accessid__accessid=5,
+        isactive=True
+    ).annotate(
+        crew_count=Count('crew_led', filter=Q(crew_led__enddate__isnull=True))
+    ).order_by('lastname', 'firstname')
+
+    return render(request, 'users/crew_assignments.html', {'shifters': shifters})
+
+
+@login_required(login_url='login')
+def crew_assignment_detail(request, shifter_id):
+    if request.user.access_level != 2:
+        return redirect('profile')
+
+    shifter = get_object_or_404(User, employeeid=shifter_id, roleid__accessid__accessid=5, isactive=True)
+
+    active_assignments = CrewAssignment.objects.filter(
+        shifter=shifter,
+        enddate__isnull=True
+    ).select_related('employee')
+
+    assigned_ids = CrewAssignment.objects.filter(enddate__isnull=True).values_list('employee_id', flat=True)
+    available_employees = User.objects.filter(roleid__accessid__accessid=8, isactive=True).exclude(employeeid__in=assigned_ids)
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'add_member':
+            employee_id = request.POST.get('employee_id')
+            start_date = request.POST.get('startdate')
+            employee = get_object_or_404(User, employeeid=employee_id, roleid__accessid__accessid=8, isactive=True)
+            CrewAssignment.objects.create(shifter=shifter, employee=employee, startdate=start_date)
+            messages.success(request, f'{employee.firstname} {employee.lastname} added to crew.')
+
+        elif action == 'remove_member':
+            assignment_id = request.POST.get('assignmentid')
+            assignment = get_object_or_404(CrewAssignment, assignmentid=assignment_id, shifter=shifter)
+            assignment.enddate = timezone.now().date()
+            assignment.save()
+            messages.success(request, f'{assignment.employee.firstname} {assignment.employee.lastname} removed from crew.')
+
+        return redirect('crew_assignment_detail', shifter_id=shifter_id)
+
+    return render(request, 'users/crew_assignment_detail.html', {
+        'shifter': shifter,
+        'active_assignments': active_assignments,
+        'available_employees': available_employees
+    })
+
+
+@login_required(login_url='login')
+def my_crew(request):
+    if request.user.access_level != 5:
+        return redirect('profile')
+
+    active_assignments = CrewAssignment.objects.filter(
+        shifter=request.user,
+        enddate__isnull=True
+    ).select_related('employee__roleid')
+
+    return render(request, 'users/my_crew.html', {'active_assignments': active_assignments})

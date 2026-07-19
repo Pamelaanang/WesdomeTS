@@ -15,15 +15,26 @@ def new_timesheet(request):
     two_months_ago = timezone.now() - timezone.timedelta(days=60)
     MainHeader.objects.filter(employeeid=request.user, overallstatus='Draft', startedat__lt=two_months_ago).delete()
     
-    existing = MainHeader.objects.filter(employeeid=request.user, overallstatus='Draft').first()
-    if existing:
-        return redirect('add_entry', pk=existing.mainheaderid)
+    now = timezone.now()
+    drafts_this_month = MainHeader.objects.filter(
+        employeeid=request.user, 
+        overallstatus='Draft', 
+        startedat__year=now.year, 
+        startedat__month=now.month
+    ).count()
+
+    if drafts_this_month >= 3:
+        messages.warning(request, 'You have reached the maximum of 3 drafts this month. Please continue a previous draft.')
+        return redirect('my_drafts')
+
     header = MainHeader.objects.create(employeeid=request.user)
     return redirect('add_entry', pk=header.mainheaderid)
 
 @login_required(login_url = 'login')
 def add_entry(request, pk):
     header = get_object_or_404(MainHeader, mainheaderid=pk, employeeid=request.user)
+    if header.overallstatus != 'Draft':
+        return redirect('profile')
     days_remaining = 60 - (timezone.now() - header.startedat).days
 
     if request.method == 'POST':
@@ -70,6 +81,8 @@ def add_entry(request, pk):
             MainEntry.objects.filter(mainentryid=entry_id, mainheaderid=header).delete()
         
         elif action == 'submit_timesheet':
+            if not MainEntry.objects.filter(mainheaderid=header).exists():
+                return redirect('add_entry', pk=header.mainheaderid)    
             header.overallstatus = 'Submitted'
             header.submittedat = timezone.now()
             header.save()
@@ -167,7 +180,16 @@ def review_timesheet(request, pk):
     
         return redirect('review_timesheet', pk=header.mainheaderid)
     
-    return render(request, 'timesheets/review_timesheet.html', {'header': header, 'entries': entries, 'empdate_submitted': empdate_submitted, 'total_hours': total_hours, 'hours_approved': hours_approved})
+    has_unreviewed = entries.filter(linestatus='New').exists()
+    
+    return render(request, 'timesheets/review_timesheet.html', {
+    'header': header, 
+    'entries': entries, 
+    'empdate_submitted': empdate_submitted, 
+    'total_hours': total_hours, 
+    'hours_approved': hours_approved,
+    'has_unreviewed': has_unreviewed
+})
 
 
 @login_required(login_url='login')
@@ -310,3 +332,15 @@ def payroll_processed_employee(request, employee_id):
         'employee': employee,
         'processed_timesheets': processed_timesheets
     })
+
+
+@login_required(login_url='login')
+def my_drafts(request):
+    drafts = MainHeader.objects.filter(employeeid=request.user, overallstatus='Draft').annotate(
+        entry_count=Count('mainentry'),
+        total_hours=Sum('mainentry__hoursworked'),
+        date_from=Min('mainentry__startdate'),
+        date_to=Max('mainentry__startdate')
+    ).order_by('-startedat')
+
+    return render(request, 'timesheets/my_drafts.html', {'drafts': drafts})

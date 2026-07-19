@@ -66,7 +66,7 @@
                         {% for entry in entries %}
                         <tr class="border-b hover:bg-gray-50 text-center">
                             <td class="p-2">{{ entry.sapworkid }}</td>
-                            <td class="p-2">{{ entry.workcategoryid.categoryname | default:entry.leavetypeid.leavetypename }}</td>
+                            <td class="p-2">{% if entry.workcategoryid %} {{ entry.workcategoryid.categoryname }} {% else %} {{ entry.leavetypeid.leavetypename }} {% endif %}</td>
                             <td class="p-2">{{ entry.shifttype }}</td>
                             <td class="p-2">{{ entry.hoursworked }}</td>
                             <td class="p-2">{{ entry.entrydescription|default:"-" }}</td>
@@ -157,15 +157,41 @@
         }
 
         function saveEntry() {
-            const category = document.querySelector('[name="category_selection"]').value;
+            const categoryEl = document.querySelector('[name="category_selection"]');
+            const categoryValue = categoryEl.value;
+            const categoryText = categoryEl.options[categoryEl.selectedIndex].text.toLowerCase();
+            const hours = parseFloat(document.querySelector('[name="hoursworked"]').value);
             const date = document.querySelector('[name="startdate"]').value;
-            if (!category || !date) {
+
+            if (!categoryValue || !date) {
                 alert('Work Category and Date Worked are required.');
                 return;
             }
+
+            // hours cap
+            if (!hours || hours <= 0 || hours > 24) {
+                alert('Hours worked must be between 0.5 and 24.');
+                return;
+            }
+
+            // future date: blocked for work categories unless it's overtime
+            if (categoryValue.startsWith('wc_') && !categoryText.includes('overtime')) {
+                const today = new Date(); today.setHours(0, 0, 0, 0);
+                if (new Date(date) > today) {
+                    alert('Date cannot be a future date for this work category.');
+                    return;
+                }
+            }
+
+            const saveBtn = document.querySelector('#add-row button[onclick="saveEntry()"]');
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+
             document.getElementById('form-action').value = 'save_entry';
             document.getElementById('entry-form').submit();
         }
+
+
 
         function deleteEntry(entryId) {
             document.getElementById('form-action').value = 'delete_entry';
@@ -174,6 +200,13 @@
         }
 
         function submitForm(action) {
+            if (action === 'submit_timesheet') {
+                const entryRows = document.querySelectorAll('#entry-form tbody tr.border-b');
+                if (entryRows.length === 0) {
+                    alert('Cannot submit an empty timesheet. Please add at least one entry.');
+                    return;
+                }
+            }
             document.getElementById('form-action').value = action;
             document.getElementById('entry-form').submit();
         }

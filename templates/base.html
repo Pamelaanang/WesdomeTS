@@ -39,8 +39,8 @@
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-gear"></i> Settings</a>
             {% endif %}
 
-            <!-- My Employees accordion: Superintendent (2), Supervisor (3), Mine Captain (4) -->
-            {% if al == 2 or al == 3 or al == 4 %}
+            <!-- My Employees accordion: Superintendent (2) and Supervisor (3) -->
+            {% if al == 2 or al == 3 %}
             <button onclick="toggleAccordion('menu-employees')" class="accordion-btn">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-people-group"></i> My Employees</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
@@ -55,13 +55,27 @@
             </div>
             {% endif %}
 
-            <!-- Shifter timesheets accordion: Superintendent (2nd level) and Mine Captain (1st level) -->
-            {% if al == 2 or al == 4 %}
+            <!-- Superintendent (2): Daily Timesheets (bonus review) and Crew Assignments -->
+            {% if al == 2 %}
+            <button onclick="toggleAccordion('menu-daily')" class="accordion-btn">
+                <span class="flex items-center gap-3"><i class="fa-solid fa-calendar-days"></i> Daily Timesheets</span>
+                <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
+            </button>
+            <div id="menu-daily" class="hidden flex flex-col">
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
+                        class="fa-solid fa-clock-rotate-left"></i> Pending</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
+                        class="fa-solid fa-circle-check"></i> Approved</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
+                        class="fa-solid fa-circle-xmark"></i> Rejected</a>
+            </div>
+            <a href="{% url 'crew_assignments' %}" class="flex items-center gap-3"><i class="fa-solid fa-people-group"></i> Crew Assignments</a>
+            {% endif %}
+
+            <!-- Mine Captain (4): My Shifters and Daily Timesheets for daily approval -->
+            {% if al == 4 %}
             <button onclick="toggleAccordion('menu-shifter')" class="accordion-btn">
-                <span class="flex items-center gap-3">
-                    <i class="fa-solid fa-hard-hat"></i>
-                    {% if al == 4 %} My Shifters {% else %} Shifters {% endif %}
-                </span>
+                <span class="flex items-center gap-3"><i class="fa-solid fa-hard-hat"></i> My Shifters</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-shifter" class="hidden flex flex-col">
@@ -72,8 +86,6 @@
                 <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
                         class="fa-solid fa-circle-xmark"></i> Rejected</a>
             </div>
-
-            <!-- Daily crew timesheets accordion: Superintendent (2nd level) and Mine Captain (1st level) -->
             <button onclick="toggleAccordion('menu-daily')" class="accordion-btn">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-calendar-days"></i> Daily Timesheets</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
@@ -88,13 +100,27 @@
             </div>
             {% endif %}
 
-            <!-- Shifter (5): crew management and daily sheet submission -->
+            <!-- Shifter (5): daily sheets and personal timesheets -->
             {% if al == 5 %}
-            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-hard-hat"></i> My Crew</a>
-            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-pen-to-square"></i> Submit Daily
-                Sheets</a>
-            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-circle-check"></i> Daily Approvals</a>
-            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-circle-xmark"></i> Daily Rejections</a>
+            <a href="{% url 'my_crew' %}" class="flex items-center gap-3"><i class="fa-solid fa-hard-hat"></i> My Crew</a>
+            <button onclick="toggleAccordion('menu-daily-sheets')" class="accordion-btn">
+                <span class="flex items-center gap-3"><i class="fa-solid fa-calendar-days"></i> Daily Sheets</span>
+                <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
+            </button>
+            <div id="menu-daily-sheets" class="hidden flex flex-col">
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-pen-to-square"></i> Submit Daily Sheets</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> Daily Approvals</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-xmark"></i> Daily Rejections</a>
+            </div>
+            <button onclick="toggleAccordion('menu-personal-shifter')" class="accordion-btn">
+                <span class="flex items-center gap-3"><i class="fa-solid fa-file-lines"></i> Personal Timesheets</span>
+                <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
+            </button>
+            <div id="menu-personal-shifter" class="hidden flex flex-col">
+                <a href="{% url 'my_drafts' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> My Approved</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-xmark"></i> My Rejected</a>
+            </div>
             {% endif %}
 
             <!-- Payroll (7) only -->
@@ -119,9 +145,22 @@
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-chart-bar"></i> Reports</a>
             {% endif %}
             
-            <!-- Personal timesheets: everyone except Admin (1) and Payroll (7) -->
-            {% if al == 4 or al == 5 or al == 6 %}
-            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
+            <!-- Personal timesheets accordion: Mine Captain (4) -->
+            {% if al == 4 %}
+            <button onclick="toggleAccordion('menu-personal')" class="accordion-btn">
+                <span class="flex items-center gap-3"><i class="fa-solid fa-file-lines"></i> Personal Timesheets</span>
+                <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
+            </button>
+            <div id="menu-personal" class="hidden flex flex-col">
+                <a href="{% url 'my_drafts' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> My Approved</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-xmark"></i> My Rejected</a>
+            </div>
+            {% endif %}
+
+            <!-- Personal timesheets flat links: Crew Member (6) only -->
+            {% if al == 6 %}
+            <a href="{% url 'my_drafts' %}" class="flex items-center gap-3"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-circle-check"></i> My Approved</a>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-circle-xmark"></i> My Rejected</a>
             {% endif %}

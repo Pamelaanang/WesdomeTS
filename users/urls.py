@@ -11,5 +11,8 @@ urlpatterns = [
     path('password_reset/', views.password_reset_view, name='password_reset'),
     path('profile/', views.profile, name='profile'),
     path('profile/upload-photo/', views.upload_profile_photo, name='upload_profile_photo'),
+    path('crew/assignments/', views.crew_assignments, name='crew_assignments'),
+    path('crew/assignments/<str:shifter_id>/', views.crew_assignment_detail, name='crew_assignment_detail'),
+    path('crew/my-crew/', views.my_crew, name='my_crew'),
 
 ]

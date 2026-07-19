@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block content %}
+
+{% if messages %}
+<div class="container mx-auto mb-4">
+    {% for message in messages %}
+    <div class="flex items-center gap-3 bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm px-4 py-3 rounded-xl">
+        <i class="fa-solid fa-triangle-exclamation text-yellow-500"></i>
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-8">
+    <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+    <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+    <p class="text-center text-sm text-gray-500 mt-1">Your draft timesheets will appear here. Click a card to continue.</p>
+</div>
+
+<div class="container mx-auto mb-8">
+    <div class="flex flex-wrap gap-4">
+        {% for draft in drafts %}
+        <a href="{% url 'add_entry' draft.mainheaderid %}"
+            class="bg-white rounded-xl shadow p-5 w-52 flex flex-col items-center gap-2 hover:shadow-md hover:border hover:border-[#28348A] transition-all">
+            <p class="text-xs">Started {{ draft.startedat|date:"M j, Y" }}</p>
+            
+            {% if draft.date_from %}
+            <p class="text-xs font-normal text-center text-gray-400">{{ draft.date_from|date:"M j" }} – {{ draft.date_to|date:"M j, Y" }}</p>
+            {% else %}
+            <p class="text-xs text-gray-400 text-center">No entries yet</p>
+            {% endif %}
+            <p class="text-xs">{{ draft.entry_count }} entr{{ draft.entry_count|pluralize:"y,ies" }}</p>
+            <p class="font-semibold text-sm">{{ draft.total_hours|default:"0" }} hrs</p>
+            <span class="mt-1 bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-0.5 rounded-full">Draft</span>
+        </a>
+        {% empty %}
+        <div class="mx-auto text-gray-400 text-sm">You have no draft timesheets.</div>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock content %}

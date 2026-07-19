@@ -69,9 +69,13 @@
                 </div>
                 <div class="mb-6">
                     <label class="block text-sm text-gray-600 mb-1">{{ form.password.label }}</label>
-                    <div class="flex items-center h-13 border border-gray-400 rounded-lg px-3 py-2 gap-2">
+                    <div id="password-container" class="flex items-center h-13 border border-gray-400 rounded-lg px-3 py-2 gap-2">
                         <span class="text-gray-400 text-sm pl-2"><i class="fa-solid fa-lock"></i></span>
                         {{ form.password }}
+                         <button type="button" onclick="toggleVisibility('password-container', 'icon_password')"
+                                class="text-gray-400 px-2">
+                                <i class="fa-solid fa-eye-slash" id="icon_password"></i>
+                      </button>
                     </div>
                 </div>
                 <div class="flex justify-center mb-2">
@@ -101,7 +105,21 @@
             current = (current + 1) % slides.length;
             slides[current].classList.replace('opacity-0', 'opacity-100');
         }, 4000);
-    </script>
+
+        function toggleVisibility(containerId, iconId) {
+            // 1. Find the container by its ID
+        const container = document.getElementById(containerId);
+        const input = document.querySelector(`#${containerId} input`);
+        const icon = document.getElementById(iconId);
+        if (input.type === "password") {
+            input.type = "text";
+            icon.classList.replace("fa-eye-slash", "fa-eye");
+        } else {
+            input.type = "password";
+            icon.classList.replace("fa-eye", "fa-eye-slash");
+        }
+    }
+</script>
 
 </body>
 

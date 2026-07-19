@@ -50,8 +50,7 @@
             {% for entry in entries %}
             <tr class="border-t">
                 <td class="px-4 py-3">{{ entry.startdate|date:"M j, Y" }}</td>
-                <td class="px-4 py-3">{{ entry.workcategoryid.categoryname|default:entry.leavetypeid.leavetypename }}
-                </td>
+                <td class="px-4 py-3">{% if entry.workcategoryid %}{{ entry.workcategoryid.categoryname }}{% else %}{{ entry.leavetypeid.leavetypename }}{% endif %}</td>
                 <td class="px-4 py-3">{{ entry.shifttype }}</td>
                 <td class="px-4 py-3">{{ entry.hoursworked }} hrs</td>
                 <td class="px-4 py-3 text-gray-500">{{ entry.sapworkid|default:"—" }}</td>
