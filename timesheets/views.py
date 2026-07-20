@@ -4,8 +4,8 @@ from urllib import request
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
-from users.models import User, Department
-from .models import MainHeader, MainEntry, Crews, Workcategory, LeaveType
+from users.models import User, Department, CrewAssignment
+from .models import MainHeader, MainEntry, Crews, Workcategory, LeaveType, OperationsHeader, OperationsEntry, Contract, Account
 from django.utils import timezone
 from django.db.models import Sum, Count, Min, Max, Q
 
@@ -24,11 +24,20 @@ def new_timesheet(request):
     ).count()
 
     if drafts_this_month >= 3:
-        messages.warning(request, 'You have reached the maximum of 3 drafts this month. Please continue a previous draft.')
+        messages.warning(request, 'You have reached the maximum of 3 drafts this month. Continue a previous draft or delete one to start fresh.')
         return redirect('my_drafts')
 
     header = MainHeader.objects.create(employeeid=request.user)
     return redirect('add_entry', pk=header.mainheaderid)
+
+
+@login_required(login_url='login')
+def delete_draft(request, pk):
+    if request.method == 'POST':
+        header = get_object_or_404(MainHeader, mainheaderid=pk, employeeid=request.user, overallstatus='Draft')
+        header.delete()
+    return redirect('my_drafts')
+
 
 @login_required(login_url = 'login')
 def add_entry(request, pk):
@@ -344,3 +353,152 @@ def my_drafts(request):
     ).order_by('-startedat')
 
     return render(request, 'timesheets/my_drafts.html', {'drafts': drafts})
+
+
+
+@login_required(login_url='login')
+def new_ops_sheet(request):
+    if request.user.access_level != 5:
+        return redirect('profile')
+    
+    crews = Crews.objects.filter(isactive=1)
+
+    if request.method == 'POST':
+        shiftdate = request.POST.get('shiftdate')
+        shifttype = request.POST.get('shifttype')
+        crewid = request.POST.get('crewid')
+
+         #If a header already exists for this shifter + date + shift, redirect to it
+        existing = OperationsHeader.objects.filter(
+            shifterid=request.user,
+            shiftdate=shiftdate,
+            shifttype=shifttype
+        ).first()
+        if existing:
+            return redirect('ops_sheet', pk=existing.opsheaderid)
+
+        header = OperationsHeader.objects.create(
+            shifterid=request.user,
+            shiftdate=shiftdate,
+            shifttype=shifttype,
+            crewid_id=crewid
+        )
+        return redirect('ops_sheet', pk=header.opsheaderid)
+
+    return render(request, 'timesheets/ops_sheet.html', {'header': None, 'crews': crews})
+
+
+@login_required(login_url='login')
+def ops_sheet(request, pk):
+    if request.user.access_level != 5:
+        return redirect('profile')
+
+    header = get_object_or_404(OperationsHeader, opsheaderid=pk, shifterid=request.user)
+
+    if header.overallstatus == 'Draft':
+        hours_elapsed = (timezone.now() - header.startedat).total_seconds() / 3600
+        if hours_elapsed > 72:
+            header.overallstatus = 'Submitted'
+            header.submittedat = timezone.now()
+            header.save()
+            OperationsEntry.objects.filter(opsheaderid=header).update(linestatus='New')
+            messages.warning(request, 'Your operations sheet was automatically submitted after 72 hours of inactivity.')
+
+    hours_remaining = max(0, 72 - (timezone.now() - header.startedat).total_seconds() / 3600)
+
+    if request.method == 'POST' and header.overallstatus == 'Draft':
+        action = request.POST.get('action')
+
+        if action == 'add_row':
+            workcategoryid = request.POST.get('workcategoryid') or None
+
+            OperationsEntry.objects.create(
+                opsheaderid=header,
+                employeeid_id=request.POST.get('employeeid'),
+                contractid_id=request.POST.get('contractid'),
+                accountid_id=request.POST.get('accountid') or None,
+                workcategoryid_id=workcategoryid,
+                hoursworked=request.POST.get('hoursworked'),
+                remarks=request.POST.get('remarks') or None,
+                hauledto=request.POST.get('hauledto') or None,
+                tonnesorehauled=request.POST.get('tonnesorehauled') or None,
+                tonneswastehauled=request.POST.get('tonneswastehauled') or None,
+                lowgradehauled=request.POST.get('lowgradehauled') or None,
+                tonnesoreskipped=request.POST.get('tonnesoreskipped') or None,
+                tonneswasteskipped=request.POST.get('tonneswasteskipped') or None,
+                lowgradeskipped=request.POST.get('lowgradeskipped') or None,
+                longholefootage=request.POST.get('longholefootage') or None,
+            )
+
+        elif action == 'delete_row':
+            entry_id = request.POST.get('entryid')
+            OperationsEntry.objects.filter(opsentryid=entry_id, opsheaderid=header).delete()
+
+        elif action == 'submit_sheet':
+            if not OperationsEntry.objects.filter(opsheaderid=header).exists():
+                return redirect('ops_sheet', pk=header.opsheaderid)
+            header.overallstatus = 'Submitted'
+            header.submittedat = timezone.now()
+            header.save()
+            OperationsEntry.objects.filter(opsheaderid=header).update(linestatus='New')
+            return redirect('my_ops_sheets')
+
+        return redirect('ops_sheet', pk=header.opsheaderid)
+
+    entries = OperationsEntry.objects.filter(opsheaderid=header).select_related(
+        'employeeid', 'contractid', 'accountid', 'workcategoryid'
+    )
+
+    active_assignments = CrewAssignment.objects.filter(
+        shifter=request.user, enddate__isnull=True
+    ).select_related('employee')
+
+    guest_employees = User.objects.filter(roleid__accessid__accessid=8, isactive=True)
+
+    contracts = Contract.objects.filter(isactive=1)
+    accounts = Account.objects.filter(isactive=1)
+    workcategories = Workcategory.objects.filter(isactive=1)
+
+    prefill = {}
+    for assignment in active_assignments:
+        last = OperationsEntry.objects.filter(
+            employeeid=assignment.employee
+        ).order_by('-opsentryid').first()
+        if last:
+            prefill[assignment.employee.employeeid] = {
+                'contractid': last.contractid_id,
+                'accountid': last.accountid_id,
+            }
+
+    return render(request, 'timesheets/ops_sheet.html', {
+        'header': header,
+        'entries': entries,
+        'active_assignments': active_assignments,
+        'guest_employees': guest_employees,
+        'contracts': contracts,
+        'accounts': accounts,
+        'workcategories': workcategories,
+        'prefill': prefill,
+        'hours_remaining': round(hours_remaining, 1),
+    })
+
+
+@login_required(login_url='login')
+@login_required(login_url='login')
+def delete_ops_draft(request, pk):
+    if request.method == 'POST':
+        header = get_object_or_404(OperationsHeader, opsheaderid=pk, shifterid=request.user, overallstatus='Draft')
+        header.delete()
+    return redirect('my_ops_sheets')
+
+
+def my_ops_sheets(request):
+    if request.user.access_level != 5:
+        return redirect('profile')
+
+    sheets = OperationsHeader.objects.filter(shifterid=request.user).annotate(
+        entry_count=Count('operationsentry'),
+        total_hours=Sum('operationsentry__hoursworked')
+    ).order_by('-shiftdate', 'shifttype')
+
+    return render(request, 'timesheets/my_ops_sheets.html', {'sheets': sheets})

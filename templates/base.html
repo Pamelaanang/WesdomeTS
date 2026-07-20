@@ -74,8 +74,11 @@
 
             <!-- Mine Captain (4): My Shifters and Daily Timesheets for daily approval -->
             {% if al == 4 %}
+            <a href="#"  class="flex items-center gap-3 ">
+                 <i class="fa-solid fa-people-line"></i> My People
+            </a>
             <button onclick="toggleAccordion('menu-shifter')" class="accordion-btn">
-                <span class="flex items-center gap-3"><i class="fa-solid fa-hard-hat"></i> My Shifters</span>
+                <span class="flex items-center gap-3"><i class="fa-solid fa-hard-hat"></i> Shifters Timesheets</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-shifter" class="hidden flex flex-col">
@@ -87,7 +90,7 @@
                         class="fa-solid fa-circle-xmark"></i> Rejected</a>
             </div>
             <button onclick="toggleAccordion('menu-daily')" class="accordion-btn">
-                <span class="flex items-center gap-3"><i class="fa-solid fa-calendar-days"></i> Daily Timesheets</span>
+                <span class="flex items-center gap-3"><i class="fa-solid fa-calendar-days"></i> Crew Timesheets</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-daily" class="hidden flex flex-col">
@@ -104,13 +107,13 @@
             {% if al == 5 %}
             <a href="{% url 'my_crew' %}" class="flex items-center gap-3"><i class="fa-solid fa-hard-hat"></i> My Crew</a>
             <button onclick="toggleAccordion('menu-daily-sheets')" class="accordion-btn">
-                <span class="flex items-center gap-3"><i class="fa-solid fa-calendar-days"></i> Daily Sheets</span>
+                <span class="flex items-center gap-3"><i class="fa-solid fa-calendar-days"></i> Crew Sheets</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-daily-sheets" class="hidden flex flex-col">
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-pen-to-square"></i> Submit Daily Sheets</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> Daily Approvals</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-xmark"></i> Daily Rejections</a>
+                <a href="{% url 'my_ops_sheets' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_ops_sheets,ops_sheet,new_ops_sheet' %}font-semibold{% endif %}"><i class="fa-solid fa-pen-to-square"></i> Submit Crew Daily Sheets</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> Crew Daily Approvals</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-xmark"></i> Crew Daily Rejections</a>
             </div>
             <button onclick="toggleAccordion('menu-personal-shifter')" class="accordion-btn">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-file-lines"></i> Personal Timesheets</span>
@@ -206,6 +209,26 @@
     </main>
 
     <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const label = document.querySelector('.back-label');
+            if (!label || !document.referrer) return;
+            try {
+                const path = new URL(document.referrer).pathname;
+                let text = null;
+                if (path === '/profile/' || path === '/profile') text = 'Back to Profile';
+                else if (path.startsWith('/operations/my-sheets')) text = 'My Daily Sheets';
+                else if (path.startsWith('/timesheet/drafts')) text = 'My Drafts';
+                else if (path.startsWith('/supervisor/inbox')) text = 'Pending Submissions';
+                else if (path.startsWith('/payroll/processed/employee')) text = 'Processed';
+                else if (path.startsWith('/payroll/processed')) text = 'Processed';
+                else if (path.startsWith('/payroll/unprocessed')) text = 'Unprocessed';
+                else if (path.startsWith('/crew/assignments/') && path.length > '/crew/assignments/'.length) text = 'Crew Assignments';
+                else if (path.startsWith('/crew/assignments')) text = 'Crew Assignments';
+                else if (path.startsWith('/crew/my-crew')) text = 'My Crew';
+                if (text) label.textContent = text;
+            } catch (e) {}
+        });
+
         function toggleAccordion(id) {
             const menu = document.getElementById(id);
             const isOpen = !menu.classList.contains('hidden');

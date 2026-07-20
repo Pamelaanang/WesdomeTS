@@ -329,9 +329,9 @@
                 class="flex items-center gap-3 px-4 py-3 bg-[#FFBB7C] text-gray-700 rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-file-pen"></i> Continue Draft
             </a>
-            <a href="#"
+            <a href="{% url 'new_ops_sheet' %}"
                 class="flex items-center gap-3 px-4 py-3 bg-[#8A6B28] text-white rounded-xl text-sm font-medium hover:opacity-90">
-                <i class="fa-solid fa-clipboard-list"></i> Create Daily Sheet
+                <i class="fa-solid fa-clipboard-list"></i> Create Daily Crew Sheet
             </a>
             {% else %}
             <form method="POST" action="{% url 'new_timesheet' %}">

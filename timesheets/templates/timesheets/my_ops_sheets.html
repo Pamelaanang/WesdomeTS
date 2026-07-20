@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
+    <div class="flex items-center justify-between mb-2">
+        <button onclick="history.back()" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline cursor-pointer">
+            <i class="fa-solid fa-arrow-left"></i> <span class="back-label">Back to Profile</span>
+        </button>
+        <a href="{% url 'new_ops_sheet' %}"
+            class="bg-[#28348A] text-white text-sm px-4 py-1.5 rounded-xl hover:opacity-90">+ New Daily Sheet</a>
+    </div>
+    <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+    <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+    <p class="text-center text-sm text-gray-500 mt-1"><span class="font-semibold text-gray-700">CREW SHEETS:</span> Your daily crew sheets. Click a card to open.</p>
+</div>
+
+<div class="container mx-auto mb-8">
+    <div class="flex flex-wrap gap-4">
+        {% for sheet in sheets %}
+        <div class="bg-white rounded-xl shadow p-5 w-52 flex flex-col items-center gap-2 hover:shadow-md hover:border hover:border-[#28348A] transition-all">
+            <a href="{% url 'ops_sheet' sheet.opsheaderid %}" class="flex flex-col items-center gap-2 w-full">
+                <p class="text-xs font-semibold">{{ sheet.shiftdate|date:"M j, Y" }}</p>
+                <p class="text-xs text-gray-500 text-center">{{ sheet.shifttype }} Shift &mdash; {{ sheet.crewid.crewname }}</p>
+                <p class="text-xs">{{ sheet.entry_count }} entr{{ sheet.entry_count|pluralize:"y,ies" }}</p>
+                <p class="font-semibold text-sm">{{ sheet.total_hours|default:"0" }} hrs</p>
+                {% if sheet.overallstatus == 'Draft' %}
+                <span class="mt-1 bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-0.5 rounded-full">Draft</span>
+                {% elif sheet.overallstatus == 'Submitted' %}
+                <span class="mt-1 bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full">Submitted</span>
+                {% elif sheet.overallstatus == 'Approved' %}
+                <span class="mt-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Approved</span>
+                {% else %}
+                <span class="mt-1 bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-0.5 rounded-full">{{ sheet.overallstatus }}</span>
+                {% endif %}
+            </a>
+            {% if sheet.overallstatus == 'Draft' %}
+            <form method="POST" action="{% url 'delete_ops_draft' sheet.opsheaderid %}" onsubmit="return confirm('Delete this draft sheet? This cannot be undone.')">
+                {% csrf_token %}
+                <button type="submit" class="text-xs text-white bg-red-500 hover:bg-red-600 px-4 py-1 rounded-full cursor-pointer mt-1">Delete</button>
+            </form>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="mx-auto text-gray-400 text-sm py-6">You have no daily sheets yet.</div>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock content %}

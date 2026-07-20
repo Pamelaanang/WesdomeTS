@@ -209,14 +209,12 @@ class OperationsHeader(models.Model):
     shifterid = models.ForeignKey('users.User', models.DO_NOTHING, db_column='ShifterID')
     shiftdate = models.DateField(db_column='ShiftDate')
     shifttype = models.CharField(db_column='ShiftType', max_length=5, choices=[('Day', 'Day'), ('Night', 'Night')])
-    crewid = models.ForeignKey(Crews, models.DO_NOTHING, db_column='CrewID', blank=True, null=True)
+    crewid = models.ForeignKey(Crews, models.DO_NOTHING, db_column='CrewID')
     overallstatus = models.CharField(db_column='OverallStatus', max_length=25, default='Draft')
     startedat = models.DateTimeField(db_column='StartedAt', auto_now_add=True)
     submittedat = models.DateTimeField(db_column='SubmittedAt', blank=True, null=True)
     ohapprovedby_capt = models.ForeignKey('users.User', models.DO_NOTHING, db_column='OpsHApprovedBy_Capt', blank=True, null=True, related_name='captain_headerapproved_%(class)s')
     ohapprovedat_capt = models.DateTimeField(db_column='OHApprovedAt_Capt', blank=True, null=True)
-    ohapprovedby_sup = models.ForeignKey('users.User', models.DO_NOTHING, db_column='OpsHApprovedBy_Sup', blank=True, null=True, related_name='supervisor_headerapproved_%(class)s')
-    ohapprovedat_sup = models.DateTimeField(db_column='OHApprovedAt_Sup', blank=True, null=True)
   
     class Meta:
         managed = True
@@ -228,8 +226,7 @@ class OperationsEntry(models.Model):
     opsheaderid = models.ForeignKey(OperationsHeader, models.DO_NOTHING, db_column='OpsHeaderID')
     employeeid = models.ForeignKey('users.User', models.DO_NOTHING, db_column='EmployeeID')
     contractid = models.ForeignKey(Contract, models.DO_NOTHING, db_column='ContractID')
-    accountid = models.ForeignKey(Account, models.DO_NOTHING, db_column='AccountID')
-    leavetypeid = models.ForeignKey('LeaveType', models.DO_NOTHING, db_column='LeaveTypeID', blank=True, null=True)  # Field name made lowercase.
+    accountid = models.ForeignKey(Account, models.DO_NOTHING, db_column='AccountID', blank=True, null=True)
     workcategoryid = models.ForeignKey(Workcategory, models.DO_NOTHING, db_column='WorkCategoryID', blank=True, null=True)
     hoursworked = models.DecimalField(db_column='HoursWorked', max_digits=5, decimal_places=2)
     remarks = models.TextField(db_column='Remarks', blank=True, null=True)
@@ -247,10 +244,27 @@ class OperationsEntry(models.Model):
     approvedat_capt = models.DateTimeField(db_column='ApprovedAt_Capt', blank=True, null=True)
     approvedby_capt = models.ForeignKey('users.User', models.DO_NOTHING, db_column='ApprovedBy_Capt', blank=True, null=True, related_name='captain_approved_%(class)s')
     captainnote = models.TextField(db_column='CaptainNote', blank=True, null=True)
-    approvedat_sup = models.DateTimeField(db_column='ApprovedAt_Sup', blank=True, null=True)
-    approvedby_sup = models.ForeignKey('users.User', models.DO_NOTHING, db_column='ApprovedBy_Sup', blank=True, null=True, related_name='supervisor_approved_%(class)s')
-    superintendentnote = models.TextField(db_column='SuperintendentNote', blank=True, null=True)
 
     class Meta:
         managed = True
         db_table = 'OperationsEntry'
+
+
+BONUS_RATE_CODES = [('1x','1x'), ('2x','2x'), ('3x','3x'), ('1','1'), ('2','2'), ('3','3'), 
+                    ('4','4'), ('5','5'), ('6','6'), ('7','7'), ('8','8'), ]
+
+class OperationsBonus(models.Model):
+    opsbonusid = models.AutoField(db_column='OpsBonusID', primary_key=True)
+    employeeid = models.ForeignKey('users.User', models.DO_NOTHING, db_column='EmployeeID')
+    bonusmonth = models.DateField(db_column='BonusMonth')
+    bonusratecode = models.CharField(db_column='BonusRateCode', max_length=2, choices=BONUS_RATE_CODES)
+    notes = models.TextField(db_column='Notes', blank=True, null=True)
+    reviewedby = models.ForeignKey('users.User', models.DO_NOTHING, db_column='ReviewedBy', blank=True, null=True, related_name='reviewed_%(class)s')
+    reviewedat = models.DateTimeField(db_column='ReviewedAt', blank=True, null=True)
+    appliedbypayroll = models.ForeignKey('users.User', models.DO_NOTHING, db_column='AppliedByPayroll', blank=True, null=True, related_name='applied_%(class)s')
+    appliedatpayroll = models.DateTimeField(db_column='AppliedAtPayroll', blank=True, null=True)
+
+    class Meta:
+        managed = True
+        db_table = 'OperationsBonus'
+        unique_together = (('employeeid', 'bonusmonth'),)
