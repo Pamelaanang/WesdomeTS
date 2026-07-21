@@ -69,7 +69,14 @@
                 <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
                         class="fa-solid fa-circle-xmark"></i> Rejected</a>
             </div>
-            <a href="{% url 'crew_assignments' %}" class="flex items-center gap-3"><i class="fa-solid fa-people-group"></i> Crew Assignments</a>
+            <button onclick="toggleAccordion('menu-management')" class="accordion-btn">
+                <span class="flex items-center gap-3"><i class="fa-solid fa-screwdriver-wrench"></i> Management</span>
+                <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
+            </button>
+            <div id="menu-management" class="hidden flex flex-col">
+                <a href="{% url 'crew_assignments' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-people-group"></i> Crew Assignments</a>
+                <a href="{% url 'contract_account_management' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-link"></i> Contract-Cost Center</a>
+            </div>
             {% endif %}
 
             <!-- Mine Captain (4): My Shifters and Daily Timesheets for daily approval -->
@@ -224,6 +231,7 @@
                 else if (path.startsWith('/payroll/unprocessed')) text = 'Unprocessed';
                 else if (path.startsWith('/crew/assignments/') && path.length > '/crew/assignments/'.length) text = 'Crew Assignments';
                 else if (path.startsWith('/crew/assignments')) text = 'Crew Assignments';
+                else if (path.startsWith('/superintendent/contract-accounts')) text = 'Contract-Cost Center';
                 else if (path.startsWith('/crew/my-crew')) text = 'My Crew';
                 if (text) label.textContent = text;
             } catch (e) {}

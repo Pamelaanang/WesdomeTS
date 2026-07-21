@@ -5,9 +5,10 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from users.models import User, Department, CrewAssignment
-from .models import MainHeader, MainEntry, Crews, Workcategory, LeaveType, OperationsHeader, OperationsEntry, Contract, Account
+from .models import MainHeader, MainEntry, Crews, Workcategory, LeaveType, OperationsHeader, OperationsEntry, Contract, Account, ContractAccount, ContractSeries
 from django.utils import timezone
 from django.db.models import Sum, Count, Min, Max, Q
+from django.http import JsonResponse
 
 # Create your views here.
 @login_required(login_url = 'login')
@@ -456,7 +457,6 @@ def ops_sheet(request, pk):
     guest_employees = User.objects.filter(roleid__accessid__accessid=8, isactive=True)
 
     contracts = Contract.objects.filter(isactive=1)
-    accounts = Account.objects.filter(isactive=1)
     workcategories = Workcategory.objects.filter(isactive=1)
 
     prefill = {}
@@ -476,14 +476,12 @@ def ops_sheet(request, pk):
         'active_assignments': active_assignments,
         'guest_employees': guest_employees,
         'contracts': contracts,
-        'accounts': accounts,
         'workcategories': workcategories,
         'prefill': prefill,
         'hours_remaining': round(hours_remaining, 1),
     })
 
 
-@login_required(login_url='login')
 @login_required(login_url='login')
 def delete_ops_draft(request, pk):
     if request.method == 'POST':
@@ -502,3 +500,52 @@ def my_ops_sheets(request):
     ).order_by('-shiftdate', 'shifttype')
 
     return render(request, 'timesheets/my_ops_sheets.html', {'sheets': sheets})
+
+
+@login_required(login_url='login')
+def contract_account_management(request):
+    if request.user.access_level != 2:
+        return redirect('profile')
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'add':
+            contract_id = request.POST.get('contractid')
+            account_id = request.POST.get('accountid')
+            if contract_id and account_id:
+                ContractAccount.objects.get_or_create(
+                    contractid_id=contract_id,
+                    accountid_id=account_id
+                )
+
+        elif action == 'remove':
+            link_id = request.POST.get('contractaccountid')
+            ContractAccount.objects.filter(contractaccountid=link_id).delete()
+
+        return redirect('contract_account_management')
+
+    series_list = ContractSeries.objects.prefetch_related(
+        'contracts__contractaccount_set__accountid'
+    ).filter(contracts__isactive=1).distinct()
+
+    unassigned = Contract.objects.filter(isactive=1).exclude(series__isnull=False).prefetch_related('contractaccount_set__accountid')
+    all_accounts = Account.objects.filter(isactive=1)
+
+    return render(request, 'timesheets/contract_account_management.html', {
+        'series_list': series_list,
+        'unassigned': unassigned,
+        'all_accounts': all_accounts,
+    })
+
+
+@login_required(login_url='login')
+def accounts_for_contract(request):
+    contract_id = request.GET.get('contract')
+    if not contract_id:
+        return JsonResponse([], safe=False)
+    accounts = Account.objects.filter(
+        contractaccount__contractid=contract_id,
+        isactive=1
+    ).values('accountid', 'accountcode', 'accounttitle')
+    return JsonResponse(list(accounts), safe=False)

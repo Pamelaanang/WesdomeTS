@@ -180,11 +180,26 @@ class Workordercache(models.Model):
         db_table = 'WorkOrderCache'
 
 
+class ContractSeries(models.Model):
+    seriesid = models.AutoField(db_column='SeriesID', primary_key=True)
+    seriesname = models.CharField(db_column='SeriesName', max_length=100)
+    sortorder = models.IntegerField(db_column='SortOrder', default=0)
+
+    class Meta:
+        managed = True
+        db_table = 'ContractSeries'
+        ordering = ['sortorder', 'seriesname']
+
+    def __str__(self):
+        return self.seriesname
+
+
 class Contract(models.Model):
     contractid= models.AutoField(db_column='ContractID', primary_key=True)
     contractcode = models.CharField(db_column='ContractCode', max_length=20)
     contracttitle = models.CharField(db_column='ContractTitle', max_length=255)
     contractdescription = models.TextField(db_column='ContractDescription', blank=True, null=True)
+    series = models.ManyToManyField(ContractSeries, db_table='ContractSeriesMap', blank=True, related_name='contracts')
     isactive = models.IntegerField(db_column='IsActive', default=1)
 
     class Meta:
@@ -202,6 +217,17 @@ class Account(models.Model):
     class Meta:
         managed = True
         db_table = 'Account'
+
+
+class ContractAccount(models.Model):
+    contractaccountid = models.AutoField(db_column='ContractAccountID', primary_key=True)
+    contractid = models.ForeignKey(Contract, models.CASCADE, db_column='ContractID')
+    accountid = models.ForeignKey(Account, models.CASCADE, db_column='AccountID')
+
+    class Meta:
+        managed = True
+        db_table = 'ContractAccount'
+        unique_together = (('contractid', 'accountid'),)
 
 
 class OperationsHeader(models.Model):
@@ -268,3 +294,24 @@ class OperationsBonus(models.Model):
         managed = True
         db_table = 'OperationsBonus'
         unique_together = (('employeeid', 'bonusmonth'),)
+
+
+BONUS_TYPE_CHOICES = [('Year-End', 'Year-End'), ('Ad-Hoc', 'Ad-Hoc')]
+
+class EmployeeBonus(models.Model):
+    employeebonusid = models.AutoField(db_column='EmployeeBonusID', primary_key=True)
+    employeeid = models.ForeignKey('users.User', models.DO_NOTHING, db_column='EmployeeID', related_name='bonuses')
+    bonustype = models.CharField(db_column='BonusType', max_length=10, choices=BONUS_TYPE_CHOICES)
+    periodstart = models.DateField(db_column='PeriodStart')
+    periodend = models.DateField(db_column='PeriodEnd')
+    bonusratecode = models.CharField(db_column='BonusRateCode', max_length=2, choices=BONUS_RATE_CODES)
+    notes = models.TextField(db_column='Notes', blank=True, null=True)
+    assignedby = models.ForeignKey('users.User', models.DO_NOTHING, db_column='AssignedBy', related_name='assigned_bonuses')
+    assignedat = models.DateTimeField(db_column='AssignedAt', auto_now_add=True)
+    appliedbypayroll = models.ForeignKey('users.User', models.DO_NOTHING, db_column='AppliedByPayroll', blank=True, null=True, related_name='applied_employee_bonuses')
+    appliedatpayroll = models.DateTimeField(db_column='AppliedAtPayroll', blank=True, null=True)
+
+    class Meta:
+        managed = True
+        db_table = 'EmployeeBonus'
+        ordering = ['-periodend']

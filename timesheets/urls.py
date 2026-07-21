@@ -17,4 +17,6 @@ urlpatterns = [
     path('operations/my-sheets/', views.my_ops_sheets, name='my_ops_sheets'),
     path('operations/<int:pk>/', views.ops_sheet, name='ops_sheet'),
     path('operations/<int:pk>/delete/', views.delete_ops_draft, name='delete_ops_draft'),
+    path('api/accounts/', views.accounts_for_contract, name='accounts_for_contract'),
+    path('superintendent/contract-accounts/', views.contract_account_management, name='contract_account_management'),
 ]

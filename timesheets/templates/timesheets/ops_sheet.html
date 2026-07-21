@@ -153,16 +153,13 @@
                             <select name="contractid" id="contract-select" class="border rounded px-1 py-1 w-full text-xs">
                                 <option value="">-- Select --</option>
                                 {% for c in contracts %}
-                                <option value="{{ c.contractid }}">{{ c.contractcode }}</option>
+                                <option value="{{ c.contractid }}">{{ c.contractcode }} - {{ c.contracttitle }}</option>
                                 {% endfor %}
                             </select>
                         </td>
                         <td class="p-2">
                             <select name="accountid" id="account-select" class="border rounded px-1 py-1 w-full text-xs">
                                 <option value="">-- None --</option>
-                                {% for a in accounts %}
-                                <option value="{{ a.accountid }}">{{ a.accountcode }}</option>
-                                {% endfor %}
                             </select>
                         </td>
                         <td class="p-2">
@@ -253,11 +250,37 @@
 <script>
     const prefill = JSON.parse(document.getElementById('prefill-data').textContent);
 
+    function loadAccounts(contractId, selectValue) {
+        const accountSelect = document.getElementById('account-select');
+        if (!contractId) {
+            accountSelect.innerHTML = '<option value="">-- None --</option>';
+            return;
+        }
+        fetch(`/api/accounts/?contract=${contractId}`)
+            .then(r => r.json())
+            .then(accounts => {
+                accountSelect.innerHTML = '<option value="">-- None --</option>';
+                accounts.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a.accountid;
+                    opt.textContent = `${a.accountcode} - ${a.accounttitle}`;
+                    if (selectValue && a.accountid == selectValue) opt.selected = true;
+                    accountSelect.appendChild(opt);
+                });
+            });
+    }
+
+    document.getElementById('contract-select').addEventListener('change', function () {
+        loadAccounts(this.value, null);
+    });
+
     function applyPrefill(employeeId) {
         if (!employeeId || !prefill[employeeId]) return;
         const p = prefill[employeeId];
-        if (p.contractid) document.getElementById('contract-select').value = p.contractid;
-        if (p.accountid) document.getElementById('account-select').value = p.accountid;
+        if (p.contractid) {
+            document.getElementById('contract-select').value = p.contractid;
+            loadAccounts(p.contractid, p.accountid);
+        }
     }
 
     function toggleAddRow() {
