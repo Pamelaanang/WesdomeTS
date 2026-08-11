@@ -117,10 +117,50 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.isactive
 
 
+class Position(models.Model):
+    positionid = models.AutoField(db_column='PositionID', primary_key=True)
+    positionname = models.CharField(db_column='PositionName', max_length=100)
+    isactive = models.IntegerField(db_column='IsActive', default=1)
+
+    class Meta:
+        managed = True
+        db_table = 'Position'
+        ordering = ['positionname']
+
+    def __str__(self):
+        return self.positionname
+
+
+class CrewCoverage(models.Model):
+    coverageid = models.AutoField(db_column='CoverageID', primary_key=True)
+    covering_shifter = models.ForeignKey('User', models.DO_NOTHING, db_column='CoveringShifterID', related_name='coverages_covering')
+    home_shifter = models.ForeignKey('User', models.DO_NOTHING, db_column='HomeShifterID', related_name='coverages_home')
+    startdate = models.DateField(db_column='StartDate')
+    enddate = models.DateField(db_column='EndDate', blank=True, null=True)
+    notes = models.TextField(db_column='Notes', blank=True, null=True)
+    assignedby = models.ForeignKey('User', models.DO_NOTHING, db_column='AssignedBy', related_name='coverages_assigned')
+    assignedat = models.DateTimeField(db_column='AssignedAt', auto_now_add=True)
+
+    class Meta:
+        managed = True
+        db_table = 'CrewCoverage'
+        ordering = ['-startdate']
+
+    def __str__(self):
+        return f"{self.covering_shifter} covering {self.home_shifter}"
+
+    @property
+    def is_active(self):
+        from django.utils import timezone
+        today = timezone.now().date()
+        return self.startdate <= today and (self.enddate is None or self.enddate >= today)
+
+
 class CrewAssignment(models.Model):
-    assignmentid = models.AutoField(db_column='AssignmentID', primary_key=True)  # Field name made lowercase.
-    shifter = models.ForeignKey(User, models.DO_NOTHING, db_column='ShifterID' , related_name='crew_led') 
-    employee = models.ForeignKey('User', models.DO_NOTHING, db_column='EmployeeID', related_name='crew_assignments') # Field name made lowercase.
+    assignmentid = models.AutoField(db_column='AssignmentID', primary_key=True)
+    shifter = models.ForeignKey(User, models.DO_NOTHING, db_column='ShifterID', related_name='crew_led')
+    employee = models.ForeignKey('User', models.DO_NOTHING, db_column='EmployeeID', related_name='crew_assignments')
+    positionid = models.ForeignKey(Position, models.SET_NULL, db_column='PositionID', blank=True, null=True)
     startdate = models.DateField(db_column='StartDate')
     enddate = models.DateField(db_column='EndDate', blank=True, null=True)
 

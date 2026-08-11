@@ -16,11 +16,12 @@
         <div>
             <h2 class="text-xl font-bold">{{ employee.firstname }} {{ employee.lastname }}</h2>
             <p class="text-sm text-gray-500 mt-1">{{ employee.roleid.rolename }} &mdash; {{ employee.roleid.departmentid.departmentname }}</p>
+            <p class="text-sm font-semibold text-[#28348A] mt-1">{{ processed_timesheets|length }} paid sheet{{ processed_timesheets|length|pluralize }} in the last 6 months</p>
         </div>
     </div>
 </div>
 
-{% regroup processed_timesheets by paidat|date:"F Y" as month_groups %}
+{% regroup processed_timesheets by date_from|date:"F Y" as month_groups %}
 
 {% for month in month_groups %}
 <div class="container mx-auto mb-6">

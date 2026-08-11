@@ -21,6 +21,9 @@
             <a href="{% url 'ops_sheet' sheet.opsheaderid %}" class="flex flex-col items-center gap-2 w-full">
                 <p class="text-xs font-semibold">{{ sheet.shiftdate|date:"M j, Y" }}</p>
                 <p class="text-xs text-gray-500 text-center">{{ sheet.shifttype }} Shift &mdash; {{ sheet.crewid.crewname }}</p>
+                {% if sheet.coverageid %}
+                <p class="text-xs text-green-700 font-medium text-center">Covering {{ sheet.coverageid.home_shifter.firstname }} {{ sheet.coverageid.home_shifter.lastname }}</p>
+                {% endif %}
                 <p class="text-xs">{{ sheet.entry_count }} entr{{ sheet.entry_count|pluralize:"y,ies" }}</p>
                 <p class="font-semibold text-sm">{{ sheet.total_hours|default:"0" }} hrs</p>
                 {% if sheet.overallstatus == 'Draft' %}

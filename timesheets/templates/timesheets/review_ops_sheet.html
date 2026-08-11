@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<!-- HEADER CARD -->
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow">
+    <a href="{% url 'ops_approval_inbox' %}" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline mb-2">
+        <i class="fa-solid fa-arrow-left"></i> Ops Inbox
+    </a>
+    <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+    <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+    <p class="text-center text-sm text-gray-500 mt-1">
+        <span class="font-semibold text-gray-700">OPERATIONS REVIEW:</span> Approve or reject each entry below.
+    </p>
+
+    {% if header.coverageid %}
+    <div class="mt-3 mx-4 bg-green-50 border border-green-300 text-green-800 text-xs rounded px-3 py-2">
+        <i class="fa-solid fa-arrows-rotate mr-1"></i>
+        Coverage sheet &mdash; submitted on behalf of <strong>{{ header.coverageid.home_shifter.firstname }} {{ header.coverageid.home_shifter.lastname }}</strong>'s crew
+    </div>
+    {% endif %}
+
+    <div class="flex flex-wrap justify-between items-center mt-4 text-sm gap-y-2 px-4">
+        <span>Shifter: <span class="font-medium">{{ header.shifterid.firstname }} {{ header.shifterid.lastname }}</span></span>
+        <span>Date: <span class="font-medium">{{ header.shiftdate|date:"M j, Y" }}</span></span>
+        <span>Shift: <span class="font-medium">{{ header.shifttype }}</span></span>
+        <span>Crew: <span class="font-medium">{{ header.crewid.crewname }}</span></span>
+        <span>Status: <span class="font-medium text-[#ffbd59]">{{ header.overallstatus }}</span></span>
+    </div>
+</div>
+
+<!-- STATUS BANNER -->
+<div class="container mx-auto mt-2 px-4">
+    {% if has_unreviewed %}
+    <div class="bg-yellow-50 border border-yellow-400 text-yellow-800 text-sm rounded px-4 py-2">
+        <i class="fa-solid fa-circle-exclamation mr-1"></i>
+        {{ entries|length }} entr{{ entries|length|pluralize:"y,ies" }} to review — approve or reject each row, then click Finish Review.
+    </div>
+    {% else %}
+    <div class="bg-green-50 border border-green-300 text-green-800 text-sm rounded px-4 py-2">
+        <i class="fa-solid fa-circle-check mr-1"></i>
+        All entries reviewed. Click Finish Review to finalise.
+    </div>
+    {% endif %}
+</div>
+
+<!-- ENTRY TABLE -->
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mt-4">
+    <div class="overflow-x-auto">
+        <table class="w-full text-xs min-w-[960px]">
+            <thead>
+                <tr class="text-black text-center border-b">
+                    <th class="p-2">Employee</th>
+                    <th class="p-2">Contract</th>
+                    <th class="p-2">Account</th>
+                    <th class="p-2">Work Category</th>
+                    <th class="p-2">Hours</th>
+                    <th class="p-2">Haulage / Footage</th>
+                    <th class="p-2">Remarks</th>
+                    <th class="p-2">Status</th>
+                    {% if has_rejected %}<th class="p-2">Note</th>{% endif %}
+                    <th class="p-2"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in entries %}
+
+                {% if entry.linestatus == 'Approved' %}
+                <tr class="border-b bg-green-50 text-center">
+                {% elif entry.linestatus == 'Rejected' %}
+                <tr class="border-b bg-red-50 text-center">
+                {% else %}
+                <tr class="border-b hover:bg-gray-50 text-center">
+                {% endif %}
+
+                    <td class="p-2">{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</td>
+                    <td class="p-2">{{ entry.contractid.contractcode }}</td>
+                    <td class="p-2">{{ entry.accountid.accountcode|default:"—" }}</td>
+                    <td class="p-2">{{ entry.workcategoryid.categoryname|default:"—" }}</td>
+                    <td class="p-2">{{ entry.hoursworked }}</td>
+                    <td class="p-2 text-gray-500">
+                        {% if entry.tonnesorehauled %}Ore: {{ entry.tonnesorehauled }}t &nbsp;{% endif %}
+                        {% if entry.tonneswastehauled %}Waste: {{ entry.tonneswastehauled }}t &nbsp;{% endif %}
+                        {% if entry.tonnesoreskipped %}Skip: {{ entry.tonnesoreskipped }}t &nbsp;{% endif %}
+                        {% if entry.longholefootage %}LH: {{ entry.longholefootage }}ft{% endif %}
+                        {% if not entry.tonnesorehauled and not entry.tonneswastehauled and not entry.tonnesoreskipped and not entry.longholefootage %}—{% endif %}
+                    </td>
+                    <td class="p-2">{{ entry.remarks|default:"—" }}</td>
+
+                    <!-- STATUS CELL -->
+                    <td class="p-2">
+                        {% if entry.linestatus == 'Approved' %}
+                        <span class="text-green-700 font-semibold">Approved</span>
+                        {% if entry.approvedby_capt %}
+                        <br><span class="text-gray-400 text-xs">by {{ entry.approvedby_capt.firstname }} {{ entry.approvedby_capt.lastname }}</span>
+                        {% endif %}
+                        {% elif entry.linestatus == 'Rejected' %}
+                        <span class="text-red-600 font-semibold">Rejected</span>
+                        {% if entry.approvedby_capt %}
+                        <br><span class="text-gray-400 text-xs">by {{ entry.approvedby_capt.firstname }} {{ entry.approvedby_capt.lastname }}</span>
+                        {% endif %}
+                        {% else %}
+                        <span class="text-gray-400">Pending</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- NOTE CELL (conditional column) -->
+                    {% if has_rejected %}
+                    <td class="p-2 text-left text-red-600 max-w-xs">
+                        {% if entry.captainnote %}{{ entry.captainnote }}{% endif %}
+                    </td>
+                    {% endif %}
+
+                    <!-- ACTIONS CELL -->
+                    <td class="p-2">
+                        <div class="flex gap-1 justify-center">
+                            <form method="POST">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="approve">
+                                <input type="hidden" name="entryid" value="{{ entry.opsentryid }}">
+                                <button type="submit"
+                                    class="border text-xs px-3 py-1 rounded
+                                    {% if entry.linestatus == 'Approved' %}bg-green-600 text-white border-green-600{% else %}border-green-600 text-green-700 hover:bg-green-50{% endif %}">
+                                    Approve
+                                </button>
+                            </form>
+                            <button type="button" onclick="openRejectModal('{{ entry.opsentryid }}')"
+                                class="border text-xs px-3 py-1 rounded
+                                {% if entry.linestatus == 'Rejected' %}bg-red-600 text-white border-red-600{% else %}border-red-500 text-red-600 hover:bg-red-50{% endif %}">
+                                Reject
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="{% if has_rejected %}10{% else %}9{% endif %}" class="text-center text-gray-400 py-6">
+                        No entries on this sheet.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- FINISH REVIEW -->
+    <div class="mt-6 flex flex-col items-end gap-1">
+        <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="finish_review">
+            <button type="submit" {% if has_unreviewed %}disabled{% endif %}
+                class="px-6 py-2 rounded-xl text-sm font-semibold
+                {% if has_unreviewed %}bg-gray-200 text-gray-400 cursor-not-allowed{% else %}bg-[#28348A] text-white hover:opacity-90{% endif %}">
+                Finish Review
+            </button>
+        </form>
+        {% if has_unreviewed %}
+        <p class="text-xs text-gray-400">Review all entries before finishing.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- REJECT MODAL -->
+<div id="reject-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl p-6 w-96 shadow-xl">
+        <h3 class="font-semibold text-gray-800 mb-1">Rejection Note</h3>
+        <p class="text-xs text-gray-500 mb-3">Required — explain what needs correcting on this entry.</p>
+        <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reject">
+            <input type="hidden" name="entryid" id="modal-entry-id">
+            <textarea name="captainnote" id="modal-note" rows="4" required
+                placeholder="Describe what's incorrect..."
+                class="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-4 focus:outline-none focus:border-[#28348A] resize-none"></textarea>
+            <div class="flex gap-2 justify-end">
+                <button type="button" onclick="closeRejectModal()"
+                    class="text-sm px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit"
+                    class="text-sm px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                    Done
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openRejectModal(entryId) {
+    document.getElementById('modal-entry-id').value = entryId;
+    document.getElementById('modal-note').value = '';
+    document.getElementById('reject-modal').classList.remove('hidden');
+    document.getElementById('modal-note').focus();
+}
+function closeRejectModal() {
+    document.getElementById('reject-modal').classList.add('hidden');
+}
+document.getElementById('reject-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeRejectModal();
+});
+</script>
+
+{% endblock %}

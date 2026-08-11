@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.conf import settings
 from users.forms import UserLoginForm
-from users.models import User, CrewAssignment, Roles
+from users.models import User, CrewAssignment, Roles, Position, CrewCoverage
 from django.contrib.auth.decorators import login_required
 import random
 import string
@@ -38,7 +38,7 @@ def logout_view(request):
 @login_required(login_url='login')
 def user_list_view(request):
     if request.user.access_level != 1:
-        return redirect('home')
+        return redirect('profile')
     users = User.objects.select_related('roleid__departmentid').order_by('roleid__departmentid__departmentname', 'lastname')
     roles = Roles.objects.select_related('departmentid').order_by('departmentid__departmentname', 'rolename')
     active_supervisors = User.objects.filter(isactive=True).select_related('roleid').order_by('lastname', 'firstname')
@@ -52,7 +52,7 @@ def user_list_view(request):
 @login_required(login_url='login')
 def generate_password(request, employeeid):
     if request.user.access_level != 1:
-        return redirect('home')
+        return redirect('profile')
     
     user = User.objects.get(employeeid=employeeid)
     temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
@@ -76,7 +76,7 @@ def password_reset_view(request):
             request.user.is_temporary = False
             request.user.save()
             update_session_auth_hash(request, request.user)  # Keep the user logged in after password change
-            return redirect('home')
+            return redirect('profile')
         else:
             error_message = "Passwords do not match."
             return render(request, 'password_reset.html', {'error_message': error_message})
@@ -108,7 +108,7 @@ def profile(request):
             submittedat__year=today.year, submittedat__month=today.month
         ).count()
         ops_completed = OperationsHeader.objects.filter(
-            overallstatus='Completed', ohapprovedat_sup__year=today.year, ohapprovedat_sup__month=today.month
+            overallstatus='Completed', ohapprovedat_capt__year=today.year, ohapprovedat_capt__month=today.month
         ).count()
         return render(request, 'users/profile.html', {
             'today': today,
@@ -224,8 +224,8 @@ def profile(request):
         ).count()
         ops_crew_completed = OperationsHeader.objects.filter(
             overallstatus='Completed',
-            ohapprovedat_sup__year=today.year,
-            ohapprovedat_sup__month=today.month
+            ohapprovedat_capt__year=today.year,
+            ohapprovedat_capt__month=today.month
         ).count()
         return render(request, 'users/profile.html', {
             'today': today,
@@ -272,7 +272,7 @@ def upload_profile_photo(request):
 @login_required(login_url='login')
 def add_employee(request):
     if request.user.access_level != 1:
-        return redirect('home')
+        return redirect('profile')
 
     if request.method == 'POST':
         employeeid   = request.POST.get('employeeid', '').strip()
@@ -311,7 +311,7 @@ def add_employee(request):
 @login_required(login_url='login')
 def replace_employee(request, employeeid):
     if request.user.access_level != 1:
-        return redirect('home')
+        return redirect('profile')
 
     leaving = get_object_or_404(User, employeeid=employeeid)
     subordinates = User.objects.filter(supervisorid=leaving, isactive=True)
@@ -415,8 +415,14 @@ def crew_assignment_detail(request, shifter_id):
         if action == 'add_member':
             employee_id = request.POST.get('employee_id')
             start_date = request.POST.get('startdate')
+            position_id = request.POST.get('positionid') or None
             employee = get_object_or_404(User, employeeid=employee_id, roleid__accessid__accessid=8, isactive=True)
-            CrewAssignment.objects.create(shifter=shifter, employee=employee, startdate=start_date)
+            CrewAssignment.objects.create(
+                shifter=shifter,
+                employee=employee,
+                positionid_id=position_id,
+                startdate=start_date
+            )
             messages.success(request, f'{employee.firstname} {employee.lastname} added to crew.')
 
         elif action == 'remove_member':
@@ -428,10 +434,13 @@ def crew_assignment_detail(request, shifter_id):
 
         return redirect('crew_assignment_detail', shifter_id=shifter_id)
 
+    positions = Position.objects.filter(isactive=1)
+
     return render(request, 'users/crew_assignment_detail.html', {
         'shifter': shifter,
         'active_assignments': active_assignments,
-        'available_employees': available_employees
+        'available_employees': available_employees,
+        'positions': positions,
     })
 
 
@@ -446,3 +455,52 @@ def my_crew(request):
     ).select_related('employee__roleid')
 
     return render(request, 'users/my_crew.html', {'active_assignments': active_assignments})
+
+
+@login_required(login_url='login')
+def crew_coverage(request):
+    if request.user.access_level != 2:
+        return redirect('profile')
+
+    today = timezone.now().date()
+    shifters = User.objects.filter(roleid__accessid__accessid=5, isactive=True).order_by('lastname', 'firstname')
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'add':
+            covering_id = request.POST.get('covering_shifter')
+            home_id = request.POST.get('home_shifter')
+            startdate = request.POST.get('startdate')
+            notes = request.POST.get('notes') or None
+            if covering_id and home_id and startdate and covering_id != home_id:
+                CrewCoverage.objects.create(
+                    covering_shifter_id=covering_id,
+                    home_shifter_id=home_id,
+                    startdate=startdate,
+                    notes=notes,
+                    assignedby=request.user,
+                )
+
+        elif action == 'end':
+            coverage_id = request.POST.get('coverage_id')
+            coverage = get_object_or_404(CrewCoverage, coverageid=coverage_id)
+            coverage.enddate = today
+            coverage.save()
+
+        return redirect('crew_coverage')
+
+    active_coverages = CrewCoverage.objects.filter(
+        enddate__isnull=True
+    ).select_related('covering_shifter', 'home_shifter', 'assignedby')
+
+    past_coverages = CrewCoverage.objects.filter(
+        enddate__isnull=False
+    ).select_related('covering_shifter', 'home_shifter').order_by('-enddate')[:20]
+
+    return render(request, 'users/crew_coverage.html', {
+        'shifters': shifters,
+        'active_coverages': active_coverages,
+        'past_coverages': past_coverages,
+        'today': today,
+    })

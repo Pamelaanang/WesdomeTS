@@ -1,13 +1,16 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<div class="container mx-auto p-4">
-    <button onclick="history.back()" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline cursor-pointer mb-3">
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
+    <button onclick="history.back()" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline cursor-pointer mb-2">
         <i class="fa-solid fa-arrow-left"></i> <span class="back-label">Back to Profile</span>
     </button>
-    <h2 class="text-xl font-bold mb-1">Unprocessed Submissions</h2>
-    <p class="text-sm text-gray-500 mb-6">Completed timesheets pending payment processing.</p>
+    <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+    <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+    <p class="text-center text-sm text-gray-500 mt-1"><span class="font-semibold text-gray-700">UNPROCESSED:</span> Completed timesheets pending payment processing.</p>
+</div>
 
+<div class="container mx-auto mb-8">
     <div class="flex flex-wrap gap-6">
         {% for dept in departments %}
         <a href="{% url 'payroll_unprocessed_dept' dept.departmentid %}"
@@ -24,4 +27,4 @@
     </div>
 </div>
 
-{% endblock %}
+{% endblock content %}

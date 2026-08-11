@@ -33,10 +33,10 @@
         <p class="text-xl font-semibold">{{ request.user.firstname }} {{ request.user.lastname }}</p>
         <p class="text-sm text-black mb-4">{{ request.user.roleid.rolename }}</p>
         <div class="flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm text-black">
-            <span><i class="fa-solid fa-building text-black mr-1"></i>{{ request.user.roleid.departmentid.departmentname }}</span>
-            <span><i class="fa-solid fa-id-card text-black mr-1"></i>ID: {{ request.user.employeeid }}</span>
+            <span><i class="fa-solid fa-building text-black mr-1"></i>Department: {{ request.user.roleid.departmentid.departmentname }}</span>
+            <span><i class="fa-solid fa-id-card text-black mr-1"></i>Payroll ID: {{ request.user.employeeid }}</span>
             {% if request.user.supervisorid %}
-            <span><i class="fa-solid fa-book-open-reader text-black mr-1"></i>{{ request.user.supervisorid.firstname }} {{ request.user.supervisorid.lastname }}</span>
+            <span><i class="fa-solid fa-book-open-reader text-black mr-1"></i>Supervisor: {{ request.user.supervisorid.firstname }} {{ request.user.supervisorid.lastname }}</span>
             {% endif %}
         </div>
     </div>
@@ -300,6 +300,14 @@
             <a href="#"
                 class="flex items-center gap-3 px-4 py-3 bg-[#8A6B28] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-clipboard-list"></i> Crew Daily Sheets Inbox
+            </a>
+            <a href="{% url 'crew_assignments' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#1a6b3c] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-people-group"></i> Crew Management
+            </a>
+            <a href="{% url 'contract_account_management' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#5a3e8a] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-link"></i> Contract-Cost Centre
             </a>
             {% elif al == 4 %}
             <form method="POST" action="{% url 'new_timesheet' %}">

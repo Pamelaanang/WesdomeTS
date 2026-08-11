@@ -6,7 +6,11 @@
         <i class="fa-solid fa-arrow-left"></i> <span class="back-label">Unprocessed</span>
     </button>
     <h2 class="text-xl font-bold">{{ dept.departmentname }}</h2>
-    <p class="text-sm text-gray-500 mt-1">Unprocessed submissions pending payment.</p>
+    {% if submissions %}
+    <p class="text-sm text-gray-500 mt-1">{{ submissions|length }} unprocessed submission{{ submissions|length|pluralize }} in this department.</p>
+    {% else %}
+    <p class="text-center text-gray-500 mt-1">No unprocessed submissions in this department.</p>
+    {% endif %}
 </div>
 
 {% if messages %}

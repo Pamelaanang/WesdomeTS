@@ -15,8 +15,11 @@ urlpatterns = [
     path('payroll/processed/employee/<str:employee_id>/', views.payroll_processed_employee, name='payroll_processed_employee'),
     path('operations/new/', views.new_ops_sheet, name='new_ops_sheet'),
     path('operations/my-sheets/', views.my_ops_sheets, name='my_ops_sheets'),
+    path('operations/captain/inbox/', views.ops_approval_inbox, name='ops_approval_inbox'),
+    path('operations/captain/review/<int:pk>/', views.review_ops_sheet, name='review_ops_sheet'),
     path('operations/<int:pk>/', views.ops_sheet, name='ops_sheet'),
     path('operations/<int:pk>/delete/', views.delete_ops_draft, name='delete_ops_draft'),
     path('api/accounts/', views.accounts_for_contract, name='accounts_for_contract'),
     path('superintendent/contract-accounts/', views.contract_account_management, name='contract_account_management'),
+
 ]

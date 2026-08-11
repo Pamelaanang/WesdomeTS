@@ -241,7 +241,8 @@ class OperationsHeader(models.Model):
     submittedat = models.DateTimeField(db_column='SubmittedAt', blank=True, null=True)
     ohapprovedby_capt = models.ForeignKey('users.User', models.DO_NOTHING, db_column='OpsHApprovedBy_Capt', blank=True, null=True, related_name='captain_headerapproved_%(class)s')
     ohapprovedat_capt = models.DateTimeField(db_column='OHApprovedAt_Capt', blank=True, null=True)
-  
+    coverageid = models.ForeignKey('users.CrewCoverage', models.SET_NULL, db_column='CoverageID', blank=True, null=True)
+
     class Meta:
         managed = True
         db_table = 'OperationsHeader'

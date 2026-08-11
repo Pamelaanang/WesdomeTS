@@ -55,6 +55,15 @@
                     </select>
                 </div>
                 <div class="flex flex-col gap-1">
+                    <label class="text-xs text-gray-500">Position</label>
+                    <select name="positionid" class="border rounded px-2 py-1 text-sm">
+                        <option value="">-- Select Position --</option>
+                        {% for pos in positions %}
+                        <option value="{{ pos.positionid }}">{{ pos.positionname }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex flex-col gap-1">
                     <label class="text-xs text-gray-500">Start Date</label>
                     <input type="date" name="startdate" class="border rounded px-2 py-1 text-sm" required>
                 </div>
@@ -76,6 +85,9 @@
             </div>
             <p class="font-semibold text-sm text-center">{{ assignment.employee.firstname }} {{ assignment.employee.lastname }}</p>
             <p class="text-xs text-gray-500">{{ assignment.employee.roleid.rolename }}</p>
+            {% if assignment.positionid %}
+            <p class="text-xs text-[#28348A] font-medium">{{ assignment.positionid.positionname }}</p>
+            {% endif %}
             <p class="text-xs text-gray-400">Since {{ assignment.startdate|date:"M j, Y" }}</p>
             <form method="POST" class="mt-1">
                 {% csrf_token %}

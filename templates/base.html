@@ -46,28 +46,29 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-employees" class="hidden flex flex-col">
-                <a href="{% url 'approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
-                        class="fa-solid fa-clock-rotate-left"></i> Pending</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
-                        class="fa-solid fa-circle-check"></i> Approved</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
-                        class="fa-solid fa-circle-xmark"></i> Rejected</a>
+                {% if al == 3 %}
+                <a href="{% url 'approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-clock-rotate-left"></i> Pending</a>
+                {% else %}
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-clock-rotate-left"></i> Pending</a>
+                {% endif %}
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> Approved</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-xmark"></i> Rejected</a>
             </div>
             {% endif %}
 
             <!-- Superintendent (2): Daily Timesheets (bonus review) and Crew Assignments -->
             {% if al == 2 %}
             <button onclick="toggleAccordion('menu-daily')" class="accordion-btn">
-                <span class="flex items-center gap-3"><i class="fa-solid fa-calendar-days"></i> Daily Timesheets</span>
+                <span class="flex items-center gap-3"><i class="fa-solid fa-land-mine-on"></i> Crew Sheets</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-daily" class="hidden flex flex-col">
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
-                        class="fa-solid fa-clock-rotate-left"></i> Pending</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
-                        class="fa-solid fa-circle-check"></i> Approved</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
-                        class="fa-solid fa-circle-xmark"></i> Rejected</a>
+                <!-- <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
+                        class="fa-solid fa-clock-rotate-left"></i> Pending</a> -->
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i 
+                    class="fa-solid fa-calendar-days"></i> Daily Approved Sheets</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i 
+                    class="fa-solid fa-person-digging"></i> Individual Approved Sheets</a>
             </div>
             <button onclick="toggleAccordion('menu-management')" class="accordion-btn">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-screwdriver-wrench"></i> Management</span>
@@ -75,6 +76,7 @@
             </button>
             <div id="menu-management" class="hidden flex flex-col">
                 <a href="{% url 'crew_assignments' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-people-group"></i> Crew Assignments</a>
+                <a href="{% url 'crew_coverage' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-arrows-rotate"></i> Crew Coverage</a>
                 <a href="{% url 'contract_account_management' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-link"></i> Contract-Cost Center</a>
             </div>
             {% endif %}
@@ -96,12 +98,12 @@
                 <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
                         class="fa-solid fa-circle-xmark"></i> Rejected</a>
             </div>
-            <button onclick="toggleAccordion('menu-daily')" class="accordion-btn">
+            <button onclick="toggleAccordion('menu-daily-captain')" class="accordion-btn">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-calendar-days"></i> Crew Timesheets</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
-            <div id="menu-daily" class="hidden flex flex-col">
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
+            <div id="menu-daily-captain" class="hidden flex flex-col">
+                <a href="{% url 'ops_approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
                         class="fa-solid fa-clock-rotate-left"></i> Pending</a>
                 <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
                         class="fa-solid fa-circle-check"></i> Approved</a>
@@ -141,7 +143,7 @@
             </button>
             <div id="menu-unprocessed" class="hidden flex flex-col">
                 <a href="{% url 'payroll_unprocessed' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-building-user"></i> Departments</a>
-                <a href="" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-hard-hat"></i> Daily Crew</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-hard-hat"></i> Daily Crew</a>
             </div>
             <a href="{% url 'payroll_processed' %}" class="flex items-center gap-3"><i class="fa-solid fa-building"></i> Processed</a>
             <button onclick="toggleAccordion('menu-crew')" class="accordion-btn">
@@ -218,22 +220,40 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const label = document.querySelector('.back-label');
-            if (!label || !document.referrer) return;
+            if (!label) return;
+
+            const storageKey = 'backReferrer_' + window.location.pathname;
+
+            function labelForPath(path) {
+                if (path === '/profile/' || path === '/profile') return 'Back to Profile';
+                if (path.startsWith('/operations/my-sheets')) return 'My Daily Sheets';
+                if (path.startsWith('/timesheet/drafts')) return 'My Drafts';
+                if (path.startsWith('/supervisor/inbox')) return 'Pending Submissions';
+                if (path.startsWith('/payroll/processed/employee')) return 'Processed';
+                if (path.startsWith('/payroll/processed')) return 'Processed';
+                if (path.match(/\/payroll\/unprocessed\/\d+\/timesheet\//)) return 'Department';
+                if (path.match(/\/payroll\/unprocessed\/\d+\//)) return 'Unprocessed';
+                if (path.startsWith('/payroll/unprocessed')) return 'Unprocessed';
+                if (path.startsWith('/crew/assignments/') && path.length > '/crew/assignments/'.length) return 'Crew Assignments';
+                if (path.startsWith('/crew/assignments')) return 'Crew Assignments';
+                if (path.startsWith('/crew/coverage')) return 'Crew Coverage';
+                if (path.startsWith('/superintendent/contract-accounts')) return 'Contract-Cost Center';
+                if (path.startsWith('/crew/my-crew')) return 'My Crew';
+                return null;
+            }
+
             try {
-                const path = new URL(document.referrer).pathname;
-                let text = null;
-                if (path === '/profile/' || path === '/profile') text = 'Back to Profile';
-                else if (path.startsWith('/operations/my-sheets')) text = 'My Daily Sheets';
-                else if (path.startsWith('/timesheet/drafts')) text = 'My Drafts';
-                else if (path.startsWith('/supervisor/inbox')) text = 'Pending Submissions';
-                else if (path.startsWith('/payroll/processed/employee')) text = 'Processed';
-                else if (path.startsWith('/payroll/processed')) text = 'Processed';
-                else if (path.startsWith('/payroll/unprocessed')) text = 'Unprocessed';
-                else if (path.startsWith('/crew/assignments/') && path.length > '/crew/assignments/'.length) text = 'Crew Assignments';
-                else if (path.startsWith('/crew/assignments')) text = 'Crew Assignments';
-                else if (path.startsWith('/superintendent/contract-accounts')) text = 'Contract-Cost Center';
-                else if (path.startsWith('/crew/my-crew')) text = 'My Crew';
-                if (text) label.textContent = text;
+                if (document.referrer) {
+                    const refPath = new URL(document.referrer).pathname;
+                    if (refPath !== window.location.pathname) {
+                        sessionStorage.setItem(storageKey, refPath);
+                    }
+                }
+                const savedPath = sessionStorage.getItem(storageKey);
+                if (savedPath) {
+                    const text = labelForPath(savedPath);
+                    if (text) label.textContent = text;
+                }
             } catch (e) {}
         });
 

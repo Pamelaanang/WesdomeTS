@@ -20,7 +20,7 @@
         <i class="fa-solid fa-chevron-down series-icon transition-transform duration-200"></i>
     </div>
 
-    <div id="series-{{ series.seriesid }}" class="hidden bg-gray-50 rounded-b-xl divide-y divide-gray-200">
+    <div id="series-{{ series.seriesid }}" class="bg-gray-50 rounded-b-xl divide-y divide-gray-200 overflow-hidden" style="max-height:0; transition: max-height 0.4s ease-out;">
         {% for contract in series.contracts.all %}
         {% if contract.isactive %}
         <div class="px-5 py-4">
@@ -39,6 +39,7 @@
                         {% csrf_token %}
                         <input type="hidden" name="action" value="remove">
                         <input type="hidden" name="contractaccountid" value="{{ link.contractaccountid }}">
+                        <input type="hidden" name="series_id" value="{{ series.seriesid }}">
                         <button type="submit" class="text-red-400 hover:text-red-600 cursor-pointer ml-1 leading-none">&times;</button>
                     </form>
                 </div>
@@ -52,6 +53,7 @@
                 {% csrf_token %}
                 <input type="hidden" name="action" value="add">
                 <input type="hidden" name="contractid" value="{{ contract.contractid }}">
+                <input type="hidden" name="series_id" value="{{ series.seriesid }}">
                 <select name="accountid" class="border border-gray-300 rounded px-2 py-1 text-xs" required>
                     <option value="">-- Add Cost Center --</option>
                     {% for account in all_accounts %}
@@ -117,13 +119,32 @@
 {% endif %}
 
 <script>
+function openSection(panel) {
+    panel.style.maxHeight = panel.scrollHeight + 'px';
+    panel.previousElementSibling?.querySelector('.series-icon')?.classList.add('rotate-180');
+}
+
+function closeSection(panel) {
+    panel.style.maxHeight = '0';
+    panel.previousElementSibling?.querySelector('.series-icon')?.classList.remove('rotate-180');
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const params = new URLSearchParams(window.location.search);
+    const openId = params.get('open');
+    if (openId) {
+        const panel = document.getElementById('series-' + openId);
+        if (panel) openSection(panel);
+    }
+});
+
 function toggleSection(id) {
     const panel = document.getElementById(id);
-    const header = panel.previousElementSibling;
-    const icon = header.querySelector('.series-icon');
-    const isOpen = !panel.classList.contains('hidden');
-    panel.classList.toggle('hidden');
-    icon.classList.toggle('rotate-180', !isOpen);
+    const isOpen = panel.style.maxHeight && panel.style.maxHeight !== '0px';
+
+    document.querySelectorAll('[id^="series-"]').forEach(el => closeSection(el));
+
+    if (!isOpen) openSection(panel);
 }
 </script>
 

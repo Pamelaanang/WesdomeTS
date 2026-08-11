@@ -74,9 +74,8 @@
     <form method="POST">
         {% csrf_token %}
         {% if header.paidat %}
-        <input type="hidden" name="action" value="mark_as_unpaid">
-        <button type="submit" class="cursor-pointer px-4 py-2 text-sm bg-yellow-500 text-white rounded-lg">Mark as
-            Unpaid</button>
+        {# <input type="hidden" name="action" value="mark_as_unpaid"> #}
+        {# <button type="submit" class="cursor-pointer px-4 py-2 text-sm bg-yellow-500 text-white rounded-lg">Mark as Unpaid</button> #}
         {% else %}
         <input type="hidden" name="action" value="mark_as_paid">
         <button type="submit" class="cursor-pointer px-4 py-2 text-sm bg-green-600 text-white rounded-lg">Mark as
