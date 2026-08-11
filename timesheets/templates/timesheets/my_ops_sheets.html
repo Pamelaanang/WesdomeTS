@@ -30,6 +30,12 @@
                 <span class="mt-1 bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-0.5 rounded-full">Draft</span>
                 {% elif sheet.overallstatus == 'Submitted' %}
                 <span class="mt-1 bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full">Submitted</span>
+                {% elif sheet.overallstatus == 'In Progress' %}
+                <span class="mt-1 text-xs font-semibold px-2 py-0.5 rounded-full" style="background-color:#fff4dc;color:#b07d00;">Review In Progress</span>
+                {% elif sheet.overallstatus == 'Revision Required' %}
+                <span class="mt-1 bg-orange-100 text-orange-700 text-xs font-semibold px-2 py-0.5 rounded-full">Revision Required</span>
+                {% elif sheet.overallstatus == 'Completed' %}
+                <span class="mt-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Captain Approved</span>
                 {% elif sheet.overallstatus == 'Approved' %}
                 <span class="mt-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Approved</span>
                 {% else %}

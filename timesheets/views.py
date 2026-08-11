@@ -5,7 +5,8 @@ from django.urls import reverse
 from users.models import User, Department, CrewAssignment, CrewCoverage
 from .models import MainHeader, MainEntry, Crews, Workcategory, LeaveType, OperationsHeader, OperationsEntry, Contract, Account, ContractAccount, ContractSeries
 from django.utils import timezone
-from django.db.models import Sum, Count, Min, Max, Q
+from django.db.models import Sum, Count, Min, Max, Q, Case, When, IntegerField
+from django.db.models.functions import TruncMonth
 from django.http import JsonResponse
 
 # Create your views here.
@@ -358,6 +359,81 @@ def my_drafts(request):
     return render(request, 'timesheets/my_drafts.html', {'drafts': drafts})
 
 
+@login_required(login_url='login')
+def my_timesheets_approved(request):
+    if request.user.access_level != 6:
+        return redirect('profile')
+    months = MainHeader.objects.filter(
+        employeeid=request.user,
+        overallstatus='Completed'
+    ).annotate(
+        month=TruncMonth('submittedat')
+    ).values('month').annotate(
+        sheet_count=Count('mainheaderid', distinct=True),
+        total_hours=Sum('mainentry__hoursworked')
+    ).order_by('-month')
+    return render(request, 'timesheets/my_timesheets_approved.html', {'months': months})
+
+
+@login_required(login_url='login')
+def my_timesheets_approved_month(request, year, month):
+    if request.user.access_level != 6:
+        return redirect('profile')
+    headers = MainHeader.objects.filter(
+        employeeid=request.user,
+        overallstatus='Completed',
+        submittedat__year=year,
+        submittedat__month=month,
+    ).annotate(
+        entry_count=Count('mainentry'),
+        total_hours=Sum('mainentry__hoursworked'),
+        date_from=Min('mainentry__startdate'),
+        date_to=Max('mainentry__startdate'),
+    ).order_by('submittedat')
+    return render(request, 'timesheets/my_timesheets_approved_month.html', {
+        'headers': headers,
+        'year': year,
+        'month': month,
+    })
+
+
+@login_required(login_url='login')
+def my_timesheets_paid(request):
+    if request.user.access_level != 6:
+        return redirect('profile')
+    months = MainHeader.objects.filter(
+        employeeid=request.user,
+        paidat__isnull=False,
+    ).annotate(
+        month=TruncMonth('paidat')
+    ).values('month').annotate(
+        sheet_count=Count('mainheaderid', distinct=True),
+        total_hours=Sum('mainentry__hoursworked')
+    ).order_by('-month')
+    return render(request, 'timesheets/my_timesheets_paid.html', {'months': months})
+
+
+@login_required(login_url='login')
+def my_timesheets_paid_month(request, year, month):
+    if request.user.access_level != 6:
+        return redirect('profile')
+    headers = MainHeader.objects.filter(
+        employeeid=request.user,
+        paidat__isnull=False,
+        paidat__year=year,
+        paidat__month=month,
+    ).select_related('paidby').annotate(
+        entry_count=Count('mainentry'),
+        total_hours=Sum('mainentry__hoursworked'),
+        date_from=Min('mainentry__startdate'),
+        date_to=Max('mainentry__startdate'),
+    ).order_by('paidat')
+    return render(request, 'timesheets/my_timesheets_paid_month.html', {
+        'headers': headers,
+        'year': year,
+        'month': month,
+    })
+
 
 @login_required(login_url='login')
 def new_ops_sheet(request):
@@ -422,12 +498,11 @@ def ops_sheet(request, pk):
 
     hours_remaining = max(0, 72 - (timezone.now() - header.startedat).total_seconds() / 3600)
 
-    if request.method == 'POST' and header.overallstatus == 'Draft':
+    if request.method == 'POST' and header.overallstatus in ('Draft', 'Revision Required'):
         action = request.POST.get('action')
 
         if action == 'add_row':
             workcategoryid = request.POST.get('workcategoryid') or None
-
             OperationsEntry.objects.create(
                 opsheaderid=header,
                 employeeid_id=request.POST.get('employeeid'),
@@ -444,13 +519,17 @@ def ops_sheet(request, pk):
                 tonneswasteskipped=request.POST.get('tonneswasteskipped') or None,
                 lowgradeskipped=request.POST.get('lowgradeskipped') or None,
                 longholefootage=request.POST.get('longholefootage') or None,
+                linestatus='New' if header.overallstatus == 'Revision Required' else 'Draft',
             )
 
         elif action == 'delete_row':
             entry_id = request.POST.get('entryid')
-            OperationsEntry.objects.filter(opsentryid=entry_id, opsheaderid=header).delete()
+            qs = OperationsEntry.objects.filter(opsentryid=entry_id, opsheaderid=header)
+            if header.overallstatus == 'Revision Required':
+                qs = qs.filter(linestatus='Rejected')
+            qs.delete()
 
-        elif action == 'submit_sheet':
+        elif action == 'submit_sheet' and header.overallstatus == 'Draft':
             if not OperationsEntry.objects.filter(opsheaderid=header).exists():
                 return redirect('ops_sheet', pk=header.opsheaderid)
             header.overallstatus = 'Submitted'
@@ -459,10 +538,41 @@ def ops_sheet(request, pk):
             OperationsEntry.objects.filter(opsheaderid=header).update(linestatus='New')
             return redirect('my_ops_sheets')
 
+        elif action == 'edit_row' and header.overallstatus in ('Draft', 'Revision Required'):
+            if header.overallstatus == 'Revision Required':
+                entry = get_object_or_404(OperationsEntry, opsentryid=request.POST.get('entryid'), opsheaderid=header, linestatus='Rejected')
+            else:
+                entry = get_object_or_404(OperationsEntry, opsentryid=request.POST.get('entryid'), opsheaderid=header)
+            entry.contractid_id = request.POST.get('contractid')
+            entry.accountid_id = request.POST.get('accountid') or None
+            entry.workcategoryid_id = request.POST.get('workcategoryid') or None
+            entry.hoursworked = request.POST.get('hoursworked')
+            entry.remarks = request.POST.get('remarks') or None
+            entry.hauledto = request.POST.get('hauledto') or None
+            entry.tonnesorehauled = request.POST.get('tonnesorehauled') or None
+            entry.tonneswastehauled = request.POST.get('tonneswastehauled') or None
+            entry.lowgradehauled = request.POST.get('lowgradehauled') or None
+            entry.tonnesoreskipped = request.POST.get('tonnesoreskipped') or None
+            entry.tonneswasteskipped = request.POST.get('tonneswasteskipped') or None
+            entry.lowgradeskipped = request.POST.get('lowgradeskipped') or None
+            entry.longholefootage = request.POST.get('longholefootage') or None
+            if header.overallstatus == 'Revision Required':
+                entry.linestatus = 'New'
+                entry.captainnote = None
+                entry.approvedby_capt = None
+                entry.approvedat_capt = None
+            entry.save()
+
+        elif action == 'resubmit' and header.overallstatus == 'Revision Required':
+            OperationsEntry.objects.filter(opsheaderid=header).exclude(linestatus='Approved').update(linestatus='New')
+            header.overallstatus = 'Submitted'
+            header.save()
+            return redirect('my_ops_sheets')
+
         return redirect('ops_sheet', pk=header.opsheaderid)
 
     entries = OperationsEntry.objects.filter(opsheaderid=header).select_related(
-        'employeeid', 'contractid', 'accountid', 'workcategoryid'
+        'employeeid', 'contractid', 'accountid', 'workcategoryid', 'approvedby_capt'
     )
 
     coverage = header.coverageid
@@ -502,6 +612,82 @@ def ops_sheet(request, pk):
 
 
 @login_required(login_url='login')
+def my_ops_approvals(request):
+    if request.user.access_level != 5:
+        return redirect('profile')
+    months = OperationsHeader.objects.filter(
+        shifterid=request.user,
+        overallstatus='Completed'
+    ).annotate(
+        month=TruncMonth('shiftdate')
+    ).values('month').annotate(
+        sheet_count=Count('opsheaderid', distinct=True),
+        total_hours=Sum('operationsentry__hoursworked')
+    ).order_by('-month')
+    return render(request, 'timesheets/my_ops_approvals.html', {'months': months})
+
+
+@login_required(login_url='login')
+def my_ops_approvals_month(request, year, month):
+    if request.user.access_level != 5:
+        return redirect('profile')
+    sheets = OperationsHeader.objects.filter(
+        shifterid=request.user,
+        overallstatus='Completed',
+        shiftdate__year=year,
+        shiftdate__month=month,
+    ).select_related(
+        'crewid', 'coverageid__home_shifter', 'ohapprovedby_capt'
+    ).annotate(
+        entry_count=Count('operationsentry'),
+        total_hours=Sum('operationsentry__hoursworked')
+    ).order_by('shiftdate', 'shifttype')
+    return render(request, 'timesheets/my_ops_approvals_month.html', {
+        'sheets': sheets,
+        'year': year,
+        'month': month,
+    })
+
+
+@login_required(login_url='login')
+def my_ops_completed(request):
+    if request.user.access_level != 4:
+        return redirect('profile')
+    months = OperationsHeader.objects.filter(
+        ohapprovedby_capt=request.user,
+        overallstatus='Completed'
+    ).annotate(
+        month=TruncMonth('shiftdate')
+    ).values('month').annotate(
+        sheet_count=Count('opsheaderid', distinct=True),
+        total_hours=Sum('operationsentry__hoursworked')
+    ).order_by('-month')
+    return render(request, 'timesheets/my_ops_completed.html', {'months': months})
+
+
+@login_required(login_url='login')
+def my_ops_completed_month(request, year, month):
+    if request.user.access_level != 4:
+        return redirect('profile')
+    sheets = OperationsHeader.objects.filter(
+        ohapprovedby_capt=request.user,
+        overallstatus='Completed',
+        shiftdate__year=year,
+        shiftdate__month=month,
+    ).select_related(
+        'shifterid', 'crewid', 'coverageid__home_shifter', 'ohapprovedby_capt'
+    ).annotate(
+        entry_count=Count('operationsentry'),
+        total_hours=Sum('operationsentry__hoursworked')
+    ).order_by('shiftdate', 'shifttype')
+    return render(request, 'timesheets/my_ops_completed_month.html', {
+        'sheets': sheets,
+        'year': year,
+        'month': month,
+    })
+
+
+@login_required(login_url='login')
 def delete_ops_draft(request, pk):
     if request.method == 'POST':
         header = get_object_or_404(OperationsHeader, opsheaderid=pk, shifterid=request.user, overallstatus='Draft')
@@ -514,12 +700,24 @@ def my_ops_sheets(request):
     if request.user.access_level != 5:
         return redirect('profile')
 
-    sheets = OperationsHeader.objects.filter(shifterid=request.user).select_related(
-        'crewid', 'coverageid__home_shifter'
+    sheets = OperationsHeader.objects.filter(
+        shifterid=request.user
+    ).exclude(
+        overallstatus='Completed'
+    ).select_related(
+        'crewid', 'coverageid__home_shifter', 'ohapprovedby_capt'
     ).annotate(
         entry_count=Count('operationsentry'),
-        total_hours=Sum('operationsentry__hoursworked')
-    ).order_by('-shiftdate', 'shifttype')
+        total_hours=Sum('operationsentry__hoursworked'),
+        status_order=Case(
+            When(overallstatus='Draft', then=0),
+            When(overallstatus='Revision Required', then=1),
+            When(overallstatus='Submitted', then=2),
+            When(overallstatus='In Progress', then=3),
+            default=4,
+            output_field=IntegerField(),
+        ),
+    ).order_by('status_order', '-shiftdate', 'shifttype')
 
     return render(request, 'timesheets/my_ops_sheets.html', {'sheets': sheets})
 
@@ -557,11 +755,20 @@ def ops_approval_inbox(request):
             new_count=Count('operationsentry', filter=Q(operationsentry__linestatus='New')),
         ).order_by('shiftdate', 'shifttype')
 
+    pending_revision_sheets = OperationsHeader.objects.filter(
+        overallstatus='Revision Required', ohapprovedby_capt=request.user
+        ).select_related(
+            'shifterid', 'crewid', 'coverageid__home_shifter'
+        ).annotate(
+            entry_count=Count('operationsentry'),
+            rejected_count=Count('operationsentry', filter=Q(operationsentry__linestatus='Rejected')),
+        ).order_by('shiftdate', 'shifttype')
 
     return render(request, 'timesheets/ops_approval_inbox.html', {
         'new_sheet': new_sheet,
         'revision_sheet': revision_sheet,
         'in_progress_sheets': in_progress_sheets,
+        'pending_revision_sheets': pending_revision_sheets,
     })
 
 

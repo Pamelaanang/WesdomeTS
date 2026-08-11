@@ -103,12 +103,10 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-daily-captain" class="hidden flex flex-col">
-                <a href="{% url 'ops_approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
-                        class="fa-solid fa-clock-rotate-left"></i> Pending</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
-                        class="fa-solid fa-circle-check"></i> Approved</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
-                        class="fa-solid fa-circle-xmark"></i> Rejected</a>
+                <a href="{% url 'ops_approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'ops_approval_inbox,review_ops_sheet' %}font-semibold{% endif %}">
+                    <i class="fa-solid fa-inbox"></i> Approval Inbox</a>
+                <a href="{% url 'my_ops_completed' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_ops_completed,my_ops_completed_month' %}font-semibold{% endif %}">
+                    <i class="fa-solid fa-circle-check"></i> Completed Sheets</a>
             </div>
             {% endif %}
 
@@ -120,16 +118,15 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-daily-sheets" class="hidden flex flex-col">
-                <a href="{% url 'my_ops_sheets' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_ops_sheets,ops_sheet,new_ops_sheet' %}font-semibold{% endif %}"><i class="fa-solid fa-pen-to-square"></i> Submit Crew Daily Sheets</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> Crew Daily Approvals</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-xmark"></i> Crew Daily Rejections</a>
+                <a href="{% url 'my_ops_sheets' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_ops_sheets,ops_sheet,new_ops_sheet' %}font-semibold{% endif %}"><i class="fa-solid fa-pen-to-square"></i> My Crew Sheets</a>
+                <a href="{% url 'my_ops_approvals' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> Crew Daily Approvals</a>
             </div>
             <button onclick="toggleAccordion('menu-personal-shifter')" class="accordion-btn">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-file-lines"></i> Personal Timesheets</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-personal-shifter" class="hidden flex flex-col">
-                <a href="{% url 'my_drafts' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
                 <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> My Approved</a>
                 <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-xmark"></i> My Rejected</a>
             </div>
@@ -164,7 +161,7 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-personal" class="hidden flex flex-col">
-                <a href="{% url 'my_drafts' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
                 <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> My Approved</a>
                 <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-xmark"></i> My Rejected</a>
             </div>
@@ -173,7 +170,8 @@
             <!-- Personal timesheets flat links: Crew Member (6) only -->
             {% if al == 6 %}
             <a href="{% url 'my_drafts' %}" class="flex items-center gap-3"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
-            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-circle-check"></i> My Approved</a>
+            <a href="{% url 'my_timesheets_approved' %}" class="flex items-center gap-3"><i class="fa-solid fa-circle-check"></i> My Approved</a>
+            <a href="{% url 'my_timesheets_paid' %}" class="flex items-center gap-3"><i class="fa-solid fa-money-check-dollar"></i> My Paid</a>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-circle-xmark"></i> My Rejected</a>
             {% endif %}
 

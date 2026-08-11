@@ -229,8 +229,8 @@
                 <span class="font-semibold">{{ ops_submitted }}</span>
             </div>
             <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#28348A]"></i> With
-                    Superintendent</span>
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#28348A]"></i> Under
+                    Review</span>
                 <span class="font-semibold">{{ ops_in_progress }}</span>
             </div>
             <div class="flex items-center justify-between text-sm">
@@ -310,36 +310,18 @@
                 <i class="fa-solid fa-link"></i> Contract-Cost Centre
             </a>
             {% elif al == 4 %}
-            <form method="POST" action="{% url 'new_timesheet' %}">
-                {% csrf_token %}
-                <button type="submit"
-                    class="w-full flex items-center gap-3 px-4 py-3 bg-[#28348A] text-white rounded-xl text-sm font-medium hover:opacity-90 cursor-pointer">
-                    <i class="fa-solid fa-plus"></i> Create Timesheet
-                </button>
-            </form>
-            <a href="{% url 'my_drafts' %}"
-                class="flex items-center gap-3 px-4 py-3 bg-[#FFBB7C] text-gray-700 rounded-xl text-sm font-medium hover:opacity-90">
-                <i class="fa-solid fa-file-pen"></i> Continue Draft
-            </a>
-            <a href="#"
+            <a href="{% url 'ops_approval_inbox' %}"
                 class="flex items-center gap-3 px-4 py-3 bg-[#8A6B28] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-inbox"></i> Crew Daily Sheets Inbox
             </a>
             {% elif al == 5 %}
-            <form method="POST" action="{% url 'new_timesheet' %}">
-                {% csrf_token %}
-                <button type="submit"
-                    class="w-full flex items-center gap-3 px-4 py-3 bg-[#28348A] text-white rounded-xl text-sm font-medium hover:opacity-90 cursor-pointer">
-                    <i class="fa-solid fa-plus"></i> Create Timesheet
-                </button>
-            </form>
-            <a href="{% url 'my_drafts' %}"
-                class="flex items-center gap-3 px-4 py-3 bg-[#FFBB7C] text-gray-700 rounded-xl text-sm font-medium hover:opacity-90">
-                <i class="fa-solid fa-file-pen"></i> Continue Draft
-            </a>
             <a href="{% url 'new_ops_sheet' %}"
                 class="flex items-center gap-3 px-4 py-3 bg-[#8A6B28] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-clipboard-list"></i> Create Daily Crew Sheet
+            </a>
+            <a href="{% url 'my_ops_sheets' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#5a7a28] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-calendar-days"></i> My Crew Sheets
             </a>
             {% else %}
             <form method="POST" action="{% url 'new_timesheet' %}">

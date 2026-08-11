@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
+    <div class="mb-2">
+        <a href="{% url 'my_ops_completed' %}" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline mb-2">
+            <i class="fa-solid fa-arrow-left"></i> Completed Sheets
+        </a>
+        <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+        <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+        <p class="text-center text-sm text-gray-500 mt-1">
+            {% if sheets %}
+            <span class="font-semibold text-gray-700">{{ sheets.0.shiftdate|date:"F Y" }}</span>
+            {% else %}
+            <span class="font-semibold text-gray-700">{{ year }}-{{ month|stringformat:"02d" }}</span>
+            {% endif %}
+            &mdash; Crew sheets you approved this month.
+        </p>
+    </div>
+</div>
+
+<div class="container mx-auto mb-8">
+    <div class="flex flex-wrap gap-4">
+        {% for sheet in sheets %}
+        <a href="{% url 'review_ops_sheet' sheet.opsheaderid %}"
+            class="bg-white rounded-xl shadow p-5 w-52 flex flex-col items-center gap-2 hover:shadow-md hover:border hover:border-green-500 transition-all">
+            <div class="w-12 h-12 rounded-full bg-black overflow-hidden flex items-center justify-center mb-1">
+                {% if sheet.shifterid.profilepic %}
+                <img src="/media/{{ sheet.shifterid.profilepic }}" class="w-full h-full object-cover" alt="Profile">
+                {% else %}
+                <i class="fa-solid fa-user text-white text-lg"></i>
+                {% endif %}
+            </div>
+            <p class="text-xs font-semibold text-center">{{ sheet.shifterid.firstname }} {{ sheet.shifterid.lastname }}</p>
+            <p class="text-xs font-semibold">{{ sheet.shiftdate|date:"M j, Y" }}</p>
+            <p class="text-xs text-gray-500 text-center">{{ sheet.shifttype }} Shift &mdash; {{ sheet.crewid.crewname }} Crew</p>
+            {% if sheet.coverageid %}
+            <p class="text-xs text-green-700 font-medium text-center">Covering {{ sheet.coverageid.home_shifter.firstname }} {{ sheet.coverageid.home_shifter.lastname }}</p>
+            {% endif %}
+            <p class="text-xs">{{ sheet.entry_count }} entr{{ sheet.entry_count|pluralize:"y,ies" }}</p>
+            <p class="font-semibold text-sm">{{ sheet.total_hours|default:"0" }} hrs</p>
+            <span class="mt-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Completed</span>
+        </a>
+        {% empty %}
+        <div class="mx-auto text-gray-400 text-sm py-6">No completed sheets for this month.</div>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock content %}

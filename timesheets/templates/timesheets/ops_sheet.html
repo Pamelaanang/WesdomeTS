@@ -75,7 +75,12 @@
         <span>Shift: <span class="font-medium">{{ header.shifttype }}</span></span>
         <span>Crew: <span class="font-medium">{{ header.crewid.crewname }}</span></span>
         <span>Status:
-            <span class="font-medium {% if header.overallstatus == 'Draft' %}text-yellow-600{% elif header.overallstatus == 'Submitted' %}text-blue-600{% else %}text-green-600{% endif %}">
+            <span class="font-medium
+                {% if header.overallstatus == 'Draft' %}text-yellow-600
+                {% elif header.overallstatus == 'Submitted' %}text-blue-600
+                {% elif header.overallstatus == 'In Progress' %}text-amber-600
+                {% elif header.overallstatus == 'Revision Required' %}text-orange-600
+                {% else %}text-green-600{% endif %}">
                 {{ header.overallstatus }}
             </span>
         </span>
@@ -90,10 +95,28 @@
         &#9888; {{ hours_remaining }} hr{{ hours_remaining|pluralize }} remaining — sheet auto-submits after 72 hours.
     </div>
 </div>
-{% else %}
+{% elif header.overallstatus == 'Submitted' %}
 <div class="container mx-auto mt-2 px-4">
     <div class="bg-blue-50 border border-blue-300 text-blue-700 text-sm rounded px-4 py-2">
-        This sheet has been submitted and is now read-only.
+        <i class="fa-solid fa-clock mr-1"></i> Sheet submitted — awaiting captain review.
+    </div>
+</div>
+{% elif header.overallstatus == 'In Progress' %}
+<div class="container mx-auto mt-2 px-4">
+    <div class="text-sm rounded px-4 py-2" style="background-color:#fff4dc;border:1px solid #f5c842;color:#7a5800;">
+        <i class="fa-solid fa-magnifying-glass mr-1"></i> A captain is currently reviewing this sheet — no changes can be made.
+    </div>
+</div>
+{% elif header.overallstatus == 'Revision Required' %}
+<div class="container mx-auto mt-2 px-4">
+    <div class="bg-orange-50 border border-orange-400 text-orange-800 text-sm rounded px-4 py-2">
+        <i class="fa-solid fa-triangle-exclamation mr-1"></i> The captain has requested revisions. Review the notes on rejected entries below, remove and correct them, then resubmit.
+    </div>
+</div>
+{% elif header.overallstatus == 'Completed' %}
+<div class="container mx-auto mt-2 px-4">
+    <div class="bg-green-50 border border-green-300 text-green-800 text-sm rounded px-4 py-2">
+        <i class="fa-solid fa-circle-check mr-1"></i> This sheet has been approved by the captain.
     </div>
 </div>
 {% endif %}
@@ -116,15 +139,37 @@
                         <th class="p-2">Hours</th>
                         <th class="p-2">Haulage / Footage</th>
                         <th class="p-2">Remarks</th>
-                        {% if header.overallstatus == 'Draft' %}<th class="p-2"></th>{% endif %}
+                        {% if header.overallstatus == 'Revision Required' %}
+                        <th class="p-2">Status</th>
+                        <th class="p-2 text-left">Captain's Note</th>
+                        {% endif %}
+                        {% if header.overallstatus == 'Draft' or header.overallstatus == 'Revision Required' %}<th class="p-2"></th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
                     {% for entry in entries %}
+
+                    {# ── DISPLAY ROW ── #}
+                    {% if header.overallstatus == 'Revision Required' and entry.linestatus == 'Approved' %}
+                    <tr class="border-b bg-green-50 text-center">
+                    {% elif header.overallstatus == 'Revision Required' and entry.linestatus == 'Rejected' %}
+                    <tr id="row-{{ entry.opsentryid }}" class="border-b bg-red-50 text-center">
+                    {% elif header.overallstatus == 'Draft' %}
+                    <tr id="row-{{ entry.opsentryid }}" class="border-b hover:bg-gray-50 text-center">
+                    {% else %}
                     <tr class="border-b hover:bg-gray-50 text-center">
+                    {% endif %}
                         <td class="p-2">{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</td>
-                        <td class="p-2">{{ entry.contractid.contractcode }}</td>
-                        <td class="p-2">{{ entry.accountid.accountcode|default:"—" }}</td>
+                        <td class="p-2">
+                            <div class="font-medium">{{ entry.contractid.contractcode }}</div>
+                            {% if entry.contractid.contracttitle %}<div class="text-gray-400 text-xs">{{ entry.contractid.contracttitle }}</div>{% endif %}
+                        </td>
+                        <td class="p-2">
+                            {% if entry.accountid %}
+                            <div class="font-medium">{{ entry.accountid.accountcode }}</div>
+                            {% if entry.accountid.accounttitle %}<div class="text-gray-400 text-xs">{{ entry.accountid.accounttitle }}</div>{% endif %}
+                            {% else %}&mdash;{% endif %}
+                        </td>
                         <td class="p-2">{{ entry.workcategoryid.categoryname|default:"—" }}</td>
                         <td class="p-2">{{ entry.hoursworked }}</td>
                         <td class="p-2 text-gray-500">
@@ -135,23 +180,183 @@
                             {% if not entry.tonnesorehauled and not entry.tonneswastehauled and not entry.tonnesoreskipped and not entry.longholefootage %}—{% endif %}
                         </td>
                         <td class="p-2">{{ entry.remarks|default:"—" }}</td>
+                        {% if header.overallstatus == 'Revision Required' %}
+                        <td class="p-2">
+                            {% if entry.linestatus == 'Approved' %}<span class="text-green-700 font-semibold">Approved</span>
+                            {% elif entry.linestatus == 'Rejected' %}<span class="text-red-600 font-semibold">Rejected</span>
+                            {% else %}<span class="text-gray-400">New</span>{% endif %}
+                        </td>
+                        <td class="p-2 text-left text-red-700 text-xs max-w-xs">{{ entry.captainnote|default:"" }}</td>
+                        {% endif %}
                         {% if header.overallstatus == 'Draft' %}
                         <td class="p-2">
-                            <button type="button" onclick="deleteRow('{{ entry.opsentryid }}')"
-                                class="border border-red-500 rounded text-red-500 text-xs px-2 py-1">Delete</button>
+                            <div class="flex flex-col gap-1">
+                                <button type="button"
+                                    data-entry="{{ entry.opsentryid }}"
+                                    data-contract="{{ entry.contractid_id }}"
+                                    data-account="{{ entry.accountid_id|default:0 }}"
+                                    onclick="openEditRow(this.dataset.entry, this.dataset.contract, this.dataset.account)"
+                                    class="border border-[#28348A] rounded text-[#28348A] text-xs px-2 py-1 hover:bg-blue-50">Edit</button>
+                                <button type="button" onclick="deleteRow('{{ entry.opsentryid }}')"
+                                    class="border border-red-500 rounded text-red-500 text-xs px-2 py-1">Delete</button>
+                            </div>
+                        </td>
+                        {% elif header.overallstatus == 'Revision Required' %}
+                        <td class="p-2">
+                            {% if entry.linestatus == 'Rejected' %}
+                            <button type="button"
+                                data-entry="{{ entry.opsentryid }}"
+                                data-contract="{{ entry.contractid_id }}"
+                                data-account="{{ entry.accountid_id|default:0 }}"
+                                onclick="openEditRow(this.dataset.entry, this.dataset.contract, this.dataset.account)"
+                                class="border border-[#28348A] rounded text-[#28348A] text-xs px-2 py-1 hover:bg-blue-50">Edit</button>
+                            {% endif %}
                         </td>
                         {% endif %}
                     </tr>
+
+                    {# ── INLINE EDIT ROW (Draft) ── #}
+                    {% if header.overallstatus == 'Draft' %}
+                    <tr id="edit-row-{{ entry.opsentryid }}" class="hidden border-b bg-blue-50 text-center">
+                        <td class="p-2 font-medium text-xs text-left">{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</td>
+                        <td class="p-2">
+                            <select id="contract-edit-{{ entry.opsentryid }}"
+                                onchange="onEditContractChange('{{ entry.opsentryid }}')"
+                                class="border rounded px-1 py-1 w-full text-xs">
+                                {% for c in contracts %}
+                                <option value="{{ c.contractid }}" {% if c.contractid == entry.contractid_id %}selected{% endif %}>{{ c.contractcode }} — {{ c.contracttitle }}</option>
+                                {% endfor %}
+                            </select>
+                            <p id="contract-info-edit-{{ entry.opsentryid }}" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
+                        </td>
+                        <td class="p-2">
+                            <select id="account-edit-{{ entry.opsentryid }}" class="border rounded px-1 py-1 w-full text-xs">
+                                <option value="">-- None --</option>
+                            </select>
+                            <p id="account-info-edit-{{ entry.opsentryid }}" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
+                        </td>
+                        <td class="p-2">
+                            <select id="workcategory-edit-{{ entry.opsentryid }}" class="border rounded px-1 py-1 w-full text-xs">
+                                <option value="">-- None --</option>
+                                {% for wc in workcategories %}
+                                <option value="{{ wc.categoryid }}" {% if wc.categoryid == entry.workcategoryid_id %}selected{% endif %}>{{ wc.categoryname }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td class="p-2">
+                            <input type="number" id="hours-edit-{{ entry.opsentryid }}" value="{{ entry.hoursworked }}"
+                                step="0.5" min="0.5" max="24" class="border rounded px-1 py-1 w-full text-xs">
+                        </td>
+                        <td class="p-2">
+                            <button type="button" onclick="toggleHaulageEdit('{{ entry.opsentryid }}')"
+                                class="text-xs text-[#28348A] underline">+ Haulage</button>
+                        </td>
+                        <td class="p-2">
+                            <input type="text" id="remarks-edit-{{ entry.opsentryid }}" value="{{ entry.remarks|default:'' }}"
+                                placeholder="Optional" class="border rounded px-1 py-1 w-full text-xs">
+                        </td>
+                        <td class="p-2">
+                            <div class="flex flex-col gap-1">
+                                <button type="button" onclick="saveEditRow('{{ entry.opsentryid }}')"
+                                    class="bg-[#28348A] text-white text-xs px-2 py-1 rounded hover:opacity-90">Save</button>
+                                <button type="button" onclick="closeEditRow('{{ entry.opsentryid }}')"
+                                    class="border border-gray-400 text-gray-600 text-xs px-2 py-1 rounded hover:bg-gray-100">Cancel</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr id="haulage-edit-{{ entry.opsentryid }}" class="hidden bg-blue-50">
+                        <td colspan="8" class="px-3 pb-3">
+                            <div class="flex flex-wrap gap-3 items-end">
+                                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Hauled To</label><input type="text" id="hauledto-edit-{{ entry.opsentryid }}" value="{{ entry.hauledto|default:'' }}" class="border rounded px-1 py-1 w-28 text-xs"></div>
+                                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Ore Hauled (t)</label><input type="number" id="tonnesorehauled-edit-{{ entry.opsentryid }}" value="{{ entry.tonnesorehauled|default:'' }}" step="0.01" class="border rounded px-1 py-1 w-24 text-xs"></div>
+                                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Waste Hauled (t)</label><input type="number" id="tonneswastehauled-edit-{{ entry.opsentryid }}" value="{{ entry.tonneswastehauled|default:'' }}" step="0.01" class="border rounded px-1 py-1 w-24 text-xs"></div>
+                                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Low Grade Hauled (t)</label><input type="number" id="lowgradehauled-edit-{{ entry.opsentryid }}" value="{{ entry.lowgradehauled|default:'' }}" step="0.01" class="border rounded px-1 py-1 w-24 text-xs"></div>
+                                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Ore Skipped (t)</label><input type="number" id="tonnesoreskipped-edit-{{ entry.opsentryid }}" value="{{ entry.tonnesoreskipped|default:'' }}" step="0.01" class="border rounded px-1 py-1 w-24 text-xs"></div>
+                                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Waste Skipped (t)</label><input type="number" id="tonneswasteskipped-edit-{{ entry.opsentryid }}" value="{{ entry.tonneswasteskipped|default:'' }}" step="0.01" class="border rounded px-1 py-1 w-24 text-xs"></div>
+                                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Low Grade Skipped (t)</label><input type="number" id="lowgradeskipped-edit-{{ entry.opsentryid }}" value="{{ entry.lowgradeskipped|default:'' }}" step="0.01" class="border rounded px-1 py-1 w-24 text-xs"></div>
+                                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Longhole Footage (ft)</label><input type="number" id="longholefootage-edit-{{ entry.opsentryid }}" value="{{ entry.longholefootage|default:'' }}" step="0.01" class="border rounded px-1 py-1 w-24 text-xs"></div>
+                            </div>
+                        </td>
+                    </tr>
+
+                    {# ── INLINE EDIT ROW (Revision Required — Rejected entries only) ── #}
+                    {% elif header.overallstatus == 'Revision Required' and entry.linestatus == 'Rejected' %}
+                    <tr id="edit-row-{{ entry.opsentryid }}" class="hidden border-b bg-red-50 text-center">
+                        <td class="p-2 font-medium text-xs text-left">{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</td>
+                        <td class="p-2">
+                            <select id="contract-edit-{{ entry.opsentryid }}"
+                                onchange="onEditContractChange('{{ entry.opsentryid }}')"
+                                class="border rounded px-1 py-1 w-full text-xs">
+                                {% for c in contracts %}
+                                <option value="{{ c.contractid }}" {% if c.contractid == entry.contractid_id %}selected{% endif %}>{{ c.contractcode }} — {{ c.contracttitle }}</option>
+                                {% endfor %}
+                            </select>
+                            <p id="contract-info-edit-{{ entry.opsentryid }}" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
+                        </td>
+                        <td class="p-2">
+                            <select id="account-edit-{{ entry.opsentryid }}" class="border rounded px-1 py-1 w-full text-xs">
+                                <option value="">-- None --</option>
+                            </select>
+                            <p id="account-info-edit-{{ entry.opsentryid }}" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
+                        </td>
+                        <td class="p-2">
+                            <select id="workcategory-edit-{{ entry.opsentryid }}" class="border rounded px-1 py-1 w-full text-xs">
+                                <option value="">-- None --</option>
+                                {% for wc in workcategories %}
+                                <option value="{{ wc.categoryid }}" {% if wc.categoryid == entry.workcategoryid_id %}selected{% endif %}>{{ wc.categoryname }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td class="p-2">
+                            <input type="number" id="hours-edit-{{ entry.opsentryid }}" value="{{ entry.hoursworked }}"
+                                step="0.5" min="0.5" max="24" class="border rounded px-1 py-1 w-full text-xs">
+                        </td>
+                        <td class="p-2">
+                            <button type="button" onclick="toggleHaulageEdit('{{ entry.opsentryid }}')"
+                                class="text-xs text-[#28348A] underline">+ Haulage</button>
+                        </td>
+                        <td class="p-2">
+                            <input type="text" id="remarks-edit-{{ entry.opsentryid }}" value="{{ entry.remarks|default:'' }}"
+                                placeholder="Optional" class="border rounded px-1 py-1 w-full text-xs">
+                        </td>
+                        <td class="p-2"><span class="text-gray-400 text-xs italic">Pending</span></td>
+                        <td class="p-2"></td>
+                        <td class="p-2">
+                            <div class="flex flex-col gap-1">
+                                <button type="button" onclick="saveEditRow('{{ entry.opsentryid }}')"
+                                    class="bg-[#28348A] text-white text-xs px-2 py-1 rounded hover:opacity-90">Save</button>
+                                <button type="button" onclick="closeEditRow('{{ entry.opsentryid }}')"
+                                    class="border border-gray-400 text-gray-600 text-xs px-2 py-1 rounded hover:bg-gray-100">Cancel</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr id="haulage-edit-{{ entry.opsentryid }}" class="hidden bg-red-50">
+                        <td colspan="10" class="px-3 pb-3">
+                            <div class="flex flex-wrap gap-3 items-end">
+                                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Hauled To</label><input type="text" id="hauledto-edit-{{ entry.opsentryid }}" value="{{ entry.hauledto|default:'' }}" class="border rounded px-1 py-1 w-28 text-xs"></div>
+                                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Ore Hauled (t)</label><input type="number" id="tonnesorehauled-edit-{{ entry.opsentryid }}" value="{{ entry.tonnesorehauled|default:'' }}" step="0.01" class="border rounded px-1 py-1 w-24 text-xs"></div>
+                                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Waste Hauled (t)</label><input type="number" id="tonneswastehauled-edit-{{ entry.opsentryid }}" value="{{ entry.tonneswastehauled|default:'' }}" step="0.01" class="border rounded px-1 py-1 w-24 text-xs"></div>
+                                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Low Grade Hauled (t)</label><input type="number" id="lowgradehauled-edit-{{ entry.opsentryid }}" value="{{ entry.lowgradehauled|default:'' }}" step="0.01" class="border rounded px-1 py-1 w-24 text-xs"></div>
+                                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Ore Skipped (t)</label><input type="number" id="tonnesoreskipped-edit-{{ entry.opsentryid }}" value="{{ entry.tonnesoreskipped|default:'' }}" step="0.01" class="border rounded px-1 py-1 w-24 text-xs"></div>
+                                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Waste Skipped (t)</label><input type="number" id="tonneswasteskipped-edit-{{ entry.opsentryid }}" value="{{ entry.tonneswasteskipped|default:'' }}" step="0.01" class="border rounded px-1 py-1 w-24 text-xs"></div>
+                                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Low Grade Skipped (t)</label><input type="number" id="lowgradeskipped-edit-{{ entry.opsentryid }}" value="{{ entry.lowgradeskipped|default:'' }}" step="0.01" class="border rounded px-1 py-1 w-24 text-xs"></div>
+                                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Longhole Footage (ft)</label><input type="number" id="longholefootage-edit-{{ entry.opsentryid }}" value="{{ entry.longholefootage|default:'' }}" step="0.01" class="border rounded px-1 py-1 w-24 text-xs"></div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+
                     {% empty %}
                     <tr>
-                        <td colspan="{% if header.overallstatus == 'Draft' %}8{% else %}7{% endif %}"
+                        <td colspan="{% if header.overallstatus == 'Revision Required' %}10{% elif header.overallstatus == 'Draft' %}8{% else %}7{% endif %}"
                             class="text-center text-gray-400 py-6">
                             No entries yet.{% if header.overallstatus == 'Draft' %} Click + Add Row to begin.{% endif %}
                         </td>
                     </tr>
                     {% endfor %}
 
-                    {% if header.overallstatus == 'Draft' %}
+                    {# ── ADD ROW FORM ── #}
+                    {% if header.overallstatus == 'Draft' or header.overallstatus == 'Revision Required' %}
                     <tr id="add-row" class="hidden bg-gray-50 border-t">
                         <td class="p-2">
                             <select name="employeeid" id="employee-select" onchange="applyPrefill(this.value)"
@@ -177,14 +382,16 @@
                             <select name="contractid" id="contract-select" class="border rounded px-1 py-1 w-full text-xs">
                                 <option value="">-- Select --</option>
                                 {% for c in contracts %}
-                                <option value="{{ c.contractid }}">{{ c.contractcode }} - {{ c.contracttitle }}</option>
+                                <option value="{{ c.contractid }}">{{ c.contractcode }} — {{ c.contracttitle }}</option>
                                 {% endfor %}
                             </select>
+                            <p id="contract-info" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
                         </td>
                         <td class="p-2">
                             <select name="accountid" id="account-select" class="border rounded px-1 py-1 w-full text-xs">
                                 <option value="">-- None --</option>
                             </select>
+                            <p id="account-info" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
                         </td>
                         <td class="p-2">
                             <select name="workcategoryid" class="border rounded px-1 py-1 w-full text-xs">
@@ -206,6 +413,10 @@
                             <input type="text" name="remarks" placeholder="Optional"
                                 class="border rounded px-1 py-1 w-full text-xs">
                         </td>
+                        {% if header.overallstatus == 'Revision Required' %}
+                        <td class="p-2"></td>
+                        <td class="p-2"></td>
+                        {% endif %}
                         <td class="p-2">
                             <div class="flex flex-col gap-1">
                                 <button type="button" onclick="saveRow()"
@@ -216,7 +427,7 @@
                         </td>
                     </tr>
                     <tr id="haulage-row" class="hidden bg-gray-50">
-                        <td colspan="8" class="px-3 pb-3">
+                        <td colspan="{% if header.overallstatus == 'Revision Required' %}10{% else %}8{% endif %}" class="px-3 pb-3">
                             <div class="flex flex-wrap gap-3 items-end">
                                 <div class="flex flex-col gap-1">
                                     <label class="text-xs text-gray-500">Hauled To</label>
@@ -265,6 +476,13 @@
             <button type="button" onclick="submitSheet()"
                 class="bg-[#097d45] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Submit Sheet</button>
         </div>
+        {% elif header.overallstatus == 'Revision Required' %}
+        <div class="flex flex-wrap gap-3 mt-6 justify-between">
+            <button type="button" onclick="toggleAddRow()"
+                class="bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">+ Add Row</button>
+            <button type="button" onclick="resubmitSheet()"
+                class="bg-[#097d45] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Resubmit Sheet</button>
+        </div>
         {% endif %}
     </form>
 </div>
@@ -274,35 +492,73 @@
 <script>
     const prefill = JSON.parse(document.getElementById('prefill-data').textContent);
 
+    // Contract lookup map built from template context
+    const contractsData = {
+        {% for c in contracts %}
+        "{{ c.contractid }}": { code: "{{ c.contractcode|escapejs }}", title: "{{ c.contracttitle|escapejs }}" },
+        {% endfor %}
+    };
+
+    function showContractInfo(contractId, infoElId) {
+        const el = document.getElementById(infoElId);
+        if (!el) return;
+        const d = contractsData[contractId];
+        el.textContent = d ? `${d.code} · ${d.title}` : '';
+    }
+
+    function showAccountInfo(accountId, accounts, infoElId) {
+        const el = document.getElementById(infoElId);
+        if (!el) return;
+        const a = accounts.find(a => String(a.accountid) === String(accountId));
+        el.textContent = a ? `${a.accountcode} · ${a.accounttitle}` : '';
+    }
+
+    // Accounts loaded for the add-row form (kept so the account select onchange can reference them)
+    let addRowAccounts = [];
+
     function loadAccounts(contractId, selectValue) {
         const accountSelect = document.getElementById('account-select');
+        const accountInfo = document.getElementById('account-info');
         if (!contractId) {
             accountSelect.innerHTML = '<option value="">-- None --</option>';
+            if (accountInfo) accountInfo.textContent = '';
+            addRowAccounts = [];
             return;
         }
         fetch(`/api/accounts/?contract=${contractId}`)
             .then(r => r.json())
             .then(accounts => {
+                addRowAccounts = accounts;
                 accountSelect.innerHTML = '<option value="">-- None --</option>';
                 accounts.forEach(a => {
                     const opt = document.createElement('option');
                     opt.value = a.accountid;
-                    opt.textContent = `${a.accountcode} - ${a.accounttitle}`;
-                    if (selectValue && a.accountid == selectValue) opt.selected = true;
+                    opt.textContent = `${a.accountcode} — ${a.accounttitle}`;
+                    if (selectValue && String(a.accountid) === String(selectValue)) opt.selected = true;
                     accountSelect.appendChild(opt);
                 });
+                if (selectValue && accountInfo) showAccountInfo(selectValue, accounts, 'account-info');
+                else if (accountInfo) accountInfo.textContent = '';
             });
     }
 
-    document.getElementById('contract-select').addEventListener('change', function () {
+    const contractSelect = document.getElementById('contract-select');
+    if (contractSelect) contractSelect.addEventListener('change', function () {
         loadAccounts(this.value, null);
+        showContractInfo(this.value, 'contract-info');
+    });
+
+    const accountSelectEl = document.getElementById('account-select');
+    if (accountSelectEl) accountSelectEl.addEventListener('change', function () {
+        showAccountInfo(this.value, addRowAccounts, 'account-info');
     });
 
     function applyPrefill(employeeId) {
         if (!employeeId || !prefill[employeeId]) return;
         const p = prefill[employeeId];
         if (p.contractid) {
-            document.getElementById('contract-select').value = p.contractid;
+            const cs = document.getElementById('contract-select');
+            if (cs) { cs.value = p.contractid; showContractInfo(p.contractid, 'contract-info'); }
             loadAccounts(p.contractid, p.accountid);
         }
     }
@@ -349,6 +605,104 @@
         }
         document.getElementById('form-action').value = 'submit_sheet';
         document.getElementById('entry-form').submit();
+    }
+
+    function resubmitSheet() {
+        document.getElementById('form-action').value = 'resubmit';
+        document.getElementById('entry-form').submit();
+    }
+
+    // Loads accounts for an inline edit row and updates its account info display
+    function loadAccountsForEntry(entryId, selectValue) {
+        const contractId = document.getElementById('contract-edit-' + entryId).value;
+        const accountSelect = document.getElementById('account-edit-' + entryId);
+        const accountInfo = document.getElementById('account-info-edit-' + entryId);
+        if (!contractId) {
+            accountSelect.innerHTML = '<option value="">-- None --</option>';
+            if (accountInfo) accountInfo.textContent = '';
+            return;
+        }
+        fetch(`/api/accounts/?contract=${contractId}`)
+            .then(r => r.json())
+            .then(accounts => {
+                accountSelect.innerHTML = '<option value="">-- None --</option>';
+                accounts.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a.accountid;
+                    opt.textContent = `${a.accountcode} — ${a.accounttitle}`;
+                    if (selectValue && String(a.accountid) === String(selectValue)) opt.selected = true;
+                    accountSelect.appendChild(opt);
+                });
+                if (selectValue && accountInfo) showAccountInfo(selectValue, accounts, 'account-info-edit-' + entryId);
+                else if (accountInfo) accountInfo.textContent = '';
+                // Keep accounts reference so the onchange handler can use it
+                accountSelect._accounts = accounts;
+                accountSelect.onchange = function () {
+                    if (accountInfo) showAccountInfo(this.value, accounts, 'account-info-edit-' + entryId);
+                };
+            });
+    }
+
+    // Called when the contract dropdown changes inside an edit row
+    function onEditContractChange(entryId) {
+        const contractId = document.getElementById('contract-edit-' + entryId).value;
+        showContractInfo(contractId, 'contract-info-edit-' + entryId);
+        loadAccountsForEntry(entryId, null);
+    }
+
+    function openEditRow(entryId, contractId, accountId) {
+        document.getElementById('row-' + entryId).classList.add('hidden');
+        document.getElementById('edit-row-' + entryId).classList.remove('hidden');
+        showContractInfo(contractId, 'contract-info-edit-' + entryId);
+        if (contractId) loadAccountsForEntry(entryId, accountId && accountId !== '0' ? accountId : null);
+    }
+
+    function closeEditRow(entryId) {
+        document.getElementById('edit-row-' + entryId).classList.add('hidden');
+        const haulage = document.getElementById('haulage-edit-' + entryId);
+        if (haulage) haulage.classList.add('hidden');
+        document.getElementById('row-' + entryId).classList.remove('hidden');
+    }
+
+    function toggleHaulageEdit(entryId) {
+        document.getElementById('haulage-edit-' + entryId).classList.toggle('hidden');
+    }
+
+    function saveEditRow(entryId) {
+        const contract = document.getElementById('contract-edit-' + entryId).value;
+        const hours = parseFloat(document.getElementById('hours-edit-' + entryId).value);
+        if (!contract) { alert('Contract is required.'); return; }
+        if (!hours || hours <= 0 || hours > 24) { alert('Hours must be between 0.5 and 24.'); return; }
+
+        document.querySelectorAll('.temp-edit-input').forEach(el => el.remove());
+        document.getElementById('form-action').value = 'edit_row';
+        document.getElementById('form-entryid').value = entryId;
+
+        const form = document.getElementById('entry-form');
+        const addHidden = (name, elId) => {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = el.value;
+            input.className = 'temp-edit-input';
+            form.appendChild(input);
+        };
+        addHidden('contractid',          'contract-edit-'             + entryId);
+        addHidden('accountid',           'account-edit-'              + entryId);
+        addHidden('workcategoryid',      'workcategory-edit-'         + entryId);
+        addHidden('hoursworked',         'hours-edit-'                + entryId);
+        addHidden('remarks',             'remarks-edit-'              + entryId);
+        addHidden('hauledto',            'hauledto-edit-'             + entryId);
+        addHidden('tonnesorehauled',     'tonnesorehauled-edit-'      + entryId);
+        addHidden('tonneswastehauled',   'tonneswastehauled-edit-'    + entryId);
+        addHidden('lowgradehauled',      'lowgradehauled-edit-'       + entryId);
+        addHidden('tonnesoreskipped',    'tonnesoreskipped-edit-'     + entryId);
+        addHidden('tonneswasteskipped',  'tonneswasteskipped-edit-'   + entryId);
+        addHidden('lowgradeskipped',     'lowgradeskipped-edit-'      + entryId);
+        addHidden('longholefootage',     'longholefootage-edit-'      + entryId);
+        form.submit();
     }
 </script>
 

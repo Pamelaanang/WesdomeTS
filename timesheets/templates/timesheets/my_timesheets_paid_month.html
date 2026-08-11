@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
+    <div class="mb-2">
+        <a href="{% url 'my_timesheets_paid' %}" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline mb-2">
+            <i class="fa-solid fa-arrow-left"></i> My Paid Timesheets
+        </a>
+        <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+        <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+        <p class="text-center text-sm text-gray-500 mt-1">
+            {% if headers %}
+            <span class="font-semibold text-gray-700">{{ headers.0.paidat|date:"F Y" }}</span>
+            {% else %}
+            <span class="font-semibold text-gray-700">{{ year }}-{{ month|stringformat:"02d" }}</span>
+            {% endif %}
+            &mdash; Payroll-processed timesheet submissions.
+        </p>
+    </div>
+</div>
+
+<div class="container mx-auto mb-8">
+    <div class="flex flex-wrap gap-4">
+        {% for header in headers %}
+        <div class="bg-white rounded-xl shadow p-5 w-52 flex flex-col items-center gap-2">
+            <p class="text-xs font-semibold">Paid {{ header.paidat|date:"M j, Y" }}</p>
+            {% if header.date_from %}
+            <p class="text-xs text-gray-500 text-center">
+                {{ header.date_from|date:"M j" }}
+                {% if header.date_to and header.date_to != header.date_from %} &mdash; {{ header.date_to|date:"M j" }}{% endif %}
+            </p>
+            {% endif %}
+            <p class="text-xs">{{ header.entry_count }} entr{{ header.entry_count|pluralize:"y,ies" }}</p>
+            <p class="font-semibold text-sm">{{ header.total_hours|default:"0" }} hrs</p>
+            <span class="mt-1 bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full">Paid</span>
+            {% if header.paidby %}
+            <p class="text-xs text-gray-400 text-center">by {{ header.paidby.firstname }} {{ header.paidby.lastname }}</p>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="mx-auto text-gray-400 text-sm py-6">No paid timesheets for this month.</div>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock content %}
