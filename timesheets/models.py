@@ -243,6 +243,14 @@ class OperationsHeader(models.Model):
     ohapprovedat_capt = models.DateTimeField(db_column='OHApprovedAt_Capt', blank=True, null=True)
     coverageid = models.ForeignKey('users.CrewCoverage', models.SET_NULL, db_column='CoverageID', blank=True, null=True)
 
+    SECTION_CHOICES = [
+        ('Production', 'Production'),
+        ('Development', 'Development'),
+        ('Longhole', 'Longhole'),
+        ('Logistics', 'Logistics'),
+    ]
+    section = models.CharField(db_column='Section', max_length=20, choices=SECTION_CHOICES, blank=True, null=True)
+
     class Meta:
         managed = True
         db_table = 'OperationsHeader'
@@ -290,6 +298,11 @@ class OperationsBonus(models.Model):
     reviewedat = models.DateTimeField(db_column='ReviewedAt', blank=True, null=True)
     appliedbypayroll = models.ForeignKey('users.User', models.DO_NOTHING, db_column='AppliedByPayroll', blank=True, null=True, related_name='applied_%(class)s')
     appliedatpayroll = models.DateTimeField(db_column='AppliedAtPayroll', blank=True, null=True)
+    status = models.CharField(
+        db_column='Status', max_length=10,
+        choices=[('Draft', 'Draft'), ('Submitted', 'Submitted'), ('Applied', 'Applied')],
+        default='Draft',
+    )
 
     class Meta:
         managed = True

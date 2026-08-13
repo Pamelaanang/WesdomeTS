@@ -38,6 +38,9 @@
             {% if request.user.supervisorid %}
             <span><i class="fa-solid fa-book-open-reader text-black mr-1"></i>Supervisor: {{ request.user.supervisorid.firstname }} {{ request.user.supervisorid.lastname }}</span>
             {% endif %}
+            {% if al == 5 %}
+            <span><i class="fa-solid fa-hard-hat text-black mr-1"></i>Section: {{ request.user.shiftertype|default:"Not set" }}</span>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -170,12 +173,12 @@
             </div>
             <div class="flex items-center justify-between text-sm">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Approved
-                    Entries</span>
+                    Sheets</span>
                 <span class="font-semibold">{{ approved_count }}</span>
             </div>
             <div class="flex items-center justify-between text-sm">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF3131]"></i> Rejected
-                    Entries</span>
+                    Sheets</span>
                 <span class="font-semibold">{{ rejected_count }}</span>
             </div>
         </div>
@@ -186,11 +189,11 @@
                     Approval</span>
                 <span class="font-semibold">{{ ops_pending_captain }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
+            <!-- <div class="flex items-center justify-between text-sm">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#28348A]"></i> Forwarded to
                     Superintendent</span>
                 <span class="font-semibold">{{ ops_forwarded }}</span>
-            </div>
+            </div> -->
         </div>
 
         {% elif al == 5 %} <!-- Shifter -->
@@ -367,4 +370,5 @@
 </script>
 
 {% endwith %}
+<script>window._pageBackLabel = 'Profile';</script>
 {% endblock content %}

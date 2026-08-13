@@ -3,7 +3,7 @@
 
 <div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
     <button onclick="history.back()" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline cursor-pointer mb-3">
-        <i class="fa-solid fa-arrow-left"></i> <span class="back-label">Processed</span>
+        <i class="fa-solid fa-arrow-left"></i> <span class="back-label">{{ employee.roleid.departmentid.departmentname }}</span>
     </button>
     <div class="flex items-center gap-4">
         <div class="w-16 h-16 rounded-full bg-black overflow-hidden flex-shrink-0 flex items-center justify-center">
@@ -16,9 +16,33 @@
         <div>
             <h2 class="text-xl font-bold">{{ employee.firstname }} {{ employee.lastname }}</h2>
             <p class="text-sm text-gray-500 mt-1">{{ employee.roleid.rolename }} &mdash; {{ employee.roleid.departmentid.departmentname }}</p>
-            <p class="text-sm font-semibold text-[#28348A] mt-1">{{ processed_timesheets|length }} paid sheet{{ processed_timesheets|length|pluralize }} in the last 6 months</p>
+            <p class="text-sm font-semibold text-[#28348A] mt-1">
+                {% if selected_year == current_year %}
+                    {{ processed_timesheets|length }} paid sheet{{ processed_timesheets|length|pluralize }} in {{ current_year }}
+                {% else %}
+                    {{ processed_timesheets|length }} paid sheet{{ processed_timesheets|length|pluralize }} archived &mdash; {{ selected_year }}
+                {% endif %}
+            </p>
         </div>
     </div>
+
+    {% if archive_years or selected_year != current_year %}
+    <div class="mt-4 flex flex-wrap items-center gap-2 text-sm">
+        {% if selected_year != current_year %}
+        <a href="{% url 'payroll_processed_employee' employee.employeeid %}"
+            class="px-3 py-1 rounded-full border border-[#28348A] text-[#28348A] text-xs hover:bg-[#28348A] hover:text-white transition">
+            {{ current_year }} (current)
+        </a>
+        {% endif %}
+        {% for yr in archive_years %}
+        <a href="{% url 'payroll_processed_employee' employee.employeeid %}?year={{ yr }}"
+            class="px-3 py-1 rounded-full border text-xs transition
+            {% if selected_year == yr %}bg-gray-600 text-white border-gray-600{% else %}border-gray-400 text-gray-600 hover:bg-gray-100{% endif %}">
+            {{ yr }}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
 </div>
 
 {% regroup processed_timesheets by date_from|date:"F Y" as month_groups %}
@@ -43,7 +67,7 @@
 </div>
 {% empty %}
 <div class="container mx-auto bg-white rounded-2xl shadow p-8 text-center text-sm text-gray-400">
-    No processed submissions in the last 6 months.
+    No processed submissions for {{ selected_year }}.
 </div>
 {% endfor %}
 

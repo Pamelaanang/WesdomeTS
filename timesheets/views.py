@@ -1,9 +1,10 @@
+from datetime import date
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from users.models import User, Department, CrewAssignment, CrewCoverage
-from .models import MainHeader, MainEntry, Crews, Workcategory, LeaveType, OperationsHeader, OperationsEntry, Contract, Account, ContractAccount, ContractSeries
+from .models import MainHeader, MainEntry, Crews, Workcategory, LeaveType, OperationsHeader, OperationsEntry, Contract, Account, ContractAccount, ContractSeries, OperationsBonus, BONUS_RATE_CODES
 from django.utils import timezone
 from django.db.models import Sum, Count, Min, Max, Q, Case, When, IntegerField
 from django.db.models.functions import TruncMonth
@@ -309,16 +310,57 @@ def payroll_processed(request):
     if request.user.access_level != 7:
         return redirect('profile')
 
-    six_months_ago = timezone.now() - timezone.timedelta(days=180)
-
-    employees = User.objects.filter(
-    mainheader__paidat__gte=six_months_ago,
-    mainheader__paidat__isnull=False,
-    isactive=True
-    ).distinct().select_related('roleid__departmentid')
+    current_year = timezone.now().year
+    departments = Department.objects.filter(isactive=1).annotate(
+        employee_count=Count(
+            'roles__user',
+            filter=Q(
+                roles__user__isactive=True,
+                roles__user__mainheader__paidat__isnull=False,
+                roles__user__mainheader__paidat__year=current_year,
+            ),
+            distinct=True,
+        )
+    )
 
     return render(request, 'timesheets/payroll_processed.html', {
-        'employees': employees
+        'departments': departments,
+    })
+
+
+@login_required(login_url='login')
+def payroll_processed_dept(request, dept_id):
+    if request.user.access_level != 7:
+        return redirect('profile')
+
+    dept = get_object_or_404(Department, departmentid=dept_id)
+    current_year = timezone.now().year
+
+    employees = User.objects.filter(
+        roleid__departmentid=dept_id,
+        isactive=True,
+        mainheader__paidat__isnull=False,
+        mainheader__paidat__year=current_year,
+    ).distinct().annotate(
+        paid_count=Count(
+            'mainheader',
+            filter=Q(mainheader__paidat__isnull=False, mainheader__paidat__year=current_year),
+            distinct=True,
+        ),
+        total_hours=Sum(
+            'mainheader__mainentry__hoursworked',
+            filter=Q(
+                mainheader__paidat__isnull=False,
+                mainheader__paidat__year=current_year,
+                mainheader__mainentry__linestatus='Approved',
+            ),
+        ),
+    ).select_related('roleid').order_by('lastname', 'firstname')
+
+    return render(request, 'timesheets/payroll_processed_dept.html', {
+        'dept': dept,
+        'employees': employees,
+        'current_year': current_year,
     })
 
 
@@ -328,23 +370,365 @@ def payroll_processed_employee(request, employee_id):
         return redirect('profile')
 
     employee = get_object_or_404(User, employeeid=employee_id, isactive=True)
-    six_months_ago = timezone.now() - timezone.timedelta(days=180)
+    current_year = timezone.now().year
+    selected_year = int(request.GET.get('year', current_year))
 
     processed_timesheets = MainHeader.objects.filter(
         employeeid=employee,
-        paidat__gte=six_months_ago,
-        paidat__isnull=False
-    ).select_related('employeeid').annotate(
+        paidat__isnull=False,
+        paidat__year=selected_year,
+    ).annotate(
         entry_count=Count('mainentry', filter=Q(mainentry__linestatus='Approved')),
         total_hours=Sum('mainentry__hoursworked', filter=Q(mainentry__linestatus='Approved')),
         date_from=Min('mainentry__startdate', filter=Q(mainentry__linestatus='Approved')),
-        date_to=Max('mainentry__startdate', filter=Q(mainentry__linestatus='Approved'))
-    ).filter(entry_count__gt=0).order_by('-date_from')
+        date_to=Max('mainentry__startdate', filter=Q(mainentry__linestatus='Approved')),
+    ).filter(entry_count__gt=0).order_by('date_from')
+
+    archive_years = [
+        d.year for d in MainHeader.objects.filter(
+            employeeid=employee,
+            paidat__isnull=False,
+        ).dates('paidat', 'year')
+        if d.year != current_year
+    ]
 
     return render(request, 'timesheets/payroll_processed_employee.html', {
         'employee': employee,
-        'processed_timesheets': processed_timesheets
+        'processed_timesheets': processed_timesheets,
+        'current_year': current_year,
+        'selected_year': selected_year,
+        'archive_years': archive_years,
     })
+
+
+@login_required(login_url='login')
+def payroll_ops_unprocessed(request):
+    if request.user.access_level != 7:
+        return redirect('profile')
+
+    opsheader = OperationsHeader.objects.filter(
+        overallstatus='Completed',
+        operationsentry__linestatus='Approved',
+        operationsentry__paidat__isnull=True
+    ).distinct().annotate(
+        unpaidcount=Count('operationsentry', filter=Q(
+        operationsentry__linestatus='Approved',
+        operationsentry__paidat__isnull=True), distinct=True)
+    ).select_related(
+        'shifterid', 'crewid', 'coverageid'
+    ).order_by(
+        'shiftdate'
+    )
+
+    return render(request, 'timesheets/payroll_ops_unprocessed.html', {'opsheader': opsheader})
+
+
+@login_required(login_url='login')
+def payroll_ops_daily(request):
+    if request.user.access_level != 7:
+        return redirect('profile')
+
+    current_year = timezone.now().year
+    selected_year = int(request.GET.get('year', current_year))
+
+    unpaid_header_ids = OperationsEntry.objects.filter(
+        linestatus='Approved',
+        paidat__isnull=True,
+    ).values_list('opsheaderid', flat=True)
+
+    months = OperationsHeader.objects.filter(
+        overallstatus='Completed',
+        shiftdate__year=selected_year,
+    ).exclude(
+        opsheaderid__in=unpaid_header_ids
+    ).annotate(
+        month=TruncMonth('shiftdate')
+    ).values('month').annotate(
+        sheet_count=Count('opsheaderid')
+    ).order_by('-month')
+
+    archive_years = [
+        d.year for d in OperationsHeader.objects.filter(
+            overallstatus='Completed',
+        ).exclude(
+            opsheaderid__in=unpaid_header_ids
+        ).dates('shiftdate', 'year')
+        if d.year != current_year
+    ]
+
+    return render(request, 'timesheets/payroll_ops_daily.html', {
+        'months': months,
+        'current_year': current_year,
+        'selected_year': selected_year,
+        'archive_years': archive_years,
+    })
+
+
+@login_required(login_url='login')
+def payroll_ops_daily_month(request, year, month):
+    if request.user.access_level != 7:
+        return redirect('profile')
+
+    unpaid_header_ids = OperationsEntry.objects.filter(
+        linestatus='Approved',
+        paidat__isnull=True,
+    ).values_list('opsheaderid', flat=True)
+
+    sheets = OperationsHeader.objects.filter(
+        overallstatus='Completed',
+        shiftdate__year=year,
+        shiftdate__month=month,
+    ).exclude(
+        opsheaderid__in=unpaid_header_ids
+    ).select_related(
+        'shifterid', 'crewid', 'coverageid'
+    ).annotate(
+        entry_count=Count('operationsentry', filter=Q(operationsentry__linestatus='Approved'))
+    ).order_by('shiftdate', 'shifttype')
+
+    return render(request, 'timesheets/payroll_ops_daily_month.html', {
+        'sheets': sheets,
+        'year': year,
+        'month': month,
+        'month_date': date(year, month, 1),
+    })
+
+
+@login_required(login_url='login')
+def payroll_ops_members(request):
+    if request.user.access_level != 7:
+        return redirect('profile')
+
+    current_year = timezone.now().year
+
+    members = User.objects.filter(
+        operationsentry__linestatus='Approved',
+        operationsentry__paidat__isnull=False,
+        operationsentry__paidat__year=current_year,
+    ).distinct().annotate(
+        paid_entry_count=Count(
+            'operationsentry',
+            filter=Q(
+                operationsentry__linestatus='Approved',
+                operationsentry__paidat__isnull=False,
+                operationsentry__paidat__year=current_year,
+            ),
+            distinct=True,
+        )
+    ).select_related('roleid').order_by('lastname', 'firstname')
+
+    return render(request, 'timesheets/payroll_ops_members.html', {
+        'members': members,
+        'current_year': current_year,
+    })
+
+
+@login_required(login_url='login')
+def payroll_ops_member_detail(request, employee_id):
+    if request.user.access_level != 7:
+        return redirect('profile')
+
+    member = get_object_or_404(User, employeeid=employee_id)
+    current_year = timezone.now().year
+    selected_year = int(request.GET.get('year', current_year))
+
+    months = OperationsEntry.objects.filter(
+        employeeid=member,
+        linestatus='Approved',
+        paidat__isnull=False,
+        paidat__year=selected_year,
+    ).annotate(
+        month=TruncMonth('paidat')
+    ).values('month').annotate(
+        entry_count=Count('opsentryid')
+    ).order_by('-month')
+
+    archive_years = [
+        d.year for d in OperationsEntry.objects.filter(
+            employeeid=member,
+            linestatus='Approved',
+            paidat__isnull=False,
+        ).dates('paidat', 'year')
+        if d.year != current_year
+    ]
+
+    return render(request, 'timesheets/payroll_ops_member_detail.html', {
+        'member': member,
+        'months': months,
+        'current_year': current_year,
+        'selected_year': selected_year,
+        'archive_years': archive_years,
+    })
+
+
+@login_required(login_url='login')
+def payroll_ops_member_month(request, employee_id, year, month):
+    if request.user.access_level != 7:
+        return redirect('profile')
+
+    member = get_object_or_404(User, employeeid=employee_id)
+    month_date = date(year, month, 1)
+
+    if request.method == 'POST' and request.POST.get('action') == 'apply_bonus':
+        bonus = get_object_or_404(OperationsBonus, employeeid=member, bonusmonth=month_date, status='Submitted')
+        bonus.status = 'Applied'
+        bonus.appliedbypayroll = request.user
+        bonus.appliedatpayroll = timezone.now()
+        bonus.save()
+        return redirect('payroll_ops_member_month', employee_id=employee_id, year=year, month=month)
+
+    entries = OperationsEntry.objects.filter(
+        employeeid=member,
+        linestatus='Approved',
+        paidat__isnull=False,
+        paidat__year=year,
+        paidat__month=month,
+    ).select_related(
+        'opsheaderid__shifterid', 'opsheaderid__crewid', 'contractid', 'accountid', 'workcategoryid', 'paidby'
+    ).order_by('opsheaderid__shiftdate', 'opsheaderid__shifttype')
+
+    total_hours = entries.aggregate(total=Sum('hoursworked'))['total'] or 0
+    bonus = OperationsBonus.objects.filter(employeeid=member, bonusmonth=month_date).first()
+
+    return render(request, 'timesheets/payroll_ops_member_month.html', {
+        'member': member,
+        'entries': entries,
+        'total_hours': total_hours,
+        'year': year,
+        'month': month,
+        'month_date': month_date,
+        'bonus': bonus,
+    })
+
+
+@login_required(login_url='login')
+def superintendent_ops_members(request):
+    if request.user.access_level != 2:
+        return redirect('profile')
+    members_qs = User.objects.filter(
+        operationsentry__opsheaderid__overallstatus='Completed',
+        operationsentry__linestatus='Approved',
+    ).distinct().select_related('roleid').order_by('lastname', 'firstname')
+    return render(request, 'timesheets/superintendent_ops_members.html', {
+        'members': members_qs,
+    })
+
+
+@login_required(login_url='login')
+def superintendent_ops_member_detail(request, employee_id):
+    if request.user.access_level != 2:
+        return redirect('profile')
+    member = get_object_or_404(User, employeeid=employee_id)
+    months_qs = OperationsEntry.objects.filter(
+        employeeid=member,
+        opsheaderid__overallstatus='Completed',
+        linestatus='Approved',
+    ).annotate(
+        month=TruncMonth('opsheaderid__shiftdate')
+    ).values('month').annotate(
+        entry_count=Count('opsentryid')
+    ).order_by('-month')
+
+    bonuses = {
+        (b.bonusmonth.year, b.bonusmonth.month): b
+        for b in OperationsBonus.objects.filter(employeeid=member)
+    }
+    months = [
+        {
+            'month': m['month'],
+            'entry_count': m['entry_count'],
+            'bonus': bonuses.get((m['month'].year, m['month'].month)),
+        }
+        for m in months_qs
+    ]
+    return render(request, 'timesheets/superintendent_ops_member_detail.html', {
+        'member': member,
+        'months': months,
+    })
+
+
+@login_required(login_url='login')
+def superintendent_ops_member_month(request, employee_id, year, month):
+    if request.user.access_level != 2:
+        return redirect('profile')
+    member = get_object_or_404(User, employeeid=employee_id)
+    month_date = date(year, month, 1)
+    entries = OperationsEntry.objects.filter(
+        employeeid=member,
+        opsheaderid__overallstatus='Completed',
+        linestatus='Approved',
+        opsheaderid__shiftdate__year=year,
+        opsheaderid__shiftdate__month=month,
+    ).select_related(
+        'opsheaderid__shifterid', 'opsheaderid__crewid',
+        'contractid', 'accountid', 'workcategoryid',
+    ).order_by('opsheaderid__shiftdate', 'opsheaderid__shifttype')
+    total_hours = entries.aggregate(total=Sum('hoursworked'))['total'] or 0
+    bonus = OperationsBonus.objects.filter(employeeid=member, bonusmonth=month_date).first()
+
+    if request.method == 'POST':
+        if bonus and bonus.status == 'Applied':
+            return redirect('superintendent_ops_member_month', employee_id=employee_id, year=year, month=month)
+        action = request.POST.get('action')
+        ratecode = request.POST.get('bonusratecode', '').strip()
+        notes = request.POST.get('notes', '').strip()
+        if not bonus:
+            bonus = OperationsBonus(employeeid=member, bonusmonth=month_date)
+        bonus.bonusratecode = ratecode
+        bonus.notes = notes or None
+        if action == 'confirm':
+            bonus.status = 'Submitted'
+            bonus.reviewedby = request.user
+            bonus.reviewedat = timezone.now()
+        else:
+            bonus.status = 'Draft'
+            bonus.reviewedby = None
+            bonus.reviewedat = None
+        bonus.save()
+        return redirect('superintendent_ops_member_month', employee_id=employee_id, year=year, month=month)
+
+    return render(request, 'timesheets/superintendent_ops_member_month.html', {
+        'member': member,
+        'entries': entries,
+        'total_hours': total_hours,
+        'year': year,
+        'month': month,
+        'month_date': month_date,
+        'bonus': bonus,
+        'rate_codes': BONUS_RATE_CODES,
+    })
+
+
+@login_required(login_url='login')
+def payroll_ops_sheet(request,pk):
+    if request.user.access_level != 7:
+        return redirect('profile')
+
+    opsheader = get_object_or_404(
+        OperationsHeader, opsheaderid=pk, overallstatus='Completed')
+
+    opsentries = OperationsEntry.objects.filter(
+        opsheaderid=opsheader, linestatus='Approved'
+    ).select_related(
+        'employeeid', 'contractid', 'accountid', 'workcategoryid', 'paidby'
+    )
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'mark_as_paid':
+            opsentries.filter(paidat__isnull=True).update(paidat=timezone.now(), paidby=request.user)
+            messages.success(request, f'Payment for operations sheet {opsheader.opsheaderid} marked as complete.')
+            return redirect('payroll_ops_unprocessed')
+
+    all_paid = not opsentries.filter(paidat__isnull=True).exists()
+
+    return render(request, 'timesheets/payroll_ops_sheet.html', {
+        'opsheader': opsheader,
+        'opsentries': opsentries,
+        'all_paid': all_paid,
+    })
+
 
 
 @login_required(login_url='login')
@@ -455,6 +839,20 @@ def new_ops_sheet(request):
         crewid = request.POST.get('crewid')
         coverage_id = request.POST.get('coverage_id') or None
 
+        try:
+            from datetime import date as _date
+            if shiftdate and _date.fromisoformat(shiftdate) > today:
+                return render(request, 'timesheets/ops_sheet.html', {
+                    'header': None,
+                    'crews': crews,
+                    'active_coverages': active_coverages,
+                    'own_shiftertype': request.user.shiftertype or '',
+                    'coverage_sections': {},
+                    'error': 'Crew sheets cannot be created for future dates.',
+                })
+        except ValueError:
+            pass
+
         existing = OperationsHeader.objects.filter(
             shifterid=request.user,
             shiftdate=shiftdate,
@@ -464,19 +862,37 @@ def new_ops_sheet(request):
         if existing:
             return redirect('ops_sheet', pk=existing.opsheaderid)
 
+        # Derive section: own crew → own shiftertype; coverage → home shifter's shiftertype
+        section = None
+        if coverage_id:
+            cov = active_coverages.filter(coverageid=coverage_id).first()
+            if cov:
+                section = cov.home_shifter.shiftertype
+        else:
+            section = request.user.shiftertype
+
         header = OperationsHeader.objects.create(
             shifterid=request.user,
             shiftdate=shiftdate,
             shifttype=shifttype,
             crewid_id=crewid,
             coverageid_id=coverage_id,
+            section=section,
         )
         return redirect('ops_sheet', pk=header.opsheaderid)
+
+    # Build coverage_sections map for JS: { coverageid: home_shifter.shiftertype }
+    coverage_sections = {
+        str(cov.coverageid): cov.home_shifter.shiftertype or ''
+        for cov in active_coverages
+    }
 
     return render(request, 'timesheets/ops_sheet.html', {
         'header': None,
         'crews': crews,
         'active_coverages': active_coverages,
+        'own_shiftertype': request.user.shiftertype or '',
+        'coverage_sections': coverage_sections,
     })
 
 
@@ -778,15 +1194,17 @@ def review_ops_sheet(request,pk):
         return redirect('profile')
 
     header = get_object_or_404(
-        OperationsHeader, 
+        OperationsHeader,
         opsheaderid=pk,
-        overallstatus__in=['Submitted', 'In Progress'],
-        )
+        overallstatus__in=['Submitted', 'In Progress', 'Completed'],
+    )
 
     if header.ohapprovedby_capt and header.ohapprovedby_capt != request.user:
         return redirect('ops_approval_inbox')
 
-    if request.method == 'POST':
+    readonly = header.overallstatus == 'Completed'
+
+    if request.method == 'POST' and not readonly:
         action = request.POST.get('action')
 
         if action in ('approve', 'reject'):
@@ -840,7 +1258,8 @@ def review_ops_sheet(request,pk):
         'header': header,
         'entries': entries,
         'has_unreviewed': has_unreviewed,
-        'has_rejected': has_rejected
+        'has_rejected': has_rejected,
+        'readonly': readonly,
     })
 
 

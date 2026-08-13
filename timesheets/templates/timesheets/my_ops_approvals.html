@@ -12,14 +12,14 @@
     </div>
 </div>
 
-<div class="container mx-auto p-4 bg-white rounded-2xl shadow">
+<div class="container mx-auto">
     {% if months %}
-    <div class="divide-y">
+    <div class="flex flex-col gap-4">
         {% for m in months %}
         <a href="{% url 'my_ops_approvals_month' m.month.year m.month.month %}"
-            class="flex items-center justify-between px-4 py-4 hover:bg-gray-50 transition-colors group">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+            class="flex items-center justify-between px-5 py-4 bg-white rounded-2xl shadow hover:shadow-md transition-all group">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
                     <i class="fa-solid fa-calendar-check text-green-700 text-sm"></i>
                 </div>
                 <div>
@@ -32,8 +32,11 @@
         {% endfor %}
     </div>
     {% else %}
-    <p class="text-center text-gray-400 text-sm py-8">No approved sheets yet.</p>
+    <div class="bg-white rounded-2xl shadow p-8">
+        <p class="text-center text-gray-400 text-sm">No approved sheets yet.</p>
+    </div>
     {% endif %}
 </div>
 
+<script>window._pageBackLabel = 'Daily Approvals';</script>
 {% endblock content %}

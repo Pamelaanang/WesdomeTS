@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
+    <button onclick="history.back()" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline cursor-pointer mb-3">
+        <i class="fa-solid fa-arrow-left"></i> <span class="back-label">Back</span>
+    </button>
+    <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+    <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+
+    {% if opsheader.coverageid %}
+    <div class="mt-3 mx-4 bg-amber-50 border border-amber-300 text-amber-800 text-xs rounded px-3 py-2">
+        <i class="fa-solid fa-arrows-rotate mr-1"></i>
+        Coverage sheet &mdash; submitted on behalf of <strong>{{ opsheader.coverageid.home_shifter.firstname }} {{ opsheader.coverageid.home_shifter.lastname }}</strong>'s crew
+    </div>
+    {% endif %}
+
+    <div class="flex flex-wrap justify-between items-center mt-4 text-sm gap-y-2 px-2">
+        <span class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full bg-black overflow-hidden flex-shrink-0 flex items-center justify-center">
+                {% if opsheader.shifterid.profilepic %}
+                <img src="/media/{{ opsheader.shifterid.profilepic }}" class="w-full h-full object-cover" alt="">
+                {% else %}
+                <i class="fa-solid fa-user text-white text-xs"></i>
+                {% endif %}
+            </div>
+            Shifter: <span class="font-medium">{{ opsheader.shifterid.firstname }} {{ opsheader.shifterid.lastname }}</span>
+        </span>
+        <span>Date: <span class="font-medium">{{ opsheader.shiftdate|date:"M j, Y" }}</span></span>
+        <span>Shift: <span class="font-medium">{{ opsheader.shifttype }}</span></span>
+        <span>Crew: <span class="font-medium">{{ opsheader.crewid.crewname }}</span></span>
+        <span>Approved by: <span class="font-medium">{{ opsheader.ohapprovedby_capt.firstname }} {{ opsheader.ohapprovedby_capt.lastname }}</span></span>
+    </div>
+</div>
+
+<!-- STATUS BANNER -->
+<div class="container mx-auto mt-2 px-4">
+    {% if all_paid %}
+    <div class="bg-green-50 border border-green-300 text-green-800 text-sm rounded px-4 py-2">
+        <i class="fa-solid fa-circle-check mr-1"></i>
+        All entries on this sheet have been paid.
+    </div>
+    {% else %}
+    <div class="bg-yellow-50 border border-yellow-400 text-yellow-800 text-sm rounded px-4 py-2">
+        <i class="fa-solid fa-circle-exclamation mr-1"></i>
+        {{ opsentries|length }} entr{{ opsentries|length|pluralize:"y,ies" }} on this sheet — review and mark as paid.
+    </div>
+    {% endif %}
+</div>
+
+<!-- ENTRY TABLE -->
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mt-4">
+    <div class="overflow-x-auto">
+        <table class="w-full text-xs min-w-[900px]">
+            <thead>
+                <tr class="text-black text-center border-b">
+                    <th class="p-2">Payroll ID</th>
+                    <th class="p-2">Employee</th>
+                    <th class="p-2">Contract</th>
+                    <th class="p-2">Account</th>
+                    <th class="p-2">Work Category</th>
+                    <th class="p-2">Hours</th>
+                    <th class="p-2">Haulage / Footage</th>
+                    <th class="p-2">Remarks</th>
+                    <th class="p-2">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in opsentries %}
+                <tr class="border-b text-center
+                    {% if entry.paidat %}bg-green-50{% else %}hover:bg-gray-50{% endif %}">
+                    <td class="p-2">{{ entry.employeeid.employeeid }}</td>
+                    <td class="p-2">{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</td>
+                    <td class="p-2">{{ entry.contractid.contractcode }}</td>
+                    <td class="p-2">{{ entry.accountid.accountcode|default:"—" }}</td>
+                    <td class="p-2">{{ entry.workcategoryid.categoryname|default:"—" }}</td>
+                    <td class="p-2">{{ entry.hoursworked }}</td>
+                    <td class="p-2 text-gray-500">
+                        {% if entry.tonnesorehauled %}Ore: {{ entry.tonnesorehauled }}t &nbsp;{% endif %}
+                        {% if entry.tonneswastehauled %}Waste: {{ entry.tonneswastehauled }}t &nbsp;{% endif %}
+                        {% if entry.tonnesoreskipped %}Skip: {{ entry.tonnesoreskipped }}t &nbsp;{% endif %}
+                        {% if entry.longholefootage %}LH: {{ entry.longholefootage }}ft{% endif %}
+                        {% if not entry.tonnesorehauled and not entry.tonneswastehauled and not entry.tonnesoreskipped and not entry.longholefootage %}—{% endif %}
+                    </td>
+                    <td class="p-2">{{ entry.remarks|default:"—" }}</td>
+                    <td class="p-2">
+                        {% if entry.paidat %}
+                        <span class="text-green-700 font-semibold">Paid</span>
+                        <br><span class="text-gray-400 text-xs">{{ entry.paidat|date:"M j, Y" }}</span>
+                        {% else %}
+                        <span class="text-yellow-600 font-semibold">Unpaid</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center text-gray-400 py-6">No approved entries on this sheet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-6 flex justify-between items-center">
+        <p class="text-sm text-gray-700">Employees: <span class="font-bold">{{ opsentries|length }}</span></p>
+        {% if not all_paid %}
+        <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="mark_as_paid">
+            <button type="submit"
+                class="px-6 py-2 rounded-xl text-sm font-semibold bg-green-600 text-white hover:bg-green-700">
+                Mark Sheet as Paid
+            </button>
+        </form>
+        {% else %}
+        <span class="inline-block bg-green-100 text-green-700 text-sm font-semibold px-4 py-2 rounded-xl">Paid</span>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock content %}

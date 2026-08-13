@@ -84,6 +84,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     supervisorid = models.ForeignKey('self', models.DO_NOTHING, db_column='SupervisorID', blank=True, null=True)  # Field name made lowercase.
     microsoftid = models.CharField(db_column='MicrosoftID', max_length=255, blank=True, null=True)  # Field name made lowercase.
 
+    SHIFTER_TYPE_CHOICES = [
+        ('Production', 'Production'),
+        ('Development', 'Development'),
+        ('Longhole', 'Longhole'),
+        ('Logistics', 'Logistics'),
+    ]
+    shiftertype = models.CharField(db_column='ShifterType', max_length=20, choices=SHIFTER_TYPE_CHOICES, blank=True, null=True)
+
     objects = EmployeeManager()
 
     #Tell Django which variable to use for Authentication

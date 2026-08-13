@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
+    <button onclick="history.back()" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline cursor-pointer mb-2">
+        <i class="fa-solid fa-arrow-left"></i> <span class="back-label">Back</span>
+    </button>
+    <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+    <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+    <p class="text-center text-sm text-gray-500 mt-1">
+        <span class="font-semibold text-gray-700">OPERATIONS DAILY CREW — PROCESSED:</span> Fully paid operations sheets by month.
+    </p>
+
+    {% if archive_years or selected_year != current_year %}
+    <div class="mt-4 flex flex-wrap items-center gap-2 text-sm">
+        {% if selected_year != current_year %}
+        <a href="{% url 'payroll_ops_daily' %}"
+            class="px-3 py-1 rounded-full border border-[#28348A] text-[#28348A] text-xs hover:bg-[#28348A] hover:text-white transition">
+            {{ current_year }} (current)
+        </a>
+        {% endif %}
+        {% for yr in archive_years %}
+        <a href="{% url 'payroll_ops_daily' %}?year={{ yr }}"
+            class="px-3 py-1 rounded-full border text-xs transition
+            {% if selected_year == yr %}bg-gray-600 text-white border-gray-600{% else %}border-gray-400 text-gray-600 hover:bg-gray-100{% endif %}">
+            {{ yr }}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<div class="container mx-auto">
+    {% if months %}
+    <div class="flex flex-wrap gap-6">
+        {% for month in months %}
+        <a href="{% url 'payroll_ops_daily_month' month.month.year month.month.month %}"
+            class="bg-white rounded-2xl shadow p-5 w-52 hover:bg-[#E9F4FB] transition duration-200 ease-in-out cursor-pointer block">
+            <p class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">{{ month.month|date:"F" }}</p>
+            <p class="text-2xl font-bold text-slate-800">{{ month.month|date:"Y" }}</p>
+            <div class="mt-4 border-t pt-3 text-sm text-gray-600">
+                {{ month.sheet_count }} sheet{{ month.sheet_count|pluralize }}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl shadow p-8 text-center text-sm text-gray-400">
+        No processed ops sheets for {{ selected_year }}.
+    </div>
+    {% endif %}
+</div>
+
+<script>window._pageBackLabel = 'Daily';</script>
+{% endblock content %}

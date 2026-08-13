@@ -65,10 +65,12 @@
             <div id="menu-daily" class="hidden flex flex-col">
                 <!-- <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
                         class="fa-solid fa-clock-rotate-left"></i> Pending</a> -->
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i 
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
                     class="fa-solid fa-calendar-days"></i> Daily Approved Sheets</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i 
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
                     class="fa-solid fa-person-digging"></i> Individual Approved Sheets</a>
+                <a href="{% url 'superintendent_ops_members' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'superintendent_ops_members,superintendent_ops_member_detail,superintendent_ops_member_month' %}font-semibold{% endif %}">
+                    <i class="fa-solid fa-star"></i> Crew Bonuses</a>
             </div>
             <button onclick="toggleAccordion('menu-management')" class="accordion-btn">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-screwdriver-wrench"></i> Management</span>
@@ -114,12 +116,12 @@
             {% if al == 5 %}
             <a href="{% url 'my_crew' %}" class="flex items-center gap-3"><i class="fa-solid fa-hard-hat"></i> My Crew</a>
             <button onclick="toggleAccordion('menu-daily-sheets')" class="accordion-btn">
-                <span class="flex items-center gap-3"><i class="fa-solid fa-calendar-days"></i> Crew Sheets</span>
+                <span class="flex items-center gap-3"><i class="fa-solid fa-calendar-days"></i> Daily Crew Sheets</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-daily-sheets" class="hidden flex flex-col">
-                <a href="{% url 'my_ops_sheets' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_ops_sheets,ops_sheet,new_ops_sheet' %}font-semibold{% endif %}"><i class="fa-solid fa-pen-to-square"></i> My Crew Sheets</a>
-                <a href="{% url 'my_ops_approvals' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> Crew Daily Approvals</a>
+                <a href="{% url 'my_ops_sheets' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_ops_sheets,ops_sheet,new_ops_sheet' %}font-semibold{% endif %}"><i class="fa-solid fa-pen-to-square"></i> Draft Crew Sheets</a>
+                <a href="{% url 'my_ops_approvals' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> Daily Crew Approvals</a>
             </div>
             <button onclick="toggleAccordion('menu-personal-shifter')" class="accordion-btn">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-file-lines"></i> Personal Timesheets</span>
@@ -139,17 +141,17 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-unprocessed" class="hidden flex flex-col">
-                <a href="{% url 'payroll_unprocessed' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-building-user"></i> Departments</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-hard-hat"></i> Daily Crew</a>
+                <a href="{% url 'payroll_unprocessed' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_unprocessed,payroll_unprocessed_dept,payroll_unprocessed_review' %}font-semibold{% endif %}"><i class="fa-solid fa-building-user"></i> Departments</a>
+                <a href="{% url 'payroll_ops_unprocessed' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_ops_unprocessed,payroll_ops_sheet' %}font-semibold{% endif %}"><i class="fa-solid fa-hard-hat"></i> Daily Crew</a>
             </div>
-            <a href="{% url 'payroll_processed' %}" class="flex items-center gap-3"><i class="fa-solid fa-building"></i> Processed</a>
+            <a href="{% url 'payroll_processed' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name in 'payroll_processed,payroll_processed_dept,payroll_processed_employee' %}active{% endif %}"><i class="fa-solid fa-building"></i> Processed</a>
             <button onclick="toggleAccordion('menu-crew')" class="accordion-btn">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-hard-hat"></i> Crew</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-crew" class="hidden flex flex-col">
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-calendar-days"></i> Daily</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-person"></i> Members</a>
+                <a href="{% url 'payroll_ops_daily' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_ops_daily,payroll_ops_daily_month' %}font-semibold{% endif %}"><i class="fa-solid fa-calendar-days"></i> Daily</a>
+                <a href="{% url 'payroll_ops_members' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_ops_members,payroll_ops_member_detail,payroll_ops_member_month' %}font-semibold{% endif %}"><i class="fa-solid fa-person"></i> Members</a>
             </div>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-chart-bar"></i> Reports</a>
             {% endif %}
@@ -216,43 +218,39 @@
     </main>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const label = document.querySelector('.back-label');
-            if (!label) return;
-
-            const storageKey = 'backReferrer_' + window.location.pathname;
-
-            function labelForPath(path) {
-                if (path === '/profile/' || path === '/profile') return 'Back to Profile';
-                if (path.startsWith('/operations/my-sheets')) return 'My Daily Sheets';
-                if (path.startsWith('/timesheet/drafts')) return 'My Drafts';
-                if (path.startsWith('/supervisor/inbox')) return 'Pending Submissions';
-                if (path.startsWith('/payroll/processed/employee')) return 'Processed';
-                if (path.startsWith('/payroll/processed')) return 'Processed';
-                if (path.match(/\/payroll\/unprocessed\/\d+\/timesheet\//)) return 'Department';
-                if (path.match(/\/payroll\/unprocessed\/\d+\//)) return 'Unprocessed';
-                if (path.startsWith('/payroll/unprocessed')) return 'Unprocessed';
-                if (path.startsWith('/crew/assignments/') && path.length > '/crew/assignments/'.length) return 'Crew Assignments';
-                if (path.startsWith('/crew/assignments')) return 'Crew Assignments';
-                if (path.startsWith('/crew/coverage')) return 'Crew Coverage';
-                if (path.startsWith('/superintendent/contract-accounts')) return 'Contract-Cost Center';
-                if (path.startsWith('/crew/my-crew')) return 'My Crew';
-                return null;
+        // Back label system: every link click stores the current page's label in sessionStorage.
+        // Each page's back button reads it on load. history.back() is always the action.
+        (function () {
+            var stored = sessionStorage.getItem('backLabel');
+            if (stored) {
+                document.querySelectorAll('.back-label').forEach(function (el) {
+                    el.textContent = stored;
+                });
             }
+            document.addEventListener('click', function (e) {
+                var link = e.target.closest('a[href]');
+                if (!link || !link.href || link.target === '_blank') return;
+                try {
+                    var dest = new URL(link.href);
+                    if (dest.origin !== window.location.origin) return;
+                    if (dest.pathname === window.location.pathname) return;
+                } catch (_) { return; }
+                var label = (typeof window._pageBackLabel !== 'undefined' && window._pageBackLabel !== '')
+                    ? window._pageBackLabel : null;
+                if (label) sessionStorage.setItem('backLabel', label);
+            }, true);
+        })();
 
-            try {
-                if (document.referrer) {
-                    const refPath = new URL(document.referrer).pathname;
-                    if (refPath !== window.location.pathname) {
-                        sessionStorage.setItem(storageKey, refPath);
-                    }
+        // Auto-open the accordion that contains an active (font-semibold) link on page load
+        document.querySelectorAll('[id^="menu-"]').forEach(function (menu) {
+            if (menu.querySelector('a.font-semibold')) {
+                menu.classList.remove('hidden');
+                var btn = menu.previousElementSibling;
+                if (btn) {
+                    btn.querySelector('.accordion-icon')?.classList.add('rotate-90');
+                    btn.classList.add('active');
                 }
-                const savedPath = sessionStorage.getItem(storageKey);
-                if (savedPath) {
-                    const text = labelForPath(savedPath);
-                    if (text) label.textContent = text;
-                }
-            } catch (e) {}
+            }
         });
 
         function toggleAccordion(id) {

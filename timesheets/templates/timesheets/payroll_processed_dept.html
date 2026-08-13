@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
+    <button onclick="history.back()" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline cursor-pointer mb-2">
+        <i class="fa-solid fa-arrow-left"></i> <span class="back-label">Processed</span>
+    </button>
+    <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+    <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+    <p class="text-center text-sm text-gray-500 mt-1">
+        <span class="font-semibold text-gray-700">{{ dept.departmentname|upper }}:</span> Payment history for {{ current_year }}.
+    </p>
+</div>
+
+<div class="container mx-auto mb-8">
+    <div class="flex flex-wrap gap-6">
+        {% for emp in employees %}
+        <a href="{% url 'payroll_processed_employee' emp.employeeid %}"
+            class="bg-white rounded-2xl shadow p-5 w-52 hover:bg-[#E9F4FB] transition duration-200 ease-in-out cursor-pointer block">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                    {% if emp.profilepic %}
+                    <img src="/media/{{ emp.profilepic }}" class="w-full h-full object-cover" alt="">
+                    {% else %}
+                    <i class="fa-solid fa-user text-gray-400 text-sm"></i>
+                    {% endif %}
+                </div>
+                <div>
+                    <p class="font-semibold text-slate-800 text-sm leading-tight">{{ emp.firstname }} {{ emp.lastname }}</p>
+                    <p class="text-xs text-gray-400">{{ emp.roleid.rolename }}</p>
+                </div>
+            </div>
+            <p class="text-xl font-bold text-[#28348A]">{{ emp.paid_count }}</p>
+            <p class="text-xs text-gray-500">paid sheet{{ emp.paid_count|pluralize }}</p>
+            {% if emp.total_hours %}
+            <p class="text-xs text-gray-400 mt-1">{{ emp.total_hours }} hrs total</p>
+            {% endif %}
+        </a>
+        {% empty %}
+        <p class="text-sm text-gray-400">No active employees in this department.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<script>window._pageBackLabel = '{{ dept.departmentname }}';</script>
+{% endblock content %}
