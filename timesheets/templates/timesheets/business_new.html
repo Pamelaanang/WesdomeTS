@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block content %}
+
+{% if messages %}
+<div class="container mx-auto mb-4">
+    {% for message in messages %}
+    <div class="flex items-center gap-3 bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm px-4 py-3 rounded-xl">
+        <i class="fa-solid fa-triangle-exclamation text-yellow-500"></i>
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
+    <button onclick="history.back()" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline cursor-pointer mb-3">
+        <i class="fa-solid fa-arrow-left"></i> <span class="back-label">My Drafts</span>
+    </button>
+    <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+    <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+    <p class="text-center text-sm text-gray-500 mt-1"><span class="font-semibold text-gray-700">NEW PERSONAL TIMESHEET:</span> Select the pay period for this submission.</p>
+</div>
+
+<div class="container mx-auto p-6 bg-white rounded-2xl shadow max-w-sm">
+    <form method="POST">
+        {% csrf_token %}
+        <div class="flex flex-col gap-5">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Month</label>
+                <select name="month" class="border border-gray-300 rounded-lg px-3 py-2 w-full text-sm focus:outline-none focus:border-[#28348A]">
+                    {% for num, name in month_choices %}
+                    <option value="{{ num }}" {% if num == default_month %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Year</label>
+                <select name="year" class="border border-gray-300 rounded-lg px-3 py-2 w-full text-sm focus:outline-none focus:border-[#28348A]">
+                    {% for y in year_choices %}
+                    <option value="{{ y }}" {% if y == default_year %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="bg-[#28348A] text-white text-sm px-6 py-2 rounded-xl hover:opacity-90">
+                Start Timesheet
+            </button>
+        </div>
+    </form>
+</div>
+
+{% endblock content %}

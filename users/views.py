@@ -10,8 +10,9 @@ import os
 from django.utils import timezone
 from django.contrib.auth import update_session_auth_hash
 from django.contrib import messages
-from timesheets.models import MainHeader, MainEntry, OperationsHeader
-from django.db.models import Count, Q
+from timesheets.models import MainHeader, MainEntry, OperationsHeader, BusinessHeader, BusinessEntry
+from django.db.models import Count, Q, Sum
+from calendar import month_name as _month_name
 
 
 def login_view(request):
@@ -123,93 +124,103 @@ def profile(request):
         })
 
     elif al == 3:  # Supervisor
-        subordinates = User.objects.filter(supervisorid=user)
-        awaiting_count = MainHeader.objects.filter(employeeid__in=subordinates, overallstatus='Submitted').count()
-        in_progress_count = MainHeader.objects.filter(employeeid__in=subordinates, overallstatus='In Progress').count()
-        completed_count = MainHeader.objects.filter(
-            employeeid__in=subordinates, overallstatus='Completed', completedat__year=today.year, completedat__month=today.month
-            ).count()
-        oldest_waiting = MainHeader.objects.filter(
-            employeeid__in=subordinates, overallstatus='Submitted'
-        ).order_by('submittedat').first()
+        direct_reports = User.objects.filter(supervisorid=user)
+        pending_count = (
+            MainHeader.objects.filter(employeeid__in=direct_reports, overallstatus__in=['Submitted', 'In Progress']).count() +
+            BusinessHeader.objects.filter(employeeid__in=direct_reports, overallstatus__in=['Submitted', 'In Progress']).count()
+        )
+        revision_count = (
+            MainHeader.objects.filter(employeeid__in=direct_reports, overallstatus='Revision Required').count() +
+            BusinessHeader.objects.filter(employeeid__in=direct_reports, overallstatus='Revision Required').count()
+        )
+        completed_month = (
+            MainHeader.objects.filter(employeeid__in=direct_reports, overallstatus='Completed', completedat__year=today.year, completedat__month=today.month).count() +
+            BusinessHeader.objects.filter(employeeid__in=direct_reports, overallstatus='Completed', completedat__year=today.year, completedat__month=today.month).count()
+        )
 
         return render(request, 'users/profile.html', {
             'today': today,
-            'awaiting_count': awaiting_count,
-            'in_progress_count': in_progress_count,
-            'completed_count': completed_count,
-            'oldest_waiting': oldest_waiting,
+            'pending_count': pending_count,
+            'revision_count': revision_count,
+            'completed_month': completed_month,
         })
 
     elif al == 2:  # Superintendent
         direct_reports = User.objects.filter(supervisorid=user)
-        personal_pending = MainHeader.objects.filter(
+        personal_pending = BusinessHeader.objects.filter(
             employeeid__in=direct_reports, overallstatus__in=['Submitted', 'In Progress']
         ).count()
-        personal_completed = MainHeader.objects.filter(
-            employeeid__in=direct_reports, overallstatus='Completed', completedat__year=today.year, completedat__month=today.month
+        personal_completed = BusinessHeader.objects.filter(
+            employeeid__in=direct_reports, overallstatus='Completed',
+            completedat__year=today.year, completedat__month=today.month
         ).count()
         shifters = User.objects.filter(supervisorid__in=direct_reports)
-        ops_pending_super = OperationsHeader.objects.filter(
-            shifterid__in=shifters, overallstatus='In Progress'
-        ).count()
-        ops_completed = OperationsHeader.objects.filter(
-            shifterid__in=shifters, overallstatus='Completed'
+        ops_completed_month = OperationsHeader.objects.filter(
+            shifterid__in=shifters,
+            overallstatus='Completed',
+            ohapprovedat_capt__year=today.year,
+            ohapprovedat_capt__month=today.month,
         ).count()
 
         return render(request, 'users/profile.html', {
             'today': today,
             'personal_pending': personal_pending,
             'personal_completed': personal_completed,
-            'ops_pending_super': ops_pending_super,
-            'ops_completed': ops_completed,
+            'ops_completed_month': ops_completed_month,
         })
 
     elif al == 4:  # Mine Captain
-        draft_count = MainHeader.objects.filter(employeeid=user, overallstatus='Draft').count()
-        pending_count = MainHeader.objects.filter(employeeid=user, overallstatus='Submitted').count()
-        latest_header = MainHeader.objects.filter(
-            employeeid=user, overallstatus='Submitted'
-        ).order_by('-mainheaderid').first()
-        approved_count = MainEntry.objects.filter(mainheaderid=latest_header, linestatus='Approved').count() if latest_header else 0
-        rejected_count = MainEntry.objects.filter(mainheaderid=latest_header, linestatus='Rejected').count() if latest_header else 0
+        draft_count = BusinessHeader.objects.filter(employeeid=user, overallstatus='Draft').count()
+        awaiting_count = BusinessHeader.objects.filter(employeeid=user, overallstatus__in=['Submitted', 'In Progress']).count()
+        revision_count = BusinessHeader.objects.filter(employeeid=user, overallstatus='Revision Required').count()
+        latest_paid = BusinessHeader.objects.filter(employeeid=user, paidat__isnull=False).order_by('-paidat').first()
+        paid_hours = BusinessEntry.objects.filter(businessheaderid=latest_paid).aggregate(Sum('hoursworked'))['hoursworked__sum'] if latest_paid else None
+        paid_period = f"{_month_name[latest_paid.periodmonth]} {latest_paid.periodyear}" if latest_paid else None
         shifters = User.objects.filter(supervisorid=user)
         ops_pending_captain = OperationsHeader.objects.filter(
             shifterid__in=shifters, overallstatus='Submitted'
         ).count()
-        ops_forwarded = OperationsHeader.objects.filter(
-            shifterid__in=shifters, overallstatus='In Progress'
+        ops_revision_captain = OperationsHeader.objects.filter(
+            shifterid__in=shifters, overallstatus='Revision Required'
+        ).count()
+        ops_completed_month = OperationsHeader.objects.filter(
+            shifterid__in=shifters,
+            overallstatus='Completed',
+            ohapprovedat_capt__year=today.year,
+            ohapprovedat_capt__month=today.month,
         ).count()
 
         return render(request, 'users/profile.html', {
             'today': today,
             'draft_count': draft_count,
-            'pending_count': pending_count,
-            'approved_count': approved_count,
-            'rejected_count': rejected_count,
+            'awaiting_count': awaiting_count,
+            'revision_count': revision_count,
+            'paid_hours': paid_hours,
+            'paid_period': paid_period,
             'ops_pending_captain': ops_pending_captain,
-            'ops_forwarded': ops_forwarded,
+            'ops_revision_captain': ops_revision_captain,
+            'ops_completed_month': ops_completed_month,
         })
 
     elif al == 5:  # Shifter
-        draft_count = MainHeader.objects.filter(employeeid=user, overallstatus='Draft').count()
-        pending_count = MainHeader.objects.filter(employeeid=user, overallstatus='Submitted').count()
-        latest_header = MainHeader.objects.filter(
-            employeeid=user, overallstatus='Submitted'
-        ).order_by('-mainheaderid').first()
-        approved_count = MainEntry.objects.filter(mainheaderid=latest_header, linestatus='Approved').count() if latest_header else 0
-        rejected_count = MainEntry.objects.filter(mainheaderid=latest_header, linestatus='Rejected').count() if latest_header else 0
+        draft_count = BusinessHeader.objects.filter(employeeid=user, overallstatus='Draft').count()
+        awaiting_count = BusinessHeader.objects.filter(employeeid=user, overallstatus__in=['Submitted', 'In Progress']).count()
+        revision_count = BusinessHeader.objects.filter(employeeid=user, overallstatus='Revision Required').count()
+        latest_paid = BusinessHeader.objects.filter(employeeid=user, paidat__isnull=False).order_by('-paidat').first()
+        paid_hours = BusinessEntry.objects.filter(businessheaderid=latest_paid).aggregate(Sum('hoursworked'))['hoursworked__sum'] if latest_paid else None
+        paid_period = f"{_month_name[latest_paid.periodmonth]} {latest_paid.periodyear}" if latest_paid else None
         ops_draft = OperationsHeader.objects.filter(shifterid=user, overallstatus='Draft').count()
         ops_submitted = OperationsHeader.objects.filter(shifterid=user, overallstatus='Submitted').count()
         ops_in_progress = OperationsHeader.objects.filter(shifterid=user, overallstatus='In Progress').count()
-        ops_completed = OperationsHeader.objects.filter(shifterid=user, overallstatus='Completed').count()
-        
+        ops_completed = OperationsHeader.objects.filter(shifterid=user, overallstatus='Completed', ohapprovedat_capt__year=today.year, ohapprovedat_capt__month=today.month).count()
+
         return render(request, 'users/profile.html', {
             'today': today,
             'draft_count': draft_count,
-            'pending_count': pending_count,
-            'approved_count': approved_count,
-            'rejected_count': rejected_count,
+            'awaiting_count': awaiting_count,
+            'revision_count': revision_count,
+            'paid_hours': paid_hours,
+            'paid_period': paid_period,
             'ops_draft': ops_draft,
             'ops_submitted': ops_submitted,
             'ops_in_progress': ops_in_progress,
@@ -235,18 +246,18 @@ def profile(request):
 
     else:  # Employee (6) and anyone else
         draft_count = MainHeader.objects.filter(employeeid=user, overallstatus='Draft').count()
-        pending_count = MainHeader.objects.filter(employeeid=user, overallstatus='Submitted').count()
-        latest_header = MainHeader.objects.filter(
-            employeeid=user, overallstatus='Submitted'
-        ).order_by('-mainheaderid').first()
-        approved_count = MainEntry.objects.filter(mainheaderid=latest_header, linestatus='Approved').count() if latest_header else 0
-        rejected_count = MainEntry.objects.filter(mainheaderid=latest_header, linestatus='Rejected').count() if latest_header else 0
+        awaiting_count = MainHeader.objects.filter(employeeid=user, overallstatus__in=['Submitted', 'In Progress']).count()
+        revision_count = MainHeader.objects.filter(employeeid=user, overallstatus='Revision Required').count()
+        latest_paid = MainHeader.objects.filter(employeeid=user, paidat__isnull=False).order_by('-paidat').first()
+        paid_hours = MainEntry.objects.filter(mainheaderid=latest_paid).aggregate(Sum('hoursworked'))['hoursworked__sum'] if latest_paid else None
+        paid_period = latest_paid.paidat.strftime('%B %Y') if latest_paid else None
         return render(request, 'users/profile.html', {
             'today': today,
             'draft_count': draft_count,
-            'pending_count': pending_count,
-            'approved_count': approved_count,
-            'rejected_count': rejected_count,
+            'awaiting_count': awaiting_count,
+            'revision_count': revision_count,
+            'paid_hours': paid_hours,
+            'paid_period': paid_period,
         })
 
 @login_required(login_url='login')

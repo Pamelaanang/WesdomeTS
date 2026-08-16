@@ -47,12 +47,11 @@
             </button>
             <div id="menu-employees" class="hidden flex flex-col">
                 {% if al == 3 %}
-                <a href="{% url 'approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-clock-rotate-left"></i> Pending</a>
+                <a href="{% url 'approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'approval_inbox,review_timesheet' %}font-semibold{% endif %}"><i class="fa-solid fa-clock-rotate-left"></i> Pending</a>
                 {% else %}
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-clock-rotate-left"></i> Pending</a>
+                <a href="{% url 'business_approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'business_approval_inbox,review_business_timesheet' %}font-semibold{% endif %}"><i class="fa-solid fa-clock-rotate-left"></i> Pending</a>
                 {% endif %}
                 <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> Approved</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-xmark"></i> Rejected</a>
             </div>
             {% endif %}
 
@@ -93,12 +92,10 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-shifter" class="hidden flex flex-col">
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
+                <a href="{% url 'business_approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'business_approval_inbox,review_business_timesheet' %}font-semibold{% endif %}"><i
                         class="fa-solid fa-clock-rotate-left"></i> Pending</a>
                 <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
                         class="fa-solid fa-circle-check"></i> Approved</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
-                        class="fa-solid fa-circle-xmark"></i> Rejected</a>
             </div>
             <button onclick="toggleAccordion('menu-daily-captain')" class="accordion-btn">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-calendar-days"></i> Crew Timesheets</span>
@@ -121,16 +118,16 @@
             </button>
             <div id="menu-daily-sheets" class="hidden flex flex-col">
                 <a href="{% url 'my_ops_sheets' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_ops_sheets,ops_sheet,new_ops_sheet' %}font-semibold{% endif %}"><i class="fa-solid fa-pen-to-square"></i> Draft Crew Sheets</a>
-                <a href="{% url 'my_ops_approvals' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> Daily Crew Approvals</a>
+                <a href="{% url 'my_ops_approvals' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_ops_approvals,my_ops_approvals_month' %}font-semibold{% endif %}"><i class="fa-solid fa-circle-check"></i> Daily Crew Approvals</a>
             </div>
             <button onclick="toggleAccordion('menu-personal-shifter')" class="accordion-btn">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-file-lines"></i> Personal Timesheets</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-personal-shifter" class="hidden flex flex-col">
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> My Approved</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-xmark"></i> My Rejected</a>
+                <a href="{% url 'my_business_drafts' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_business_drafts,add_business_entry,new_business_timesheet' %}font-semibold{% endif %}"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
+                <a href="{% url 'my_business_approved' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_business_approved,my_business_approved_month' %}font-semibold{% endif %}"><i class="fa-solid fa-circle-check"></i> My Approved</a>
+                <a href="{% url 'my_business_paid' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_business_paid,my_business_paid_month' %}font-semibold{% endif %}"><i class="fa-solid fa-money-check-dollar"></i> My Paid</a>
             </div>
             {% endif %}
 
@@ -163,9 +160,9 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-personal" class="hidden flex flex-col">
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> My Approved</a>
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-xmark"></i> My Rejected</a>
+                <a href="{% url 'my_business_drafts' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_business_drafts,add_business_entry,new_business_timesheet' %}font-semibold{% endif %}"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
+                <a href="{% url 'my_business_approved' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_business_approved,my_business_approved_month' %}font-semibold{% endif %}"><i class="fa-solid fa-circle-check"></i> My Approved</a>
+                <a href="{% url 'my_business_paid' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_business_paid,my_business_paid_month' %}font-semibold{% endif %}"><i class="fa-solid fa-money-check-dollar"></i> My Paid</a>
             </div>
             {% endif %}
 
@@ -174,7 +171,6 @@
             <a href="{% url 'my_drafts' %}" class="flex items-center gap-3"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
             <a href="{% url 'my_timesheets_approved' %}" class="flex items-center gap-3"><i class="fa-solid fa-circle-check"></i> My Approved</a>
             <a href="{% url 'my_timesheets_paid' %}" class="flex items-center gap-3"><i class="fa-solid fa-money-check-dollar"></i> My Paid</a>
-            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-circle-xmark"></i> My Rejected</a>
             {% endif %}
 
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-magnifying-glass"></i> Search</a>

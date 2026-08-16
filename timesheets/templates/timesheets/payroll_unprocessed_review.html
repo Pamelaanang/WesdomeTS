@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load timesheet_extras %}
 {% block content %}
 
 <div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
@@ -48,7 +49,10 @@
         <tbody>
             {% for entry in entries %}
             <tr class="border-t">
-                <td class="px-4 py-3">{{ entry.startdate|date:"M j, Y" }}</td>
+                <td class="px-4 py-3">
+                    {{ entry.startdate|date:"M j, Y" }}
+                    {% if entry.startdate in stat_dates %}<span class="ml-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_labels|get_item:entry.startdate }}">Stat</span>{% endif %}
+                </td>
                 <td class="px-4 py-3">{% if entry.workcategoryid %}{{ entry.workcategoryid.categoryname }}{% else %}{{ entry.leavetypeid.leavetypename }}{% endif %}</td>
                 <td class="px-4 py-3">{{ entry.shifttype }}</td>
                 <td class="px-4 py-3">{{ entry.hoursworked }} hrs</td>

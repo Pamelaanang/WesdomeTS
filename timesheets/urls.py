@@ -40,5 +40,14 @@ urlpatterns = [
     path('superintendent/ops/members/', views.superintendent_ops_members, name='superintendent_ops_members'),
     path('superintendent/ops/members/<str:employee_id>/', views.superintendent_ops_member_detail, name='superintendent_ops_member_detail'),
     path('superintendent/ops/members/<str:employee_id>/<int:year>/<int:month>/', views.superintendent_ops_member_month, name='superintendent_ops_member_month'),
-
+    path('business/new/', views.new_business_timesheet, name='new_business_timesheet'),
+    path('business/<int:pk>/', views.add_business_entry, name='add_business_entry'),
+    path('business/<int:pk>/delete/', views.delete_business_draft, name='delete_business_draft'),
+    path('business/drafts/', views.my_business_drafts, name='my_business_drafts'),
+    path('business/approved/', views.my_business_approved, name='my_business_approved'),
+    path('business/approved/<int:year>/<int:month>/', views.my_business_approved_month, name='my_business_approved_month'),
+    path('business/paid/', views.my_business_paid, name='my_business_paid'),
+    path('business/paid/<int:year>/<int:month>/', views.my_business_paid_month, name='my_business_paid_month'),
+    path('business/inbox/', views.business_approval_inbox, name='business_approval_inbox'),
+    path('business/review/<int:pk>/', views.review_business_timesheet, name='review_business_timesheet'),
 ]

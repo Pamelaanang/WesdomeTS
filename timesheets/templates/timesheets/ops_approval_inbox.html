@@ -9,142 +9,129 @@
         </button>
         <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
         <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
-        <p class="text-center text-sm text-gray-500 mt-1"><span class="font-semibold text-gray-700">Operations Approval
-                Inbox:</span> Your
-            Daily Crew Submissions Awaiting Your Approval.</p>
+        <p class="text-center text-sm text-gray-500 mt-1">
+            <span class="font-semibold text-gray-700">Operations Approval Inbox:</span>
+            Your daily crew submissions awaiting your approval.
+        </p>
     </div>
 </div>
 
-<div class="container mx-auto p-4 bg-white rounded-2xl shadow m-4">
-    {# ── NEW SUBMISSIONS ─────────────────────────────── #}
-    <h2 class="text-lg font-semibold mb-2">New Submissions</h2>
-    <p class="text-center text-sm mt-1 text-gray-500 "> New Submissions ({{ new_sheet|length }})</p>
 
-    <div class="flex flex-wrap gap-2 ">
-        {% if new_sheet %}
-        {% for sheet in new_sheet %}
+{# ── ACTION NEEDED ────────────────────────────────────────────── #}
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-4">
+    <div class="mb-3">
+        <h2 class="text-lg font-semibold">Action Needed
+            <span class="ml-2 text-sm font-normal text-gray-400">({{ action_needed|length }})</span>
+        </h2>
+        <p class="text-xs text-gray-400 mt-0.5">Sheets submitted and waiting for your review. Sheets you previously returned for correction are marked <span class="text-purple-600 font-medium">Revision</span>.</p>
+    </div>
+
+    <div class="flex flex-wrap gap-2">
+        {% if action_needed %}
+        {% for sheet in action_needed %}
+        {% with is_revision=sheet.ohapprovedby_capt_id %}
         <a href="{% url 'review_ops_sheet' sheet.opsheaderid %}"
-            class="bg-[#e4e5e5] border-2 border-[#28348A] rounded-xl p-2 w-52 flex flex-col items-center gap-2 hover:shadow-md transition-all">
-             <div class="w-20 h-20 rounded-full bg-black overflow-hidden border-1 border-black flex items-center justify-center mb-2 mt-2">
+            class="bg-[#e4e5e5] border-2 {% if is_revision %}border-[#cb6ce6]{% else %}border-[#28348A]{% endif %} rounded-xl p-2 w-52 flex flex-col items-center gap-2 hover:shadow-md transition-all">
+            <div class="w-20 h-20 rounded-full bg-black overflow-hidden flex items-center justify-center mb-2 mt-2">
                 {% if sheet.shifterid.profilepic %}
-                <img src="/media/{{ sheet.shifterid.profilepic }}" class="w-full h-full object-cover" alt="Profile Photo">
+                <img src="/media/{{ sheet.shifterid.profilepic }}" class="w-full h-full object-cover" alt="">
                 {% else %}
                 <i class="fa-solid fa-user text-white text-2xl"></i>
                 {% endif %}
             </div>
-            <p class="text-xs font-normal text-center mb-2">{{ sheet.shifterid.firstname }} {{ sheet.shifterid.lastname}}</p>
-            <p class="text-xs font-normal text-center mb-2">{{ sheet.crewid.crewname }} Crew - {{ sheet.shifttype }} Shift</p>
-            <p class="text-xs font-normal text-center mb-2">{{ sheet.shiftdate|date:"M j, Y" }}</p>
-            <p class="text-xs font-normal text-center mb-2">{{ sheet.entry_count }} entr{{ sheet.entry_count|pluralize:"y,ies" }}</p>
+            <p class="text-xs font-normal text-center mb-1">{{ sheet.shifterid.firstname }} {{ sheet.shifterid.lastname }}</p>
+            <p class="text-xs font-normal text-center mb-1">{{ sheet.crewid.crewname }} Crew &mdash; {{ sheet.shifttype }} Shift</p>
+            <p class="text-xs font-normal text-center mb-1">{{ sheet.shiftdate|date:"M j, Y" }}</p>
+            <p class="text-xs font-normal text-center mb-1">{{ sheet.entry_count }} entr{{ sheet.entry_count|pluralize:"y,ies" }}</p>
+            {% if is_revision %}
+            <span class="mt-1 bg-purple-100 text-purple-700 text-xs font-semibold px-2 py-0.5 rounded-full">Revision</span>
+            {% endif %}
             {% if sheet.coverageid %}
-            <p class="text-xs font-medium text-center text-[#097d45] mb-2">Covering {{ sheet.coverageid.home_shifter.firstname }} {{ sheet.coverageid.home_shifter.lastname }}'s crew</p>
+            <p class="text-xs font-medium text-center text-[#097d45] mt-1">Covering {{ sheet.coverageid.home_shifter.firstname }} {{ sheet.coverageid.home_shifter.lastname }}'s crew</p>
             {% endif %}
         </a>
+        {% endwith %}
         {% endfor %}
         {% else %}
-        <p class="text-center text-sm m-4 text-gray-500 ">No new sheets.</p>
+        <p class="text-sm text-gray-400 py-4 w-full text-center">No sheets waiting for review.</p>
         {% endif %}
     </div>
 </div>
 
 
-<div class="container mx-auto p-4 bg-white rounded-2xl shadow m-4">
-    {# ── REVISION SUBMISSIONS ─────────────────────────────── #}
-    <h2 class="text-lg font-semibold mb-2">Revisions</h2>
-    <p class="text-center text-sm mt-1 text-gray-500 "> Revisions ({{ revision_sheet|length }})</p>
-
-    <div class="flex flex-wrap gap-2 ">
-        {% if revision_sheet %}
-        {% for sheet in revision_sheet %}
-        <a href="{% url 'review_ops_sheet' sheet.opsheaderid %}"
-            class="bg-[#e4e5e5] border-2 border-[#cb6ce6] rounded-xl p-2 w-52 flex flex-col items-center gap-2 hover:shadow-md transition-all">
-             <div class="w-20 h-20 rounded-full bg-black overflow-hidden border-1 border-[#cb6ce6] flex items-center justify-center mb-2 mt-2">
-                {% if sheet.shifterid.profilepic %}
-                <img src="/media/{{ sheet.shifterid.profilepic }}" class="w-full h-full object-cover" alt="Profile Photo">
-                {% else %}
-                <i class="fa-solid fa-user text-white text-2xl"></i>
-                {% endif %}
-            </div>
-            <p class="text-xs font-normal text-center mb-2">{{ sheet.shifterid.firstname }} {{ sheet.shifterid.lastname}}</p>
-            <p class="text-xs font-normal text-center mb-2">{{ sheet.crewid.crewname }} Crew - {{ sheet.shifttype }} Shift</p>
-            <p class="text-xs font-normal text-center mb-2">{{ sheet.shiftdate|date:"M j, Y" }}</p>
-            <p class="text-xs font-normal text-center mb-2">{{ sheet.entry_count }} entr{{ sheet.entry_count|pluralize:"y,ies" }}</p>
-            {% if sheet.coverageid %}
-            <p class="text-xs font-medium text-center text-[#cb6ce6] mb-2">Covering {{ sheet.coverageid.home_shifter.firstname }} {{ sheet.coverageid.home_shifter.lastname }}'s crew</p>
-            {% endif %}
-        </a>
-        {% endfor %}
-        {% else %}
-        <p class="text-center text-sm m-4 text-gray-500 ">No pending revision sheets.</p>
-        {% endif %}
+{# ── IN PROGRESS ──────────────────────────────────────────────── #}
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-4">
+    <div class="mb-3">
+        <h2 class="text-lg font-semibold">In Progress
+            <span class="ml-2 text-sm font-normal text-gray-400">({{ in_progress_sheets|length }})</span>
+        </h2>
+        <p class="text-xs text-gray-400 mt-0.5">You've started reviewing these but haven't finished — the ball is still in your court.</p>
     </div>
-</div>
-
-
-
-
-<div class="container mx-auto p-4 bg-white rounded-2xl shadow m-4">
-    {# ── IN PROGRESS ─────────────────────────────────── #}
-    <h2 class="text-lg font-semibold mb-2">In Progress</h2>
-    <p class="text-center text-sm mt-1 text-gray-500">In Progress ({{ in_progress_sheets|length }})</p>
 
     <div class="flex flex-wrap gap-2">
         {% if in_progress_sheets %}
         {% for sheet in in_progress_sheets %}
         <a href="{% url 'review_ops_sheet' sheet.opsheaderid %}"
             class="bg-[#e4e5e5] border-2 border-[#ffbd59] rounded-xl p-2 w-52 flex flex-col items-center gap-2 hover:shadow-md transition-all">
-            <div class="w-20 h-20 rounded-full bg-black overflow-hidden border-1 border-[#ffbd59] flex items-center justify-center mb-2 mt-2">
-                {% if sheet.shifterid.profilepic %}
-                <img src="/media/{{ sheet.shifterid.profilepic }}" class="w-full h-full object-cover" alt="Profile Photo">
-                {% else %}
-                <i class="fa-solid fa-user text-white text-2xl"></i>
-                {% endif %}
-            </div>
-            <p class="text-xs font-normal text-center mb-2">{{ sheet.shifterid.firstname }} {{ sheet.shifterid.lastname }}</p>
-            <p class="text-xs font-normal text-center mb-2">{{ sheet.crewid.crewname }} Crew - {{ sheet.shifttype }} Shift</p>
-            <p class="text-xs font-normal text-center mb-2">{{ sheet.shiftdate|date:"M j, Y" }}</p>
-            <p class="text-xs font-normal text-center mb-2">{{ sheet.entry_count }} entr{{ sheet.entry_count|pluralize:"y,ies" }}</p>
-            <p class="text-xs font-semibold text-center text-[#ffbd59] mb-2">{{ sheet.approved_count }} of {{ sheet.entry_count }} approved</p>
-            {% if sheet.coverageid %}
-            <p class="text-xs font-medium text-center text-[#097d45] mb-2">Covering {{ sheet.coverageid.home_shifter.firstname }} {{ sheet.coverageid.home_shifter.lastname }}'s crew</p>
-            {% endif %}
-        </a>
-        {% endfor %}
-        {% else %}
-        <p class="text-center text-sm m-4 text-gray-500">Nothing in progress.</p>
-        {% endif %}
-    </div>
-</div>
-
-{% if pending_revision_sheets %}
-<div class="container mx-auto p-4 bg-white rounded-2xl shadow m-4">
-    {# ── PENDING REVISION ─────────────────────────────── #}
-    <h2 class="text-lg font-semibold mb-2">Awaiting Correction <span class="text-sm font-normal text-gray-400">({{ pending_revision_sheets|length }})</span></h2>
-    <p class="text-xs text-gray-400 mb-3">These sheets are with the shifter for correction. No action needed from you yet.</p>
-
-    <div class="flex flex-wrap gap-2">
-        {% for sheet in pending_revision_sheets %}
-        <div class="bg-gray-50 border border-gray-200 border-dashed rounded-xl p-2 w-52 flex flex-col items-center gap-2 opacity-80">
             <div class="w-20 h-20 rounded-full bg-black overflow-hidden flex items-center justify-center mb-2 mt-2">
                 {% if sheet.shifterid.profilepic %}
-                <img src="/media/{{ sheet.shifterid.profilepic }}" class="w-full h-full object-cover" alt="Profile Photo">
+                <img src="/media/{{ sheet.shifterid.profilepic }}" class="w-full h-full object-cover" alt="">
                 {% else %}
                 <i class="fa-solid fa-user text-white text-2xl"></i>
                 {% endif %}
             </div>
             <p class="text-xs font-normal text-center mb-1">{{ sheet.shifterid.firstname }} {{ sheet.shifterid.lastname }}</p>
-            <p class="text-xs font-normal text-center mb-1">{{ sheet.crewid.crewname }} Crew - {{ sheet.shifttype }} Shift</p>
+            <p class="text-xs font-normal text-center mb-1">{{ sheet.crewid.crewname }} Crew &mdash; {{ sheet.shifttype }} Shift</p>
             <p class="text-xs font-normal text-center mb-1">{{ sheet.shiftdate|date:"M j, Y" }}</p>
-            <p class="text-xs font-normal text-center text-orange-600 mb-1">{{ sheet.rejected_count }} entr{{ sheet.rejected_count|pluralize:"y,ies" }} rejected</p>
+            <p class="text-xs font-normal text-center mb-1">{{ sheet.entry_count }} entr{{ sheet.entry_count|pluralize:"y,ies" }}</p>
+            <p class="text-xs font-semibold text-center text-[#ffbd59] mb-1">{{ sheet.approved_count }} of {{ sheet.entry_count }} approved</p>
+            {% if sheet.coverageid %}
+            <p class="text-xs font-medium text-center text-[#097d45] mt-1">Covering {{ sheet.coverageid.home_shifter.firstname }} {{ sheet.coverageid.home_shifter.lastname }}'s crew</p>
+            {% endif %}
+        </a>
+        {% endfor %}
+        {% else %}
+        <p class="text-sm text-gray-400 py-4 w-full text-center">Nothing in progress right now.</p>
+        {% endif %}
+    </div>
+</div>
+
+
+{# ── AWAITING CORRECTION ──────────────────────────────────────── #}
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-4">
+    <div class="mb-3">
+        <h2 class="text-lg font-semibold">Awaiting Correction
+            <span class="ml-2 text-sm font-normal text-gray-400">({{ pending_revision_sheets|length }})</span>
+        </h2>
+        <p class="text-xs text-gray-400 mt-0.5">You've requested changes on these. The shifter is correcting them — no action needed from you yet.</p>
+    </div>
+
+    <div class="flex flex-wrap gap-2">
+        {% if pending_revision_sheets %}
+        {% for sheet in pending_revision_sheets %}
+        <div class="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-2 w-52 flex flex-col items-center gap-2 opacity-75">
+            <div class="w-20 h-20 rounded-full bg-black overflow-hidden flex items-center justify-center mb-2 mt-2">
+                {% if sheet.shifterid.profilepic %}
+                <img src="/media/{{ sheet.shifterid.profilepic }}" class="w-full h-full object-cover" alt="">
+                {% else %}
+                <i class="fa-solid fa-user text-white text-2xl"></i>
+                {% endif %}
+            </div>
+            <p class="text-xs font-normal text-center mb-1">{{ sheet.shifterid.firstname }} {{ sheet.shifterid.lastname }}</p>
+            <p class="text-xs font-normal text-center mb-1">{{ sheet.crewid.crewname }} Crew &mdash; {{ sheet.shifttype }} Shift</p>
+            <p class="text-xs font-normal text-center mb-1">{{ sheet.shiftdate|date:"M j, Y" }}</p>
+            <p class="text-xs text-center text-orange-600 mb-1">{{ sheet.rejected_count }} entr{{ sheet.rejected_count|pluralize:"y,ies" }} rejected</p>
             {% if sheet.coverageid %}
             <p class="text-xs font-medium text-center text-[#097d45] mb-1">Covering {{ sheet.coverageid.home_shifter.firstname }} {{ sheet.coverageid.home_shifter.lastname }}'s crew</p>
             {% endif %}
             <span class="mt-1 bg-orange-100 text-orange-700 text-xs font-semibold px-2 py-0.5 rounded-full">Pending Correction</span>
         </div>
         {% endfor %}
+        {% else %}
+        <p class="text-sm text-gray-400 py-4 w-full text-center">No sheets pending correction.</p>
+        {% endif %}
     </div>
 </div>
-{% endif %}
 
 <script>window._pageBackLabel = 'Ops Inbox';</script>
 {% endblock %}

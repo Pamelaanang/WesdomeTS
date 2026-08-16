@@ -1,234 +1,294 @@
 {% extends 'base.html' %}
-
 {% load static %}
-
+{% load timesheet_extras %}
 {% block content %}
 
-<div class="container mx-auto p-4 bg-white rounded-2xl shadow ">
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow">
     <div class="mb-6">
         <button onclick="history.back()" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline cursor-pointer mb-2">
-            <i class="fa-solid fa-arrow-left"></i> <span class="back-label">My Drafts</span>
+            <i class="fa-solid fa-arrow-left"></i> <span class="back-label">My Timesheets</span>
         </button>
         <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
         <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
-        <p class="text-center text-sm text-gray-500 mt-1"><span class="font-semibold text-gray-700">PERSONAL SHEET:</span> This is Your Timesheet Header. Make Your Timesheet Submissions Below.</p>
+        <p class="text-center text-sm text-gray-500 mt-1">
+            <span class="font-semibold text-gray-700">PERSONAL SHEET:</span>
+            {% if revision_mode %}Your supervisor has returned this timesheet. Correct the rejected entries below and resubmit.
+            {% else %}Fill out your timesheet below.{% endif %}
+        </p>
 
         <div class="flex flex-wrap justify-between items-center mt-4 text-sm gap-y-2 px-4">
             <span>Payroll ID: {{ request.user.employeeid }}</span>
-            <span>Today: {{ today }}</span>
+            {% if not revision_mode %}<span>Today: {{ today }}</span>{% endif %}
             <span>Total Hours Logged: {{ hours }}</span>
-            <span>Current Status: {{ header.overallstatus }}</span>
+            <span>Status:
+                {% if revision_mode %}
+                <span class="inline-flex items-center bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">Revision Required</span>
+                {% else %}
+                {{ header.overallstatus }}
+                {% endif %}
+            </span>
+            {% if not revision_mode %}
             <span>
                 <form method="POST">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="update_crew">
-                    <select name="crewid" onchange="this.form.submit()"
-                        class="bg-gray-100 border border-gray-300 py-1 text-sm">
+                    <select name="crewid" onchange="this.form.submit()" class="bg-gray-100 border border-gray-300 py-1 text-sm">
                         <option value="">-- No Crew --</option>
                         {% for crew in crews %}
-                        <option value="{{ crew.crewid }}" {% if header.crewid_id == crew.crewid %}selected{% endif %}>{{ crew.crewname }}</option>                        {% endfor %}
+                        <option value="{{ crew.crewid }}" {% if header.crewid_id == crew.crewid %}selected{% endif %}>{{ crew.crewname }}</option>
+                        {% endfor %}
                     </select>
                 </form>
             </span>
+            {% endif %}
         </div>
     </div>
 </div>
 
-{% if days_remaining <= 14 and header.overallstatus == 'Draft' %} 
+{% if revision_mode %}
 <div class="container mx-auto mt-2 px-4">
-    <div class="bg-yellow-100 border border-yellow-400 text-yellow-800 text-sm rounded px-4 py-2">
-        ⚠ This draft will be automatically deleted in {{ days_remaining }} day{{ days_remaining|pluralize }} if not
-        submitted.
+    <div class="bg-red-50 border border-red-400 text-red-800 text-sm rounded px-4 py-2">
+        <i class="fa-solid fa-circle-exclamation mr-1"></i>
+        {% if has_rejected %}
+        Some entries were rejected by your supervisor. Fix each rejected entry below, then click Resubmit.
+        {% else %}
+        All rejected entries have been corrected. Click Resubmit to send for review again.
+        {% endif %}
     </div>
 </div>
-    {% endif %}
+{% elif days_remaining <= 14 %}
+<div class="container mx-auto mt-2 px-4">
+    <div class="bg-yellow-100 border border-yellow-400 text-yellow-800 text-sm rounded px-4 py-2">
+        ⚠ This draft will be automatically deleted in {{ days_remaining }} day{{ days_remaining|pluralize }} if not submitted.
+    </div>
+</div>
+{% endif %}
 
-    <div class="container mx-auto p-4 bg-white rounded-2xl shadow mt-6">
-        <form method="POST" id="entry-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" id="form-action" value="">
-            <input type="hidden" name="entryid" id="form-entryid" value="">
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mt-6">
+    <form method="POST" id="entry-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" id="form-action" value="">
+        <input type="hidden" name="entryid" id="form-entryid" value="">
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm min-w-[800px] table-fixed">
-                    <thead>
-                        <tr class="text-black text-center">
-                            <th class="p-2 w-30">Work Order</th>
-                            <th class="p-2 w-30">Category</th>
-                            <th class="p-2 w-30">Shift</th>
-                            <th class="p-2 w-30">Hours Worked</th>
-                            <th class="p-2 w-30">Description</th>
-                            <th class="p-2 w-30">Date Worked</th>
-                            <th class="p-2 w-20">
-                                {% if entries %} Actions {% endif %}
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for entry in entries %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm min-w-[800px] table-fixed">
+                <thead>
+                    <tr class="text-black text-center">
+                        <th class="p-2 w-30">Work Order</th>
+                        <th class="p-2 w-30">Category</th>
+                        <th class="p-2 w-30">Shift</th>
+                        <th class="p-2 w-30">Hours Worked</th>
+                        <th class="p-2 w-30">Description</th>
+                        <th class="p-2 w-30">Date Worked</th>
+                        {% if revision_mode %}
+                        <th class="p-2 w-40 text-left">Supervisor Note</th>
+                        {% endif %}
+                        <th class="p-2 w-20">{% if entries %}Actions{% endif %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in entries %}
+                    {% if revision_mode %}
+                        {% if entry.linestatus == 'Approved' %}
+                        <tr class="border-b bg-green-50 text-center">
+                        {% elif entry.linestatus == 'Rejected' %}
+                        <tr class="border-b bg-red-50 text-center">
+                        {% else %}
                         <tr class="border-b hover:bg-gray-50 text-center">
-                            <td class="p-2">{{ entry.sapworkid }}</td>
-                            <td class="p-2">{% if entry.workcategoryid %} {{ entry.workcategoryid.categoryname }} {% else %} {{ entry.leavetypeid.leavetypename }} {% endif %}</td>
-                            <td class="p-2">{{ entry.shifttype }}</td>
-                            <td class="p-2">{{ entry.hoursworked }}</td>
-                            <td class="p-2">{{ entry.entrydescription|default:"-" }}</td>
-                            <td class="p-2">{{ entry.startdate }}</td>
-                            <td class="p-2 flex items-center gap-5">
-                                <button type="button" data-entryid="{{ entry.mainentryid }}"
+                        {% endif %}
+                    {% else %}
+                    <tr class="border-b hover:bg-gray-50 text-center">
+                    {% endif %}
+                        <td class="p-2">{{ entry.sapworkid|default:"—" }}</td>
+                        <td class="p-2">{% if entry.workcategoryid %}{{ entry.workcategoryid.categoryname }}{% else %}{{ entry.leavetypeid.leavetypename }}{% endif %}</td>
+                        <td class="p-2">{{ entry.shifttype }}</td>
+                        <td class="p-2">{{ entry.hoursworked }}</td>
+                        <td class="p-2">{{ entry.entrydescription|default:"—" }}</td>
+                        <td class="p-2">
+                            {{ entry.startdate }}
+                            {% if entry.startdate in stat_dates %}<span class="ml-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_labels|get_item:entry.startdate }}">Stat</span>{% endif %}
+                        </td>
+                        {% if revision_mode %}
+                        <td class="p-2 text-left text-red-600 text-xs max-w-xs">{{ entry.supervisornote|default:"" }}</td>
+                        {% endif %}
+                        <td class="p-2">
+                            {% if not revision_mode %}
+                            <div class="flex items-center gap-2 justify-center">
+                                <button type="button"
+                                    data-entryid="{{ entry.mainentryid }}"
                                     data-sapworkid="{{ entry.sapworkid|default:'' }}"
-                                    data-categoryid="{{ entry.workcategoryid_id | default:'' }}" 
-                                    data-leavetypeid="{{ entry.leavetypeid_id | default:'' }}"
-                                    data-shifttype="{{ entry.shifttype }}" data-hoursworked="{{ entry.hoursworked }}"
+                                    data-categoryid="{{ entry.workcategoryid_id|default:'' }}"
+                                    data-leavetypeid="{{ entry.leavetypeid_id|default:'' }}"
+                                    data-shifttype="{{ entry.shifttype }}"
+                                    data-hoursworked="{{ entry.hoursworked }}"
                                     data-description="{{ entry.entrydescription|default:'' }}"
-                                    data-startdate="{{ entry.startdate | date:'Y-m-d' }}" onclick="editEntry(this)"
+                                    data-startdate="{{ entry.startdate|date:'Y-m-d' }}"
+                                    onclick="editEntry(this)"
                                     class="border border-[#d4a413] rounded text-[#d4a413] text-xs px-2 py-1">Edit</button>
-
                                 <button type="button" onclick="deleteEntry('{{ entry.mainentryid }}')"
                                     class="border border-red-500 rounded text-red-500 text-xs px-2 py-1">Delete</button>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="7" class="text-center text-gray-400 py-6 text-sm">No entries yet. Click + Add
-                                Entry
-                                to begin.</td>
-                        </tr>
-                        {% endfor %}
-                        <!-- New Entry Row -->
-                        <tr id="add-row" class="hidden bg-gray-100">
-                            <td class="p-2">
-                                <input type="text" name="sapworkid" placeholder="e.g. WO-1000042"
-                                    class="border rounded px-1 py-1 w-full text-xs">
-                            </td>
-                            <td class="p-2">
-                                <select name="category_selection" class="border rounded px-1 py-1 w-full text-xs">
-                                     <option value="">-- Select Category --</option>
-                                     <optgroup label="Work Categories">
-                                        {% for cat in workcategories %}
-                                        <option value="wc_{{ cat.categoryid }}">{{ cat.categoryname }}</option>
-                                        {% endfor %}
-                                    </optgroup>
-                                    <optgroup label="Leave">
-                                        {% for lt in leavetypes %}
-                                        <option value="lt_{{ lt.leavetypeid }}">{{ lt.leavetypename }}</option>
-                                        {% endfor %}
-                                    </optgroup>
-                                </select>
-                            </td>
-                            <td class="p-2">
-                                <select name="shifttype" class="border rounded px-1 py-1 w-full text-xs">
-                                    <option value="Day">Day</option>
-                                    <option value="Night">Night</option>
-                                </select>
-                            </td>
-                            <td class="p-2">
-                                <input type="number" name="hoursworked" step="0.5" min="0" max="24"
-                                    class="border rounded px-1 py-1 w-full text-xs">
-                            </td>
-                            <td class="p-2">
-                                <input type="text" name="entrydescription" placeholder="Optional"
-                                    class="border rounded px-1 py-1 w-full text-xs">
-                            </td>
-                            <td class="p-2">
-                                <input type="date" name="startdate" class="border rounded px-1 py-1 text-xs">
-                            </td>
+                            </div>
+                            {% elif entry.linestatus == 'Rejected' %}
+                            <div class="flex items-center gap-2 justify-center">
+                                <button type="button"
+                                    data-entryid="{{ entry.mainentryid }}"
+                                    data-sapworkid="{{ entry.sapworkid|default:'' }}"
+                                    data-categoryid="{{ entry.workcategoryid_id|default:'' }}"
+                                    data-leavetypeid="{{ entry.leavetypeid_id|default:'' }}"
+                                    data-shifttype="{{ entry.shifttype }}"
+                                    data-hoursworked="{{ entry.hoursworked }}"
+                                    data-description="{{ entry.entrydescription|default:'' }}"
+                                    data-startdate="{{ entry.startdate|date:'Y-m-d' }}"
+                                    onclick="editEntry(this)"
+                                    class="border border-[#28348A] rounded text-[#28348A] text-xs px-2 py-1">Fix</button>
+                                <button type="button" onclick="deleteEntry('{{ entry.mainentryid }}')"
+                                    class="border border-red-500 rounded text-red-500 text-xs px-2 py-1">Delete</button>
+                            </div>
+                            {% elif entry.linestatus == 'Approved' %}
+                            <span class="text-green-700 text-xs font-semibold">Approved</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{% if revision_mode %}8{% else %}7{% endif %}" class="text-center text-gray-400 py-6 text-sm">No entries yet.</td>
+                    </tr>
+                    {% endfor %}
 
-                            <td class="p-2">
-                                <button type="button" onclick="saveEntry()"
-                                    class="bg-[#28348A] text-white text-xs px-2 py-1 rounded hover:opacity-90">Save</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                    <!-- Inline edit/add row -->
+                    <tr id="add-row" class="hidden bg-gray-100">
+                        <td class="p-2">
+                            <input type="text" name="sapworkid" id="sap-input" placeholder="e.g. WO-1000042"
+                                class="border rounded px-1 py-1 w-full text-xs">
+                        </td>
+                        <td class="p-2">
+                            <select name="category_selection" id="cat-select" class="border rounded px-1 py-1 w-full text-xs">
+                                <option value="">-- Select Category --</option>
+                                <optgroup label="Work Categories">
+                                    {% for cat in workcategories %}
+                                    <option value="wc_{{ cat.categoryid }}">{{ cat.categoryname }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                                <optgroup label="Leave">
+                                    {% for lt in leavetypes %}
+                                    <option value="lt_{{ lt.leavetypeid }}">{{ lt.leavetypename }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                            </select>
+                        </td>
+                        <td class="p-2">
+                            <select name="shifttype" id="shift-select" class="border rounded px-1 py-1 w-full text-xs">
+                                <option value="Day">Day</option>
+                                <option value="Night">Night</option>
+                            </select>
+                        </td>
+                        <td class="p-2">
+                            <input type="number" name="hoursworked" id="hours-input" step="0.5" min="0" max="24"
+                                class="border rounded px-1 py-1 w-full text-xs">
+                        </td>
+                        <td class="p-2">
+                            <input type="text" name="entrydescription" id="desc-input" placeholder="Optional"
+                                class="border rounded px-1 py-1 w-full text-xs">
+                        </td>
+                        <td class="p-2">
+                            <input type="date" name="startdate" id="date-input" class="border rounded px-1 py-1 text-xs w-full">
+                        </td>
+                        {% if revision_mode %}<td class="p-2"></td>{% endif %}
+                        <td class="p-2">
+                            <button type="button" onclick="saveEntry()"
+                                class="bg-[#28348A] text-white text-xs px-2 py-1 rounded hover:opacity-90">Save</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="flex flex-wrap gap-3 mt-6 justify-between">
+            {% if revision_mode %}
+            <div></div>
+            <div class="flex flex-col items-end gap-1">
+                <button type="button" onclick="submitForm('resubmit')" {% if has_rejected %}disabled{% endif %}
+                    class="text-sm px-6 py-2 rounded-xl font-semibold
+                    {% if has_rejected %}bg-gray-200 text-gray-400 cursor-not-allowed{% else %}bg-[#097d45] text-white hover:opacity-90{% endif %}">
+                    Resubmit for Review
+                </button>
+                {% if has_rejected %}
+                <p class="text-xs text-gray-400">Fix all rejected entries before resubmitting.</p>
+                {% endif %}
             </div>
+            {% else %}
+            <button type="button" onclick="toggleAddRow()"
+                class="bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">+ Add Entry</button>
+            <button type="button" onclick="submitForm('submit_timesheet')"
+                class="bg-[#097d45] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Submit Timesheet</button>
+            {% endif %}
+        </div>
+    </form>
+</div>
 
-            <div class="flex flex-wrap gap-3 mt-6 justify-between">
-                <button type="button" onclick="toggleAddRow()"
-                    class="bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">+ Add Entry</button>
-                <button type="button" onclick="submitForm('submit_timesheet')"
-                    class="bg-[#097d45] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Submit
-                    Timesheet</button>
-            </div>
-        </form>
-    </div>
+<script>
+    function toggleAddRow() {
+        document.getElementById('form-entryid').value = '';
+        document.getElementById('sap-input').value = '';
+        document.getElementById('cat-select').value = '';
+        document.getElementById('shift-select').value = 'Day';
+        document.getElementById('hours-input').value = '';
+        document.getElementById('desc-input').value = '';
+        document.getElementById('date-input').value = '';
+        document.getElementById('add-row').classList.toggle('hidden');
+    }
 
-    <script>
-        function toggleAddRow() {
-            document.getElementById('form-entryid').value = '';
-            document.getElementById('add-row').classList.toggle('hidden');
+    function saveEntry() {
+        const cat = document.getElementById('cat-select').value;
+        const hours = parseFloat(document.getElementById('hours-input').value);
+        const date = document.getElementById('date-input').value;
+
+        if (!cat || !date) { alert('Work Category and Date Worked are required.'); return; }
+        if (!hours || hours <= 0 || hours > 24) { alert('Hours worked must be between 0.5 and 24.'); return; }
+
+        {% if not revision_mode %}
+        if (cat.startsWith('wc_')) {
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            if (new Date(date) > today) { alert('Date cannot be a future date for this work category.'); return; }
         }
+        {% endif %}
 
-        function saveEntry() {
-            const categoryEl = document.querySelector('[name="category_selection"]');
-            const categoryValue = categoryEl.value;
-            const categoryText = categoryEl.options[categoryEl.selectedIndex].text.toLowerCase();
-            const hours = parseFloat(document.querySelector('[name="hoursworked"]').value);
-            const date = document.querySelector('[name="startdate"]').value;
+        const saveBtn = document.querySelector('#add-row button[onclick="saveEntry()"]');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+        document.getElementById('form-action').value = 'save_entry';
+        document.getElementById('entry-form').submit();
+    }
 
-            if (!categoryValue || !date) {
-                alert('Work Category and Date Worked are required.');
-                return;
-            }
+    function deleteEntry(entryId) {
+        document.getElementById('form-action').value = 'delete_entry';
+        document.getElementById('form-entryid').value = entryId;
+        document.getElementById('entry-form').submit();
+    }
 
-            // hours cap
-            if (!hours || hours <= 0 || hours > 24) {
-                alert('Hours worked must be between 0.5 and 24.');
-                return;
-            }
-
-            // future date: blocked for work categories unless it's overtime
-            if (categoryValue.startsWith('wc_') && !categoryText.includes('overtime')) {
-                const today = new Date(); today.setHours(0, 0, 0, 0);
-                if (new Date(date) > today) {
-                    alert('Date cannot be a future date for this work category.');
-                    return;
-                }
-            }
-
-            const saveBtn = document.querySelector('#add-row button[onclick="saveEntry()"]');
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving...';
-
-            document.getElementById('form-action').value = 'save_entry';
-            document.getElementById('entry-form').submit();
+    function submitForm(action) {
+        if (action === 'submit_timesheet') {
+            const rows = document.querySelectorAll('#entry-form tbody tr.border-b');
+            if (rows.length === 0) { alert('Cannot submit an empty timesheet. Please add at least one entry.'); return; }
         }
+        document.getElementById('form-action').value = action;
+        document.getElementById('entry-form').submit();
+    }
 
+    function editEntry(btn) {
+        document.getElementById('form-entryid').value = btn.dataset.entryid;
+        document.getElementById('sap-input').value = btn.dataset.sapworkid || '';
+        const sel = document.getElementById('cat-select');
+        if (btn.dataset.categoryid) sel.value = 'wc_' + btn.dataset.categoryid;
+        else if (btn.dataset.leavetypeid) sel.value = 'lt_' + btn.dataset.leavetypeid;
+        else sel.value = '';
+        document.getElementById('shift-select').value = btn.dataset.shifttype;
+        document.getElementById('hours-input').value = btn.dataset.hoursworked;
+        document.getElementById('desc-input').value = btn.dataset.description;
+        document.getElementById('date-input').value = btn.dataset.startdate;
+        document.getElementById('add-row').classList.remove('hidden');
+        document.getElementById('add-row').scrollIntoView({ behavior: 'smooth' });
+    }
+</script>
 
-
-        function deleteEntry(entryId) {
-            document.getElementById('form-action').value = 'delete_entry';
-            document.getElementById('form-entryid').value = entryId;
-            document.getElementById('entry-form').submit();
-        }
-
-        function submitForm(action) {
-            if (action === 'submit_timesheet') {
-                const entryRows = document.querySelectorAll('#entry-form tbody tr.border-b');
-                if (entryRows.length === 0) {
-                    alert('Cannot submit an empty timesheet. Please add at least one entry.');
-                    return;
-                }
-            }
-            document.getElementById('form-action').value = action;
-            document.getElementById('entry-form').submit();
-        }
-
-        function editEntry(btn) {
-            document.getElementById('form-entryid').value = btn.dataset.entryid;
-            document.querySelector('[name="sapworkid"]').value = btn.dataset.sapworkid;
-            const sel = document.querySelector('[name="category_selection"]');
-            if (btn.dataset.categoryid) sel.value = 'wc_' + btn.dataset.categoryid;
-            else if (btn.dataset.leavetypeid) sel.value = 'lt_' + btn.dataset.leavetypeid;
-            document.querySelector('[name="shifttype"]').value = btn.dataset.shifttype;
-            document.querySelector('[name="hoursworked"]').value = btn.dataset.hoursworked;
-            document.querySelector('[name="entrydescription"]').value = btn.dataset.description;
-            document.querySelector('[name="startdate"]').value = btn.dataset.startdate;
-            document.getElementById('add-row').classList.remove('hidden');
-            document.getElementById('add-row').scrollIntoView({ behavior: 'smooth' });
-        }
-
-    </script>
-
-
-
-    {% endblock content %}
+{% endblock content %}

@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load timesheet_extras %}
 
 {% block content %}
 
@@ -93,7 +94,7 @@
     {% endif %}
     <div class="flex flex-wrap justify-between items-center mt-4 text-sm gap-y-2 px-4">
         <span>Shifter: <span class="font-medium">{{ header.shifterid.firstname }} {{ header.shifterid.lastname }}</span></span>
-        <span>Date: <span class="font-medium">{{ header.shiftdate|date:"M j, Y" }}</span></span>
+        <span>Date: <span class="font-medium">{{ header.shiftdate|date:"M j, Y" }}</span>{% if is_stat %} <span class="ml-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_label }}">Stat</span>{% endif %}</span>
         <span>Shift: <span class="font-medium">{{ header.shifttype }}</span></span>
         <span>Crew: <span class="font-medium">{{ header.crewid.crewname }}</span></span>
         {% if header.section %}<span>Section: <span class="font-medium">{{ header.section }}</span></span>{% endif %}

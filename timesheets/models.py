@@ -58,10 +58,12 @@ class LeaveAllocation(models.Model):
 
 
 class StatHoliday(models.Model):
-    statid = models.AutoField(db_column='StatID', primary_key=True)  # Field name made lowercase.
-    statname = models.CharField(db_column='StatName', max_length=255)  # Field name made lowercase.
-    statdate = models.DateField(db_column='StatDate')  # Field name made lowercase.
-    isactive = models.IntegerField(db_column='IsActive', default=1)  # Field name made lowercase.
+    PROVINCE_CHOICES = [('ON', 'Ontario'), ('QC', 'Quebec')]
+    statid = models.AutoField(db_column='StatID', primary_key=True)
+    statname = models.CharField(db_column='StatName', max_length=255)
+    statdate = models.DateField(db_column='StatDate')
+    province = models.CharField(db_column='Province', max_length=2, choices=PROVINCE_CHOICES, blank=True, null=True)
+    isactive = models.IntegerField(db_column='IsActive', default=1)
 
     class Meta:
         managed = True
@@ -152,11 +154,11 @@ class BusinessEntry(models.Model):
     businessentryid = models.AutoField(db_column='BusinessEntryID', primary_key=True)  # Field name made lowercase.
     businessheaderid = models.ForeignKey('BusinessHeader', models.CASCADE, db_column='BusinessHeaderID')  # Field name made lowercase.
     businesscategoryid = models.ForeignKey('BusinessCategory', models.DO_NOTHING, db_column='BusinessCategoryID', blank=True, null=True)  # Field name made lowercase.
+    dateworked = models.DateField(db_column='DateWorked')  # Field name made lowercase.
     leavetypeid = models.ForeignKey('LeaveType', models.DO_NOTHING, db_column='LeaveTypeID', blank=True, null=True)  # Field name made lowercase.
     shifttype = models.CharField(db_column='ShiftType', max_length=5,  choices=[('Day', 'Day'), ('Night', 'Night')], blank=True, null=True)  # Field name made lowercase.
     hoursworked = models.DecimalField(db_column='HoursWorked', max_digits=5, decimal_places=2)  # Field name made lowercase.
     entrydescription = models.TextField(db_column='EntryDescription', blank=True, null=True)  # Field name made lowercase.
-    entrydate = models.DateField(db_column='EntryDate')  # Field name made lowercase.
     linestatus = models.CharField(db_column='LineStatus', max_length=15, default='Draft')  # Field name made lowercase.
     approvedat = models.DateTimeField(db_column='ApprovedAt', blank=True, null=True)  # Field name made lowercase.
     approvedby = models.ForeignKey('users.User', models.DO_NOTHING, db_column='ApprovedBy', blank=True, null=True, related_name='approved_%(class)s')

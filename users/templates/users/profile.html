@@ -52,20 +52,20 @@
     <div class="flex-1 min-w-[240px] bg-white rounded-2xl shadow p-6">
         <p class="font-semibold mb-4">People</p>
         <div class="space-y-3">
-            <div class="flex items-center justify-between text-sm">
+            <div class="flex items-center justify-between text-base">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-users text-[#28348A]"></i> Active
                     Employees</span>
-                <span class="font-semibold">{{ total_active }}</span>
+                <span class="text-xl font-bold">{{total_active }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
+            <div class="flex items-center justify-between text-base">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-user-slash text-gray-400"></i> Inactive /
                     Replaced</span>
-                <span class="font-semibold">{{ total_inactive }}</span>
+                <span class="text-xl font-bold">{{total_inactive }}</span>
             </div>
             {% for dept in dept_breakdown %}
-            <div class="flex items-center justify-between text-sm">
+            <div class="flex items-center justify-between text-base">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-building text-gray-400"></i> {{ dept.roleid__departmentid__departmentname }}</span>
-                <span class="font-semibold">{{ dept.user_count }}</span>
+                <span class="text-xl font-bold">{{dept.user_count }}</span>
             </div>
             {% endfor %}
         </div>
@@ -74,33 +74,33 @@
         <p class="font-semibold mb-4">Timesheet Activity — {{ today|date:"F Y" }}</p>
         <p class="text-xs font-medium text-gray-400 uppercase mb-2">Maintenance</p>
         <div class="space-y-3 mb-4">
-            <div class="flex items-center justify-between text-sm">
+            <div class="flex items-center justify-between text-base">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i>
                     Submitted</span>
-                <span class="font-semibold">{{ maintenance_submitted }}</span>
+                <span class="text-xl font-bold">{{maintenance_submitted }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
+            <div class="flex items-center justify-between text-base">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF914D]"></i>
                     Pending</span>
-                <span class="font-semibold">{{ maintenance_pending }}</span>
+                <span class="text-xl font-bold">{{maintenance_pending }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
+            <div class="flex items-center justify-between text-base">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i>
                     Completed</span>
-                <span class="font-semibold">{{ maintenance_completed }}</span>
+                <span class="text-xl font-bold">{{maintenance_completed }}</span>
             </div>
         </div>
         <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">Operations Crew</p>
         <div class="space-y-3">
-            <div class="flex items-center justify-between text-sm">
+            <div class="flex items-center justify-between text-base">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i>
                     Submitted</span>
-                <span class="font-semibold">{{ ops_submitted }}</span>
+                <span class="text-xl font-bold">{{ops_submitted }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
+            <div class="flex items-center justify-between text-base">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i>
                     Completed</span>
-                <span class="font-semibold">{{ ops_completed }}</span>
+                <span class="text-xl font-bold">{{ops_completed }}</span>
             </div>
         </div>
     </div>
@@ -110,179 +110,162 @@
         <p class="font-semibold mb-4">Dashboard Statistics</p>
         {% if al == 3 %} <!-- Supervisor -->
         <div class="space-y-3">
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Awaiting
-                    Review</span>
-                <span class="font-semibold">{{ awaiting_count }}</span>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Pending Submissions</span>
+                <span class="text-xl font-bold">{{ pending_count }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#28348A]"></i> In
-                    Progress</span>
-                <span class="font-semibold">{{ in_progress_count }}</span>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF3131]"></i> Sent Back for Correction</span>
+                <span class="text-xl font-bold">{{ revision_count }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i>
-                    Completed</span>
-                <span class="font-semibold">{{ completed_count }}</span>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Completed This Month</span>
+                <span class="text-xl font-bold">{{ completed_month }}</span>
             </div>
-            {% if oldest_waiting %}
-            <p class="text-xs text-gray-400 mt-2 pt-2 border-t"> Oldest Still Waiting: {{ oldest_waiting.submittedat|date:"M j, Y" }} — {{ oldest_waiting.employeeid.firstname }} {{ oldest_waiting.employeeid.lastname }}</p>
-            {% endif %}
         </div>
+        <p class="text-xs text-gray-400 mt-3 pt-2 border-t text-right">{{ today|date:"F Y" }}</p>
 
         {% elif al == 2 %} <!-- Superintendent -->
         <p class="text-xs font-medium text-gray-400 uppercase mb-2">Personal Employee Submissions</p>
         <div class="space-y-3 mb-4">
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Pending
-                    Approval</span>
-                <span class="font-semibold">{{ personal_pending }}</span>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Pending Submissions</span>
+                <span class="text-xl font-bold">{{personal_pending }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i>
-                    Completed</span>
-                <span class="font-semibold">{{ personal_completed }}</span>
-            </div>
-        </div>
-        <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">Daily Crew Sheets</p>
-        <div class="space-y-3">
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#28348A]"></i> Awaiting
-                    Final Approval</span>
-                <span class="font-semibold">{{ ops_pending_super }}</span>
-            </div>
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i>
-                    Completed</span>
-                <span class="font-semibold">{{ ops_completed }}</span>
-            </div>
-        </div>
-
-        {% elif al == 4 %} <!-- Mine Captain-->
-        <p class="text-xs font-medium text-gray-400 uppercase mb-2">My Timesheet</p>
-        <div class="space-y-3 mb-4">
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF914D]"></i> Draft
-                    Headers</span>
-                <span class="font-semibold">{{ draft_count }}</span>
-            </div>
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Pending
-                    Approval</span>
-                <span class="font-semibold">{{ pending_count }}</span>
-            </div>
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Approved
-                    Sheets</span>
-                <span class="font-semibold">{{ approved_count }}</span>
-            </div>
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF3131]"></i> Rejected
-                    Sheets</span>
-                <span class="font-semibold">{{ rejected_count }}</span>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Completed This Month</span>
+                <span class="text-xl font-bold">{{personal_completed }}</span>
             </div>
         </div>
         <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">Crew Daily Sheets</p>
         <div class="space-y-3">
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Pending My
-                    Approval</span>
-                <span class="font-semibold">{{ ops_pending_captain }}</span>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Completed This Month</span>
+                <span class="text-xl font-bold">{{ops_completed_month }}</span>
             </div>
-            <!-- <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#28348A]"></i> Forwarded to
-                    Superintendent</span>
-                <span class="font-semibold">{{ ops_forwarded }}</span>
-            </div> -->
         </div>
+        <p class="text-xs text-gray-400 mt-3 pt-2 border-t text-right">{{ today|date:"F Y" }}</p>
+
+        {% elif al == 4 %} <!-- Mine Captain-->
+        <p class="text-xs font-medium text-gray-400 uppercase mb-2">My Timesheet</p>
+        <div class="space-y-3 mb-4">
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF914D]"></i> Active Drafts</span>
+                <span class="text-xl font-bold">{{draft_count }}</span>
+            </div>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Awaiting Response</span>
+                <span class="text-xl font-bold">{{awaiting_count }}</span>
+            </div>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF3131]"></i> Needs Correction</span>
+                <span class="text-xl font-bold">{{revision_count }}</span>
+            </div>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Last Paid</span>
+                <span class="font-semibold">{% if paid_hours %}{{ paid_hours }} hrs{% else %}—{% endif %}</span>
+            </div>
+            {% if paid_period %}<p class="text-xs text-gray-400 -mt-1">{{ paid_period }}</p>{% endif %}
+        </div>
+        <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">Crew Daily Sheets</p>
+        <div class="space-y-3">
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Pending Submissions</span>
+                <span class="text-xl font-bold">{{ops_pending_captain }}</span>
+            </div>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF3131]"></i> Sent Back for Correction</span>
+                <span class="text-xl font-bold">{{ops_revision_captain }}</span>
+            </div>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Completed This Month</span>
+                <span class="text-xl font-bold">{{ops_completed_month }}</span>
+            </div>
+        </div>
+        <p class="text-xs text-gray-400 mt-3 pt-2 border-t text-right">{{ today|date:"F Y" }}</p>
 
         {% elif al == 5 %} <!-- Shifter -->
         <p class="text-xs font-medium text-gray-400 uppercase mb-2">My Timesheet</p>
         <div class="space-y-3 mb-4">
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF914D]"></i> Draft
-                    Headers</span>
-                <span class="font-semibold">{{ draft_count }}</span>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF914D]"></i> Active Drafts</span>
+                <span class="text-xl font-bold">{{draft_count }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Pending
-                    Approval</span>
-                <span class="font-semibold">{{ pending_count }}</span>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Awaiting Response</span>
+                <span class="text-xl font-bold">{{awaiting_count }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Approved
-                    Entries</span>
-                <span class="font-semibold">{{ approved_count }}</span>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF3131]"></i> Needs Correction</span>
+                <span class="text-xl font-bold">{{revision_count }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF3131]"></i> Rejected
-                    Entries</span>
-                <span class="font-semibold">{{ rejected_count }}</span>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Last Paid</span>
+                <span class="font-semibold">{% if paid_hours %}{{ paid_hours }} hrs{% else %}—{% endif %}</span>
             </div>
+            {% if paid_period %}<p class="text-xs text-gray-400 -mt-1">{{ paid_period }}</p>{% endif %}
         </div>
         <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">My Crew Daily Sheets</p>
         <div class="space-y-3">
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF914D]"></i> Drafts</span>
-                <span class="font-semibold">{{ ops_draft }}</span>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF914D]"></i> Active Drafts</span>
+                <span class="text-xl font-bold">{{ops_draft }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
+            <div class="flex items-center justify-between text-base">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i>
                     Submitted</span>
-                <span class="font-semibold">{{ ops_submitted }}</span>
+                <span class="text-xl font-bold">{{ops_submitted }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
+            <div class="flex items-center justify-between text-base">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#28348A]"></i> Under
                     Review</span>
-                <span class="font-semibold">{{ ops_in_progress }}</span>
+                <span class="text-xl font-bold">{{ops_in_progress }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i>
-                    Completed</span>
-                <span class="font-semibold">{{ ops_completed }}</span>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Completed This Month</span>
+                <span class="text-xl font-bold">{{ops_completed }}</span>
             </div>
         </div>
+        <p class="text-xs text-gray-400 mt-3 pt-2 border-t text-right">{{ today|date:"F Y" }}</p>
 
         {% elif al == 7 %} <!-- Payroll -->
         <p class="text-xs font-medium text-gray-400 uppercase mb-2">Maintenance</p>
         <div class="space-y-3 mb-4">
-            <div class="flex items-center justify-between text-sm">
+            <div class="flex items-center justify-between text-base">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Personal
                     Timesheets Completed</span>
-                <span class="font-semibold">{{ maintenance_completed }}</span>
+                <span class="text-xl font-bold">{{maintenance_completed }}</span>
             </div>
         </div>
         <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">Operations</p>
         <div class="space-y-3">
-            <div class="flex items-center justify-between text-sm">
+            <div class="flex items-center justify-between text-base">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Daily Crew
                     Timesheets Completed</span>
-                <span class="font-semibold">{{ ops_crew_completed }}</span>
+                <span class="text-xl font-bold">{{ops_crew_completed }}</span>
             </div>
         </div>
         {% else %} <!-- Employee -->
+        <p class="text-xs font-medium text-gray-400 uppercase mb-2">My Timesheet</p>
         <div class="space-y-3">
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF914D]"></i> Draft
-                    Headers</span>
-                <span class="font-semibold">{{ draft_count }}</span>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF914D]"></i> Active Drafts</span>
+                <span class="text-xl font-bold">{{draft_count }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Pending
-                    Headers</span>
-                <span class="font-semibold">{{ pending_count }}</span>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Awaiting Response</span>
+                <span class="text-xl font-bold">{{awaiting_count }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Approved
-                    (Last Submission)</span>
-                <span class="font-semibold">{{ approved_count }}</span>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF3131]"></i> Needs Correction</span>
+                <span class="text-xl font-bold">{{revision_count }}</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FF3131]"></i> Rejected
-                    (Last Submission)</span>
-                <span class="font-semibold">{{ rejected_count }}</span>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Last Paid</span>
+                <span class="font-semibold">{% if paid_hours %}{{ paid_hours }} hrs{% else %}—{% endif %}</span>
             </div>
         </div>
+        <p class="text-xs text-gray-400 mt-3 pt-2 border-t text-right">{% if paid_period %}{{ paid_period }}{% else %}—{% endif %}</p>
         {% endif %}
     </div>
 
@@ -292,51 +275,87 @@
         <div class="flex flex-col gap-3">
             {% if al == 3 %}
             <a href="{% url 'approval_inbox' %}"
-                class="flex items-center gap-3 px-4 py-3 bg-[#28348A] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                class="flex items-center gap-3 px-4 py-3 bg-[#1D4ED8] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-inbox"></i> Approval Inbox
             </a>
             {% elif al == 2 %}
-            <a href="#"
-                class="flex items-center gap-3 px-4 py-3 bg-[#28348A] text-white rounded-xl text-sm font-medium hover:opacity-90">
+            <a href="{% url 'business_approval_inbox' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#1D4ED8] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-inbox"></i> Employee Submissions Inbox
             </a>
             <a href="#"
-                class="flex items-center gap-3 px-4 py-3 bg-[#8A6B28] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                class="flex items-center gap-3 px-4 py-3 bg-[#B45309] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-clipboard-list"></i> Crew Daily Sheets Inbox
             </a>
             <a href="{% url 'crew_assignments' %}"
-                class="flex items-center gap-3 px-4 py-3 bg-[#1a6b3c] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                class="flex items-center gap-3 px-4 py-3 bg-[#15803D] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-people-group"></i> Crew Management
             </a>
             <a href="{% url 'contract_account_management' %}"
-                class="flex items-center gap-3 px-4 py-3 bg-[#5a3e8a] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                class="flex items-center gap-3 px-4 py-3 bg-[#7C3AED] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-link"></i> Contract-Cost Centre
             </a>
             {% elif al == 4 %}
+            <p class="text-xs font-medium text-gray-400 uppercase -mb-1">Crew</p>
+            <a href="#"
+                class="flex items-center gap-3 px-4 py-3 bg-[#15803D] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-people-line"></i> My People
+            </a>
+            <a href="{% url 'business_approval_inbox' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#1D4ED8] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-clock-rotate-left"></i> Shifters' Submissions Inbox
+            </a>
             <a href="{% url 'ops_approval_inbox' %}"
-                class="flex items-center gap-3 px-4 py-3 bg-[#8A6B28] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                class="flex items-center gap-3 px-4 py-3 bg-[#B45309] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-inbox"></i> Crew Daily Sheets Inbox
             </a>
+            <p class="text-xs font-medium text-gray-400 uppercase -mb-1 pt-1">Personal Timesheet</p>
+            <a href="{% url 'new_business_timesheet' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#4338CA] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-plus"></i> Create Personal Timesheet
+            </a>
+            <a href="{% url 'my_business_drafts' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#7C3AED] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-file-pen"></i> My Personal Drafts
+            </a>
             {% elif al == 5 %}
+            <p class="text-xs font-medium text-gray-400 uppercase -mb-1">Crew Sheets</p>
             <a href="{% url 'new_ops_sheet' %}"
-                class="flex items-center gap-3 px-4 py-3 bg-[#8A6B28] text-white rounded-xl text-sm font-medium hover:opacity-90">
-                <i class="fa-solid fa-clipboard-list"></i> Create Daily Crew Sheet
+                class="flex items-center gap-3 px-4 py-3 bg-[#B45309] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-plus"></i> Create Daily Crew Sheet
             </a>
             <a href="{% url 'my_ops_sheets' %}"
-                class="flex items-center gap-3 px-4 py-3 bg-[#5a7a28] text-white rounded-xl text-sm font-medium hover:opacity-90">
-                <i class="fa-solid fa-calendar-days"></i> My Crew Sheets
+                class="flex items-center gap-3 px-4 py-3 bg-[#0369A1] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-calendar-days"></i> My Crew Draft Sheets
+            </a>
+            <a href="{% url 'my_ops_approvals' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#15803D] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-circle-check"></i> Daily Crew Approvals
+            </a>
+            <p class="text-xs font-medium text-gray-400 uppercase -mb-1 pt-1">Personal Timesheet</p>
+            <a href="{% url 'new_business_timesheet' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#4338CA] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-plus"></i> Create Personal Timesheet
+            </a>
+            <a href="{% url 'my_business_drafts' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#7C3AED] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-file-pen"></i> My Personal Drafts
+            </a>
+            <a href="{% url 'my_business_paid' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#0F766E] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-money-check-dollar"></i> My Personal Paid
             </a>
             {% else %}
             <form method="POST" action="{% url 'new_timesheet' %}">
                 {% csrf_token %}
                 <button type="submit"
-                    class="w-full flex items-center gap-3 px-4 py-3 bg-[#28348A] text-white rounded-xl text-sm font-medium hover:opacity-90 cursor-pointer">
+                    class="w-full flex items-center gap-3 px-4 py-3 bg-[#4338CA] text-white rounded-xl text-sm font-medium hover:opacity-90 cursor-pointer">
                     <i class="fa-solid fa-plus"></i> Create Timesheet
                 </button>
             </form>
             <a href="{% url 'my_drafts' %}"
-                class="flex items-center gap-3 px-4 py-3 bg-[#FFBB7C] text-gray-700 rounded-xl text-sm font-medium hover:opacity-90">
-                <i class="fa-solid fa-file-pen"></i> Continue Draft
+                class="flex items-center gap-3 px-4 py-3 bg-[#7C3AED] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-file-pen"></i> My Drafts
             </a>
             {% endif %}
         </div>

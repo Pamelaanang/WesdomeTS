@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load timesheet_extras %}
 {% block content %}
 
 <div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
@@ -26,7 +27,7 @@
             </div>
             Shifter: <span class="font-medium">{{ opsheader.shifterid.firstname }} {{ opsheader.shifterid.lastname }}</span>
         </span>
-        <span>Date: <span class="font-medium">{{ opsheader.shiftdate|date:"M j, Y" }}</span></span>
+        <span>Date: <span class="font-medium">{{ opsheader.shiftdate|date:"M j, Y" }}</span>{% if is_stat %} <span class="ml-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_label }}">Stat</span>{% endif %}</span>
         <span>Shift: <span class="font-medium">{{ opsheader.shifttype }}</span></span>
         <span>Crew: <span class="font-medium">{{ opsheader.crewid.crewname }}</span></span>
         <span>Approved by: <span class="font-medium">{{ opsheader.ohapprovedby_capt.firstname }} {{ opsheader.ohapprovedby_capt.lastname }}</span></span>
