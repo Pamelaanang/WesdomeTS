@@ -49,6 +49,9 @@ class EmployeeManager(BaseUserManager):
     def create_superuser(self, employeeid, password=None, **extra_fields):
         extra_fields.setdefault('is_temporary', False)
         extra_fields.setdefault('isactive', True)
+        extra_fields.setdefault('is_superuser', True)
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
         return self.create_user(employeeid, password, **extra_fields)
 
 

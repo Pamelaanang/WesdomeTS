@@ -1,5 +1,26 @@
 from django.contrib import admin
-from .models import Position, CrewCoverage, User
+from .models import Position, CrewCoverage, User, Department, Roles, Accesslevel
+
+
+@admin.register(Department)
+class DepartmentAdmin(admin.ModelAdmin):
+    list_display = ('departmentname', 'isactive')
+    search_fields = ('departmentname',)
+    ordering = ('departmentname',)
+
+
+@admin.register(Roles)
+class RolesAdmin(admin.ModelAdmin):
+    list_display = ('rolename', 'departmentid', 'accessid', 'vacationhours', 'isuniqueassignment')
+    list_filter = ('departmentid', 'accessid')
+    search_fields = ('rolename',)
+    ordering = ('departmentid__departmentname', 'rolename')
+
+
+@admin.register(Accesslevel)
+class AccesslevelAdmin(admin.ModelAdmin):
+    list_display = ('accessid', 'accessrole', 'accessdescription')
+    ordering = ('accessid',)
 
 
 @admin.register(Position)
