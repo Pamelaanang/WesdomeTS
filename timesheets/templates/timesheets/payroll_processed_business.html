@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-8">
+    <button onclick="history.back()" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline cursor-pointer mb-2">
+        <i class="fa-solid fa-arrow-left"></i> Back
+    </button>
+    <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+    <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+    <p class="text-center text-sm text-gray-500 mt-1">
+        <span class="font-semibold text-gray-700">PROCESSED — BUSINESS UNIT:</span> Departments with processed timesheets.
+    </p>
+</div>
+
+<div class="container mx-auto mb-8">
+    <div class="flex flex-wrap gap-6">
+        {% for dept in departments %}
+        <a href="{% url 'payroll_processed_business_dept' dept.departmentid %}"
+            class="bg-white rounded-2xl shadow w-64 flex flex-col overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition duration-200 ease-in-out cursor-pointer group">
+            <!-- Coloured header band -->
+            <div class="bg-[#28348A] px-3 pt-5 pb-6 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-briefcase text-white text-base"></i>
+                </div>
+                <p class="text-white font-bold text-xl text-base leading-tight">{{ dept.departmentname }}</p>
+            </div>
+            <!-- Stat strip -->
+            <div class="px-5 py-4 flex items-center justify-between">
+                <div>
+                    <p class="text-2xl font-extrabold text-slate-800">{{ dept.employee_count }}</p>
+                    <p class="text-xs text-gray-400 mt-0.5">Employee{{ dept.employee_count|pluralize }}</p>
+                </div>
+                <i class="fa-solid fa-chevron-right text-gray-300 group-hover:text-[#28348A] transition"></i>
+            </div>
+        </a>
+        {% empty %}
+        <div class="mx-auto text-gray-400 text-sm">No departments with processed business timesheets.</div>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock content %}

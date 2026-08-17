@@ -24,7 +24,7 @@
                 </div>
                 <div>
                     <p class="font-semibold text-sm">{{ m.month|date:"F Y" }}</p>
-                    <p class="text-xs text-gray-400">{{ m.sheet_count }} submission{{ m.sheet_count|pluralize }} &middot; {{ m.total_hours|default:"0" }} hrs total</p>
+                    <p class="text-xs text-gray-400">{{ m.entry_count }} entr{{ m.entry_count|pluralize:"y,ies" }} &middot; {{ m.total_hours|default:"0" }} hrs total</p>
                 </div>
             </div>
             <i class="fa-solid fa-chevron-right text-gray-400 group-hover:text-[#28348A] transition-colors text-xs"></i>

@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
+    <a href="{% url 'payroll_ops_daily_month' year month %}" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline mb-3">
+        <i class="fa-solid fa-arrow-left"></i> {{ month_date|date:"F Y" }}
+    </a>
+    <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+    <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+    <p class="text-center text-sm text-gray-500 mt-1">
+        <span class="font-semibold text-gray-700">OPERATIONS — {{ target_date|date:"l, F j, Y"|upper }}:</span> All paid crew sheets.
+    </p>
+</div>
+
+{% if not day_sheets and not night_sheets %}
+<div class="container mx-auto">
+    <div class="bg-white rounded-2xl shadow p-8 text-center text-sm text-gray-400">
+        No paid ops sheets found for this date.
+    </div>
+</div>
+{% endif %}
+
+<div class="container mx-auto flex flex-col gap-8">
+
+    {% if day_sheets %}
+    <div>
+        <!-- Day Shift header -->
+        <div class="flex items-center gap-3 mb-4">
+            <i class="fa-solid fa-sun text-amber-400 text-lg"></i>
+            <h2 class="text-base font-bold text-slate-700 uppercase tracking-wide">Day Shift</h2>
+            <div class="flex-1 border-t border-amber-200"></div>
+        </div>
+
+        <div class="flex flex-col gap-6">
+            {% for sheet in day_sheets %}
+            <div class="bg-white rounded-2xl shadow overflow-hidden">
+                <!-- Shifter / crew sub-header -->
+                <div class="flex items-center gap-4 px-5 py-3 bg-amber-50 border-b border-amber-100">
+                    {% if sheet.shifterid.profilepic %}
+                    <img src="/media/{{ sheet.shifterid.profilepic }}" class="w-8 h-8 rounded-full object-cover">
+                    {% else %}
+                    <div class="w-8 h-8 rounded-full bg-amber-200 flex items-center justify-center text-amber-700 text-xs font-bold">
+                        {{ sheet.shifterid.firstname|first }}{{ sheet.shifterid.lastname|first }}
+                    </div>
+                    {% endif %}
+                    <div>
+                        <p class="font-semibold text-sm text-slate-800">
+                            {{ sheet.shifterid.firstname }} {{ sheet.shifterid.lastname }}
+                            {% if sheet.coverageid %}
+                            <span class="ml-2 text-xs font-normal text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">
+                                <i class="fa-solid fa-arrows-rotate mr-0.5"></i> Coverage
+                            </span>
+                            {% endif %}
+                        </p>
+                        <p class="text-xs text-gray-500">{{ sheet.crewid.crewname }}{% if sheet.section %} &mdash; {{ sheet.section }}{% endif %}</p>
+                    </div>
+                </div>
+
+                <!-- Entries table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs min-w-[900px]">
+                        <thead>
+                            <tr class="text-gray-500 text-center border-b bg-gray-50">
+                                <th class="p-2 font-medium">Payroll ID</th>
+                                <th class="p-2 font-medium">Employee</th>
+                                <th class="p-2 font-medium">Contract</th>
+                                <th class="p-2 font-medium">Account</th>
+                                <th class="p-2 font-medium">Work Category</th>
+                                <th class="p-2 font-medium">Hours</th>
+                                <th class="p-2 font-medium">Haulage / Footage</th>
+                                <th class="p-2 font-medium">Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entry in sheet.paid_entries %}
+                            <tr class="border-b text-center hover:bg-gray-50">
+                                <td class="p-2 text-gray-500">{{ entry.employeeid.employeeid }}</td>
+                                <td class="p-2 font-medium text-slate-700">{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</td>
+                                <td class="p-2">{{ entry.contractid.contractcode }}</td>
+                                <td class="p-2">{{ entry.accountid.accountcode|default:"—" }}</td>
+                                <td class="p-2">{{ entry.workcategoryid.categoryname|default:"—" }}</td>
+                                <td class="p-2 font-semibold">{{ entry.hoursworked }}</td>
+                                <td class="p-2 text-gray-500">
+                                    {% if entry.tonnesorehauled %}Ore: {{ entry.tonnesorehauled }}t &nbsp;{% endif %}
+                                    {% if entry.tonneswastehauled %}Waste: {{ entry.tonneswastehauled }}t &nbsp;{% endif %}
+                                    {% if entry.tonnesoreskipped %}Skip: {{ entry.tonnesoreskipped }}t &nbsp;{% endif %}
+                                    {% if entry.longholefootage %}LH: {{ entry.longholefootage }}ft{% endif %}
+                                    {% if not entry.tonnesorehauled and not entry.tonneswastehauled and not entry.tonnesoreskipped and not entry.longholefootage %}—{% endif %}
+                                </td>
+                                <td class="p-2 text-gray-500">{{ entry.remarks|default:"—" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center text-gray-400 py-4">No approved entries.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if night_sheets %}
+    <div>
+        <!-- Night Shift header -->
+        <div class="flex items-center gap-3 mb-4">
+            <i class="fa-solid fa-moon text-indigo-400 text-lg"></i>
+            <h2 class="text-base font-bold text-slate-700 uppercase tracking-wide">Night Shift</h2>
+            <div class="flex-1 border-t border-indigo-200"></div>
+        </div>
+
+        <div class="flex flex-col gap-6">
+            {% for sheet in night_sheets %}
+            <div class="bg-white rounded-2xl shadow overflow-hidden">
+                <!-- Shifter / crew sub-header -->
+                <div class="flex items-center gap-4 px-5 py-3 bg-indigo-50 border-b border-indigo-100">
+                    {% if sheet.shifterid.profilepic %}
+                    <img src="/media/{{ sheet.shifterid.profilepic }}" class="w-8 h-8 rounded-full object-cover">
+                    {% else %}
+                    <div class="w-8 h-8 rounded-full bg-indigo-200 flex items-center justify-center text-indigo-700 text-xs font-bold">
+                        {{ sheet.shifterid.firstname|first }}{{ sheet.shifterid.lastname|first }}
+                    </div>
+                    {% endif %}
+                    <div>
+                        <p class="font-semibold text-sm text-slate-800">
+                            {{ sheet.shifterid.firstname }} {{ sheet.shifterid.lastname }}
+                            {% if sheet.coverageid %}
+                            <span class="ml-2 text-xs font-normal text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded">
+                                <i class="fa-solid fa-arrows-rotate mr-0.5"></i> Coverage
+                            </span>
+                            {% endif %}
+                        </p>
+                        <p class="text-xs text-gray-500">{{ sheet.crewid.crewname }}{% if sheet.section %} &mdash; {{ sheet.section }}{% endif %}</p>
+                    </div>
+                </div>
+
+                <!-- Entries table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs min-w-[900px]">
+                        <thead>
+                            <tr class="text-gray-500 text-center border-b bg-gray-50">
+                                <th class="p-2 font-medium">Payroll ID</th>
+                                <th class="p-2 font-medium">Employee</th>
+                                <th class="p-2 font-medium">Contract</th>
+                                <th class="p-2 font-medium">Account</th>
+                                <th class="p-2 font-medium">Work Category</th>
+                                <th class="p-2 font-medium">Hours</th>
+                                <th class="p-2 font-medium">Haulage / Footage</th>
+                                <th class="p-2 font-medium">Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entry in sheet.paid_entries %}
+                            <tr class="border-b text-center hover:bg-gray-50">
+                                <td class="p-2 text-gray-500">{{ entry.employeeid.employeeid }}</td>
+                                <td class="p-2 font-medium text-slate-700">{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</td>
+                                <td class="p-2">{{ entry.contractid.contractcode }}</td>
+                                <td class="p-2">{{ entry.accountid.accountcode|default:"—" }}</td>
+                                <td class="p-2">{{ entry.workcategoryid.categoryname|default:"—" }}</td>
+                                <td class="p-2 font-semibold">{{ entry.hoursworked }}</td>
+                                <td class="p-2 text-gray-500">
+                                    {% if entry.tonnesorehauled %}Ore: {{ entry.tonnesorehauled }}t &nbsp;{% endif %}
+                                    {% if entry.tonneswastehauled %}Waste: {{ entry.tonneswastehauled }}t &nbsp;{% endif %}
+                                    {% if entry.tonnesoreskipped %}Skip: {{ entry.tonnesoreskipped }}t &nbsp;{% endif %}
+                                    {% if entry.longholefootage %}LH: {{ entry.longholefootage }}ft{% endif %}
+                                    {% if not entry.tonnesorehauled and not entry.tonneswastehauled and not entry.tonnesoreskipped and not entry.longholefootage %}—{% endif %}
+                                </td>
+                                <td class="p-2 text-gray-500">{{ entry.remarks|default:"—" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center text-gray-400 py-4">No approved entries.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+{% endblock content %}

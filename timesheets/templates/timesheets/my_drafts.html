@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load timesheet_extras %}
 {% block content %}
 
 {% if messages %}
@@ -27,17 +28,20 @@
     </div>
     <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
     <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
-    <p class="text-center text-sm text-gray-500 mt-1"><span class="font-semibold text-gray-700">PERSONAL SHEETS:</span> Drafts can be edited and submitted. Timesheets returned for revision are shown here too.</p>
+    <p class="text-center text-sm text-gray-500 mt-1"><span class="font-semibold text-gray-700">PERSONAL SHEETS:</span> Drafts and submitted timesheets awaiting review.</p>
 </div>
 
 <div class="container mx-auto mb-8">
     <div class="flex flex-wrap gap-4">
         {% for draft in drafts %}
+
+        {% if draft.overallstatus == 'Draft' or draft.overallstatus == 'Revision Required' %}
+        {# Editable card #}
         <div class="bg-white rounded-xl shadow p-5 w-52 flex flex-col items-center gap-2 hover:shadow-md hover:border hover:border-[#28348A] transition-all">
             <a href="{% url 'add_entry' draft.mainheaderid %}" class="flex flex-col items-center gap-2 w-full">
-                <p class="text-xs">Started {{ draft.startedat|date:"M j, Y" }}</p>
+                <p class="text-xs text-gray-400">Started {{ draft.startedat|date:"M j, Y" }}</p>
                 {% if draft.date_from %}
-                <p class="text-xs font-normal text-center text-gray-400">{{ draft.date_from|date:"M j" }} – {{ draft.date_to|date:"M j, Y" }}</p>
+                <p class="text-xs font-normal text-center text-gray-400">Contains {{ draft.date_from|date:"M j" }} – {{ draft.date_to|date:"M j, Y" }}</p>
                 {% else %}
                 <p class="text-xs text-gray-400 text-center">No entries yet</p>
                 {% endif %}
@@ -55,9 +59,34 @@
                 <button type="submit" class="text-xs text-white bg-red-500 hover:bg-red-600 px-4 py-1 rounded-full cursor-pointer mt-1">Delete</button>
             </form>
             {% else %}
-            <p class="text-xs text-gray-400 mt-1 text-center">Correct rejected entries and resubmit</p>
+            <p class="text-xs text-gray-400 mt-1 text-center">Correct rejected entries for review</p>
             {% endif %}
         </div>
+
+        {% else %}
+        {# Locked/submitted card — view only #}
+        <a href="{% url 'view_timesheet' draft.mainheaderid %}"
+            class="bg-white rounded-xl shadow p-5 w-52 flex flex-col items-center gap-2 hover:shadow-md hover:border hover:border-slate-300 transition-all relative">
+            <i class="fa-solid fa-lock text-gray-300 absolute top-3 right-3 text-xs"></i>
+            <p class="text-xs text-gray-400">Started {{ draft.startedat|date:"M j, Y" }}</p>
+            {% if draft.date_from %}
+            <p class="text-xs font-normal text-center text-gray-400"> Contains:<br> {{ draft.date_from|date:"M j" }} – {{ draft.date_to|date:"M j, Y" }}</p>
+            {% else %}
+            <p class="text-xs text-gray-400 text-center">No entries yet</p>
+            {% endif %}
+            <p class="text-xs">{{ draft.entry_count }} entr{{ draft.entry_count|pluralize:"y,ies" }}</p>
+            <p class="font-semibold text-sm">{{ draft.total_hours|default:"0" }} hrs</p>
+            {% if draft.overallstatus == 'Submitted' %}
+            <span class="mt-1 bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full">Submitted</span>
+            {% elif draft.overallstatus == 'In Progress' %}
+            <span class="mt-1 bg-orange-100 text-orange-700 text-xs font-semibold px-2 py-0.5 rounded-full">Under Review</span>
+            {% endif %}
+            {% if draft.submittedat %}
+            <p class="text-xs text-gray-400 mt-0.5">{{ draft.submittedat|date:"M j, Y" }}</p>
+            {% endif %}
+        </a>
+        {% endif %}
+
         {% empty %}
         <div class="mx-auto text-gray-400 text-sm">You have no draft timesheets.</div>
         {% endfor %}

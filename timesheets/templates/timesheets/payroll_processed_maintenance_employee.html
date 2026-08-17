@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-8">
+    <a href="{% url 'payroll_processed_maintenance' %}" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline mb-2">
+        <i class="fa-solid fa-arrow-left"></i> Maintenance
+    </a>
+    <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+    <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+    <p class="text-center text-sm text-gray-500 mt-1">
+        <span class="font-semibold text-gray-700">{{ employee.firstname }} {{ employee.lastname }}</span>
+        &mdash; Processed timesheet months.
+    </p>
+</div>
+
+<div class="container mx-auto mb-8">
+    <div class="flex flex-wrap gap-6">
+        {% for m in months %}
+        <a href="{% url 'payroll_processed_maintenance_month' employee.employeeid m.month.year m.month.month %}"
+            class="bg-white rounded-2xl shadow p-5 w-52 flex flex-col items-center gap-3 hover:bg-[#E9F4FB] transition duration-200 ease-in-out cursor-pointer">
+            <i class="fa-solid fa-calendar-check text-[#28348A] text-2xl mt-1"></i>
+            <p class="font-semibold text-slate-800 text-center">{{ m.month|date:"F Y" }}</p>
+            <div class="text-center">
+                <p class="text-sm text-gray-600">{{ m.entry_count }} entr{{ m.entry_count|pluralize:"y,ies" }}</p>
+                <p class="text-xs text-gray-400">{{ m.total_hours }} hrs total</p>
+            </div>
+        </a>
+        {% empty %}
+        <div class="mx-auto text-gray-400 text-sm">No processed months for this employee.</div>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock content %}

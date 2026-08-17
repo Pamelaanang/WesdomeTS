@@ -10,7 +10,7 @@ import os
 from django.utils import timezone
 from django.contrib.auth import update_session_auth_hash
 from django.contrib import messages
-from timesheets.models import MainHeader, MainEntry, OperationsHeader, BusinessHeader, BusinessEntry
+from timesheets.models import MainHeader, MainEntry, OperationsHeader, OperationsEntry, BusinessHeader, BusinessEntry
 from django.db.models import Count, Q, Sum
 from calendar import month_name as _month_name
 
@@ -228,20 +228,44 @@ def profile(request):
         })
     
     elif al == 7:  # Payroll
-        maintenance_completed = MainHeader.objects.filter(
-            overallstatus='Completed',
-            completedat__year=today.year,
-            completedat__month=today.month
+        # Maintenance (MainHeader) — must have at least one approved entry to match unprocessed list
+        maintenance_pending = MainHeader.objects.filter(
+            overallstatus='Completed', paidat__isnull=True,
+        ).annotate(
+            approved_count=Count('mainentry', filter=Q(mainentry__linestatus='Approved'))
+        ).filter(approved_count__gt=0).count()
+        maintenance_paid_month = MainHeader.objects.filter(
+            paidat__year=today.year, paidat__month=today.month,
         ).count()
-        ops_crew_completed = OperationsHeader.objects.filter(
-            overallstatus='Completed',
-            ohapprovedat_capt__year=today.year,
-            ohapprovedat_capt__month=today.month
+
+        # Operations (OperationsHeader / OperationsEntry)
+        ops_unpaid_ids = OperationsEntry.objects.filter(
+            linestatus='Approved', paidat__isnull=True,
+        ).values_list('opsheaderid', flat=True).distinct()
+        ops_pending = OperationsHeader.objects.filter(
+            overallstatus='Completed', opsheaderid__in=ops_unpaid_ids,
         ).count()
+        ops_paid_month = OperationsEntry.objects.filter(
+            paidat__year=today.year, paidat__month=today.month,
+        ).values('opsheaderid').distinct().count()
+
+        # Business Unit (BusinessHeader)
+        business_pending = BusinessHeader.objects.filter(
+            overallstatus='Completed', paidat__isnull=True,
+        ).count()
+        business_paid_month = BusinessHeader.objects.filter(
+            paidat__year=today.year, paidat__month=today.month,
+        ).count()
+
         return render(request, 'users/profile.html', {
             'today': today,
-            'maintenance_completed': maintenance_completed,
-            'ops_crew_completed': ops_crew_completed,
+            'current_month': today.strftime('%B %Y'),
+            'maintenance_pending': maintenance_pending,
+            'maintenance_paid_month': maintenance_paid_month,
+            'ops_pending': ops_pending,
+            'ops_paid_month': ops_paid_month,
+            'business_pending': business_pending,
+            'business_paid_month': business_paid_month,
         })
 
     else:  # Employee (6) and anyone else

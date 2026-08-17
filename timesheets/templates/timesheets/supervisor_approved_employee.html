@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-8">
+    <a href="{% url 'supervisor_approved' %}" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline mb-3">
+        <i class="fa-solid fa-arrow-left"></i> My Employees
+    </a>
+    <div class="flex items-center gap-4 justify-center">
+        <div class="w-14 h-14 rounded-full bg-black overflow-hidden flex items-center justify-center flex-shrink-0">
+            {% if employee.profilepic %}
+            <img src="/media/{{ employee.profilepic }}" class="w-full h-full object-cover" alt="">
+            {% else %}
+            <i class="fa-solid fa-user text-white text-xl"></i>
+            {% endif %}
+        </div>
+        <div>
+            <h2 class="text-xl font-bold">{{ employee.firstname }} {{ employee.lastname }}</h2>
+            <p class="text-sm text-gray-500">{{ employee.roleid.rolename }}</p>
+        </div>
+    </div>
+    <p class="text-center text-sm text-gray-500 mt-3">
+        <span class="font-semibold text-gray-700">APPROVED HISTORY:</span> Select a month to view entries.
+    </p>
+</div>
+
+<div class="container mx-auto mb-8">
+    <div class="flex flex-wrap gap-4">
+        {% for m in months %}
+        <a href="{% url 'supervisor_approved_month' employee.employeeid m.month.year m.month.month %}"
+            class="bg-white rounded-xl shadow p-5 w-44 hover:bg-[#E9F4FB] transition duration-200 ease-in-out cursor-pointer flex flex-col items-center gap-1">
+            <p class="font-semibold text-slate-800 text-center">{{ m.month|date:"F Y" }}</p>
+            <p class="text-2xl font-bold text-[#28348A] mt-1">{{ m.total_hours|default:"0" }}</p>
+            <p class="text-xs text-gray-500">hrs &bull; {{ m.entry_count }} entr{{ m.entry_count|pluralize:"y,ies" }}</p>
+        </a>
+        {% empty %}
+        <div class="mx-auto text-gray-400 text-sm">No approved timesheets for this employee yet.</div>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock content %}

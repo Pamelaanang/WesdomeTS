@@ -51,7 +51,7 @@
                 {% else %}
                 <a href="{% url 'business_approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'business_approval_inbox,review_business_timesheet' %}font-semibold{% endif %}"><i class="fa-solid fa-clock-rotate-left"></i> Pending</a>
                 {% endif %}
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-circle-check"></i> Approved</a>
+                <a href="{% url 'supervisor_approved' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'supervisor_approved,supervisor_approved_employee,supervisor_approved_month' %}font-semibold{% endif %}"><i class="fa-solid fa-circle-check"></i> Approved</a>
             </div>
             {% endif %}
 
@@ -138,10 +138,18 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-unprocessed" class="hidden flex flex-col">
-                <a href="{% url 'payroll_unprocessed' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_unprocessed,payroll_unprocessed_dept,payroll_unprocessed_review' %}font-semibold{% endif %}"><i class="fa-solid fa-building-user"></i> Departments</a>
+                <a href="{% url 'payroll_unprocessed' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_unprocessed,payroll_unprocessed_dept,payroll_unprocessed_review' %}font-semibold{% endif %}"><i class="fa-solid fa-building-user"></i> Maintenance</a>
+                <a href="{% url 'payroll_business_unprocessed' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_business_unprocessed,payroll_business_unprocessed_dept,payroll_business_unprocessed_review' %}font-semibold{% endif %}"><i class="fa-solid fa-briefcase"></i> Business</a>
                 <a href="{% url 'payroll_ops_unprocessed' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_ops_unprocessed,payroll_ops_sheet' %}font-semibold{% endif %}"><i class="fa-solid fa-hard-hat"></i> Daily Crew</a>
             </div>
-            <a href="{% url 'payroll_processed' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name in 'payroll_processed,payroll_processed_dept,payroll_processed_employee' %}active{% endif %}"><i class="fa-solid fa-building"></i> Processed</a>
+            <button onclick="toggleAccordion('menu-processed')" class="accordion-btn {% if request.resolver_match.url_name in 'payroll_processed_maintenance,payroll_processed_maintenance_employee,payroll_processed_maintenance_month,payroll_processed_business,payroll_processed_business_dept,payroll_processed_business_employee,payroll_processed_business_month' %}active{% endif %}">
+                <span class="flex items-center gap-3"><i class="fa-solid fa-building"></i> Processed</span>
+                <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
+            </button>
+            <div id="menu-processed" class="hidden flex flex-col">
+                <a href="{% url 'payroll_processed_maintenance' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_processed_maintenance,payroll_processed_maintenance_employee,payroll_processed_maintenance_month' %}font-semibold{% endif %}"><i class="fa-solid fa-building-user"></i> Maintenance</a>
+                <a href="{% url 'payroll_processed_business' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_processed_business,payroll_processed_business_dept,payroll_processed_business_employee,payroll_processed_business_month' %}font-semibold{% endif %}"><i class="fa-solid fa-briefcase"></i> Business Unit</a>
+            </div>
             <button onclick="toggleAccordion('menu-crew')" class="accordion-btn">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-hard-hat"></i> Crew</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
@@ -166,11 +174,18 @@
             </div>
             {% endif %}
 
-            <!-- Personal timesheets flat links: Crew Member (6) only -->
-            {% if al == 6 %}
+            <!-- Personal timesheets flat links: Maintenance Crew (9) only -->
+            {% if al == 9 %}
             <a href="{% url 'my_drafts' %}" class="flex items-center gap-3"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
             <a href="{% url 'my_timesheets_approved' %}" class="flex items-center gap-3"><i class="fa-solid fa-circle-check"></i> My Approved</a>
             <a href="{% url 'my_timesheets_paid' %}" class="flex items-center gap-3"><i class="fa-solid fa-money-check-dollar"></i> My Paid</a>
+            {% endif %}
+
+            <!-- Personal timesheets flat links: Business Unit Employee (6) only -->
+            {% if al == 6 %}
+            <a href="{% url 'my_business_drafts' %}" class="flex items-center gap-3"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
+            <a href="{% url 'my_business_approved' %}" class="flex items-center gap-3"><i class="fa-solid fa-circle-check"></i> My Approved</a>
+            <a href="{% url 'my_business_paid' %}" class="flex items-center gap-3"><i class="fa-solid fa-money-check-dollar"></i> My Paid</a>
             {% endif %}
 
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-magnifying-glass"></i> Search</a>

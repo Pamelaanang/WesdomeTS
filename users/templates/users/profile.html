@@ -107,7 +107,10 @@
 
     {% else %} <!-- All other roles: stats card + quick actions -->
     <div class="flex-1 min-w-[240px] bg-white rounded-2xl shadow p-6">
-        <p class="font-semibold mb-4">Dashboard Statistics</p>
+        <div class="flex items-center justify-between mb-4">
+            <p class="font-semibold">Dashboard Statistics</p>
+            {% if al == 7 %}<p class="text-xs text-gray-400">{{ current_month }}</p>{% endif %}
+        </div>
         {% if al == 3 %} <!-- Supervisor -->
         <div class="space-y-3">
             <div class="flex items-center justify-between text-base">
@@ -232,17 +235,34 @@
         <p class="text-xs font-medium text-gray-400 uppercase mb-2">Maintenance</p>
         <div class="space-y-3 mb-4">
             <div class="flex items-center justify-between text-base">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Personal
-                    Timesheets Completed</span>
-                <span class="text-xl font-bold">{{maintenance_completed }}</span>
+                <span class="flex items-center gap-2"><i class="fa-solid fa-clock text-[#FF914D]"></i> Pending Payment</span>
+                <span class="text-xl font-bold">{{ maintenance_pending }}</span>
+            </div>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-[#097d45]"></i> Paid This Month</span>
+                <span class="text-xl font-bold">{{ maintenance_paid_month }}</span>
             </div>
         </div>
-        <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">Operations</p>
+        <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">Daily Crew - Operations</p>
+        <div class="space-y-3 mb-4">
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-clock text-[#FF914D]"></i> Pending Payment</span>
+                <span class="text-xl font-bold">{{ ops_pending }}</span>
+            </div>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-[#097d45]"></i> Paid This Month</span>
+                <span class="text-xl font-bold">{{ ops_paid_month }}</span>
+            </div>
+        </div>
+        <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">Business Unit</p>
         <div class="space-y-3">
             <div class="flex items-center justify-between text-base">
-                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Daily Crew
-                    Timesheets Completed</span>
-                <span class="text-xl font-bold">{{ops_crew_completed }}</span>
+                <span class="flex items-center gap-2"><i class="fa-solid fa-clock text-[#FF914D]"></i> Pending Payment</span>
+                <span class="text-xl font-bold">{{ business_pending }}</span>
+            </div>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-[#097d45]"></i> Paid This Month</span>
+                <span class="text-xl font-bold">{{ business_paid_month }}</span>
             </div>
         </div>
         {% else %} <!-- Employee -->

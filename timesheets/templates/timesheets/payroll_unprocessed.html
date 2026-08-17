@@ -7,25 +7,55 @@
     </button>
     <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
     <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
-    <p class="text-center text-sm text-gray-500 mt-1"><span class="font-semibold text-gray-700">UNPROCESSED:</span> Completed timesheets pending payment processing.</p>
+    <p class="text-center text-sm text-gray-500 mt-1">
+        <span class="font-semibold text-gray-700">MAINTENANCE — UNPROCESSED:</span> Completed timesheets pending payment.
+    </p>
 </div>
 
-<div class="container mx-auto mb-8">
+{% if messages %}
+<div class="container mx-auto mb-4">
+    {% for message in messages %}
+    <div class="flex items-center gap-3 bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-3 rounded-xl">
+        <i class="fa-solid fa-circle-check text-green-500"></i>
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="container mx-auto">
+    {% if submissions %}
     <div class="flex flex-wrap gap-6">
-        {% for dept in departments %}
-        <a href="{% url 'payroll_unprocessed_dept' dept.departmentid %}"
-            class="bg-white rounded-2xl shadow p-6 w-56 hover:bg-[#E9F4FB] transition duration-200 ease-in-out cursor-pointer">
-            <p class="font-semibold text-slate-700 mb-2">{{ dept.departmentname }}</p>
-            {% if dept.unpaid_count == 0 %}
-            <p class="text-xs text-gray-400">No pending submissions</p>
-            {% else %}
-            <p class="text-2xl font-bold text-[#28348A]">{{ dept.unpaid_count }}</p>
-            <p class="text-xs text-gray-500 mt-1">Pending submission{{ dept.unpaid_count|pluralize }}</p>
-            {% endif %}
+        {% for sub in submissions %}
+        <a href="{% url 'payroll_unprocessed_review' sub.employeeid.roleid.departmentid.departmentid sub.mainheaderid %}"
+            class="bg-white rounded-2xl shadow p-5 w-64 hover:bg-[#E9F4FB] transition duration-200 ease-in-out cursor-pointer block">
+
+            <p class="text-xs text-gray-400 mb-2">{{ sub.employeeid.roleid.departmentid.departmentname }}</p>
+
+            <p class="font-semibold text-slate-800 text-center">{{ sub.employeeid.firstname }} {{ sub.employeeid.lastname }}</p>
+            <p class="text-xs text-gray-500 mt-1 mb-4 text-center">{{ sub.date_from|date:"M j" }} — {{ sub.date_to|date:"M j, Y" }}</p>
+
+            <div class="w-16 h-16 rounded-full bg-black overflow-hidden flex items-center justify-center mb-3 mx-auto">
+                {% if sub.employeeid.profilepic %}
+                <img src="/media/{{ sub.employeeid.profilepic }}" class="w-full h-full object-cover" alt="">
+                {% else %}
+                <i class="fa-solid fa-user text-white text-2xl"></i>
+                {% endif %}
+            </div>
+
+            <div class="mt-3 border-t pt-3 flex justify-between text-sm">
+                <span class="text-gray-500">{{ sub.entry_count }} entr{{ sub.entry_count|pluralize:"y,ies" }}</span>
+                <span class="font-semibold text-slate-800">{{ sub.total_hours }} hrs</span>
+            </div>
+            <p class="text-xs text-gray-400 mt-2">Submitted {{ sub.submittedat|date:"M j, Y" }}</p>
         </a>
         {% endfor %}
     </div>
+    {% else %}
+    <div class="bg-white rounded-2xl shadow p-8 text-center text-sm text-gray-400">
+        No unprocessed maintenance timesheets.
+    </div>
+    {% endif %}
 </div>
 
-<script>window._pageBackLabel = 'Unprocessed';</script>
 {% endblock content %}
