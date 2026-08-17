@@ -92,6 +92,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     ]
     shiftertype = models.CharField(db_column='ShifterType', max_length=20, choices=SHIFTER_TYPE_CHOICES, blank=True, null=True)
 
+    #Home crew (A/B/C/D) for Shifters — fixed while active, independent of CrewAssignment roster membership
+    crewid = models.ForeignKey('timesheets.Crews', models.SET_NULL, db_column='CrewID', blank=True, null=True, related_name='shifters')
+
     objects = EmployeeManager()
 
     #Tell Django which variable to use for Authentication

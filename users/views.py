@@ -10,7 +10,7 @@ import os
 from django.utils import timezone
 from django.contrib.auth import update_session_auth_hash
 from django.contrib import messages
-from timesheets.models import MainHeader, MainEntry, OperationsHeader, OperationsEntry, BusinessHeader, BusinessEntry
+from timesheets.models import MainHeader, MainEntry, OperationsHeader, OperationsEntry, BusinessHeader, BusinessEntry, Crews
 from django.db.models import Count, Q, Sum
 from calendar import month_name as _month_name
 
@@ -43,10 +43,13 @@ def user_list_view(request):
     users = User.objects.select_related('roleid__departmentid').order_by('roleid__departmentid__departmentname', 'lastname')
     roles = Roles.objects.select_related('departmentid').order_by('departmentid__departmentname', 'rolename')
     active_supervisors = User.objects.filter(isactive=True).select_related('roleid').order_by('lastname', 'firstname')
+    crews = Crews.objects.filter(isactive=1)
     return render(request, 'user_list.html', {
         'users': users,
         'roles': roles,
         'active_supervisors': active_supervisors,
+        'crews': crews,
+        'shifter_type_choices': User.SHIFTER_TYPE_CHOICES,
     })
 
 
@@ -268,7 +271,24 @@ def profile(request):
             'business_paid_month': business_paid_month,
         })
 
-    else:  # Employee (6) and anyone else
+    elif al == 6:  # Business Unit Employee
+        draft_count = BusinessHeader.objects.filter(employeeid=user, overallstatus='Draft').count()
+        awaiting_count = BusinessHeader.objects.filter(employeeid=user, overallstatus__in=['Submitted', 'In Progress']).count()
+        revision_count = BusinessHeader.objects.filter(employeeid=user, overallstatus='Revision Required').count()
+        latest_paid = BusinessHeader.objects.filter(employeeid=user, paidat__isnull=False).order_by('-paidat').first()
+        paid_hours = BusinessEntry.objects.filter(businessheaderid=latest_paid).aggregate(Sum('hoursworked'))['hoursworked__sum'] if latest_paid else None
+        paid_period = f"{_month_name[latest_paid.periodmonth]} {latest_paid.periodyear}" if latest_paid else None
+
+        return render(request, 'users/profile.html', {
+            'today': today,
+            'draft_count': draft_count,
+            'awaiting_count': awaiting_count,
+            'revision_count': revision_count,
+            'paid_hours': paid_hours,
+            'paid_period': paid_period,
+        })
+
+    else:  # Maintenance Crew (9) and anyone else
         draft_count = MainHeader.objects.filter(employeeid=user, overallstatus='Draft').count()
         awaiting_count = MainHeader.objects.filter(employeeid=user, overallstatus__in=['Submitted', 'In Progress']).count()
         revision_count = MainHeader.objects.filter(employeeid=user, overallstatus='Revision Required').count()
@@ -317,6 +337,8 @@ def add_employee(request):
         roleid       = request.POST.get('roleid', '').strip()
         supervisorid = request.POST.get('supervisorid', '').strip() or None
         hasaccess    = request.POST.get('hasaccess') == 'on'
+        shiftertype  = request.POST.get('shiftertype', '').strip() or None
+        crewid       = request.POST.get('crewid', '').strip() or None
 
         if User.objects.filter(employeeid=employeeid).exists():
             messages.error(request, f"Employee ID '{employeeid}' already exists.")
@@ -334,6 +356,8 @@ def add_employee(request):
                 isactive=True,
                 hasaccess=hasaccess,
                 is_temporary=True,
+                shiftertype=shiftertype,
+                crewid_id=crewid,
             )
             new_user.set_password(temp_password)
             new_user.save()
@@ -380,6 +404,8 @@ def replace_employee(request, employeeid):
                 isactive=True,
                 hasaccess=True,
                 is_temporary=True,
+                shiftertype=leaving.shiftertype,
+                crewid=leaving.crewid,
             )
             new_hire.set_password(temp_password)
             new_hire.save()

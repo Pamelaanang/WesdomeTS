@@ -51,7 +51,11 @@
                 {% else %}
                 <a href="{% url 'business_approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'business_approval_inbox,review_business_timesheet' %}font-semibold{% endif %}"><i class="fa-solid fa-clock-rotate-left"></i> Pending</a>
                 {% endif %}
+                {% if al == 3 %}
                 <a href="{% url 'supervisor_approved' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'supervisor_approved,supervisor_approved_employee,supervisor_approved_month' %}font-semibold{% endif %}"><i class="fa-solid fa-circle-check"></i> Approved</a>
+                {% else %}
+                <a href="{% url 'superintendent_approved' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'superintendent_approved,superintendent_approved_employee,superintendent_approved_month' %}font-semibold{% endif %}"><i class="fa-solid fa-circle-check"></i> Approved</a>
+                {% endif %}
             </div>
             {% endif %}
 

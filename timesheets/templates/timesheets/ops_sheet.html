@@ -55,12 +55,7 @@
             </div>
             <div class="flex flex-col gap-1">
                 <label class="text-xs text-gray-500">Crew</label>
-                <select name="crewid" required class="border border-gray-300 rounded px-3 py-1.5 text-sm">
-                    <option value="">-- Select Crew --</option>
-                    {% for crew in crews %}
-                    <option value="{{ crew.crewid }}">{{ crew.crewname }}</option>
-                    {% endfor %}
-                </select>
+                <p id="crew-display" class="text-sm font-medium text-gray-700 px-1 py-1.5">{{ own_crewname|default:"—" }}</p>
             </div>
             <div class="flex flex-col gap-1">
                 <label class="text-xs text-gray-500">Section</label>
@@ -75,12 +70,16 @@
 
     <script>
     var ownSection = "{{ own_shiftertype }}";
+    var ownCrew = "{{ own_crewname }}";
     var coverageSections = {{ coverage_sections|safe }};
+    var coverageCrews = {{ coverage_crews|safe }};
     document.querySelectorAll('input[name="coverage_id"]').forEach(function(radio) {
         radio.addEventListener('change', function() {
             var section = this.value ? (coverageSections[this.value] || '') : ownSection;
+            var crew = this.value ? (coverageCrews[this.value] || '') : ownCrew;
             document.getElementById('section-input').value = section;
             document.getElementById('section-display').textContent = section || '—';
+            document.getElementById('crew-display').textContent = crew || '—';
         });
     });
     </script>
@@ -406,7 +405,7 @@
                             <select name="contractid" id="contract-select" class="border rounded px-1 py-1 w-full text-xs">
                                 <option value="">-- Select --</option>
                                 {% for c in contracts %}
-                                <option value="{{ c.contractid }}">{{ c.contractcode }} — {{ c.contracttitle }}</option>
+                                <option value="{{ c.contractid }}" {% if sheet_default.contractid == c.contractid %}selected{% endif %}>{{ c.contractcode }} — {{ c.contracttitle }}</option>
                                 {% endfor %}
                             </select>
                             <p id="contract-info" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
@@ -571,6 +570,15 @@
         loadAccounts(this.value, null);
         showContractInfo(this.value, 'contract-info');
     });
+
+    // Seed the sheet-level default (last contract/account saved on this sheet) so the
+    // account dropdown and info text are populated before anyone picks a crew member.
+    const sheetDefaultContract = "{{ sheet_default.contractid|default:'' }}";
+    const sheetDefaultAccount = "{{ sheet_default.accountid|default:'' }}";
+    if (sheetDefaultContract) {
+        showContractInfo(sheetDefaultContract, 'contract-info');
+        loadAccounts(sheetDefaultContract, sheetDefaultAccount);
+    }
 
     const accountSelectEl = document.getElementById('account-select');
     if (accountSelectEl) accountSelectEl.addEventListener('change', function () {

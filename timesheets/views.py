@@ -838,6 +838,63 @@ def payroll_ops_member_month(request, employee_id, year, month):
 
 
 @login_required(login_url='login')
+def superintendent_approved(request):
+    if request.user.access_level != 2:
+        return redirect('profile')
+    employees = User.objects.filter(
+        supervisorid=request.user, isactive=True,
+    ).order_by('lastname', 'firstname')
+    return render(request, 'timesheets/superintendent_approved.html', {'employees': employees})
+
+
+@login_required(login_url='login')
+def superintendent_approved_employee(request, employee_id):
+    if request.user.access_level != 2:
+        return redirect('profile')
+    employee = get_object_or_404(User, employeeid=employee_id, supervisorid=request.user)
+    periods = BusinessHeader.objects.filter(
+        employeeid=employee,
+        overallstatus='Completed',
+    ).values('periodyear', 'periodmonth').annotate(
+        sheet_count=Count('businessheaderid'),
+        total_hours=Sum('businessentry__hoursworked'),
+    ).order_by('-periodyear', '-periodmonth')
+    return render(request, 'timesheets/superintendent_approved_employee.html', {
+        'employee': employee,
+        'periods': periods,
+        'month_names': _MONTH_NAMES,
+    })
+
+
+@login_required(login_url='login')
+def superintendent_approved_month(request, employee_id, year, month):
+    if request.user.access_level != 2:
+        return redirect('profile')
+    employee = get_object_or_404(User, employeeid=employee_id, supervisorid=request.user)
+    headers = BusinessHeader.objects.filter(
+        employeeid=employee,
+        overallstatus='Completed',
+        periodyear=year,
+        periodmonth=month,
+    )
+    entries = BusinessEntry.objects.filter(
+        businessheaderid__in=headers,
+    ).select_related('businesscategoryid', 'leavetypeid').order_by('dateworked')
+    total_hours = entries.filter(linestatus='Approved').aggregate(Sum('hoursworked'))['hoursworked__sum'] or 0
+    stat_dates, stat_labels = _stat_info()
+    return render(request, 'timesheets/superintendent_approved_month.html', {
+        'employee': employee,
+        'entries': entries,
+        'total_hours': total_hours,
+        'year': year,
+        'month': month,
+        'month_name': _MONTH_NAMES.get(month, ''),
+        'stat_dates': stat_dates,
+        'stat_labels': stat_labels,
+    })
+
+
+@login_required(login_url='login')
 def superintendent_ops_members(request):
     if request.user.access_level != 2:
         return redirect('profile')
@@ -1149,18 +1206,28 @@ def new_ops_sheet(request):
         return redirect('profile')
 
     today = timezone.now().date()
-    crews = Crews.objects.filter(isactive=1)
     active_coverages = CrewCoverage.objects.filter(
         covering_shifter=request.user,
         startdate__lte=today,
     ).filter(
         Q(enddate__isnull=True) | Q(enddate__gte=today)
-    ).select_related('home_shifter')
+    ).select_related('home_shifter', 'home_shifter__crewid')
+
+    # Build maps for JS: { coverageid: value } — used to swap the displayed
+    # section/crew when the shifter toggles between "My own crew" and coverage options
+    coverage_sections = {
+        str(cov.coverageid): cov.home_shifter.shiftertype or ''
+        for cov in active_coverages
+    }
+    coverage_crews = {
+        str(cov.coverageid): (cov.home_shifter.crewid.crewname if cov.home_shifter.crewid else '')
+        for cov in active_coverages
+    }
+    own_crewname = request.user.crewid.crewname if request.user.crewid else ''
 
     if request.method == 'POST':
         shiftdate = request.POST.get('shiftdate')
         shifttype = request.POST.get('shifttype')
-        crewid = request.POST.get('crewid')
         coverage_id = request.POST.get('coverage_id') or None
 
         try:
@@ -1168,10 +1235,11 @@ def new_ops_sheet(request):
             if shiftdate and _date.fromisoformat(shiftdate) > today:
                 return render(request, 'timesheets/ops_sheet.html', {
                     'header': None,
-                    'crews': crews,
                     'active_coverages': active_coverages,
                     'own_shiftertype': request.user.shiftertype or '',
+                    'own_crewname': own_crewname,
                     'coverage_sections': {},
+                    'coverage_crews': {},
                     'error': 'Crew sheets cannot be created for future dates.',
                 })
         except ValueError:
@@ -1186,37 +1254,53 @@ def new_ops_sheet(request):
         if existing:
             return redirect('ops_sheet', pk=existing.opsheaderid)
 
-        # Derive section: own crew → own shiftertype; coverage → home shifter's shiftertype
+        # Derive section + crew from the shifter this sheet is actually for —
+        # own account, or the home shifter if this is a coverage sheet — never
+        # asked for manually, so a sheet can't get mislabeled with the wrong crew.
         section = None
+        crew = None
         if coverage_id:
             cov = active_coverages.filter(coverageid=coverage_id).first()
             if cov:
                 section = cov.home_shifter.shiftertype
+                crew = cov.home_shifter.crewid
         else:
             section = request.user.shiftertype
+            crew = request.user.crewid
+
+        if crew is None:
+            error = (
+                "The crew you're covering doesn't have a home crew set up yet. Contact your System Admin."
+                if coverage_id else
+                "Your home crew hasn't been set up yet. Contact your System Admin before starting a crew sheet."
+            )
+            return render(request, 'timesheets/ops_sheet.html', {
+                'header': None,
+                'active_coverages': active_coverages,
+                'own_shiftertype': request.user.shiftertype or '',
+                'own_crewname': own_crewname,
+                'coverage_sections': coverage_sections,
+                'coverage_crews': coverage_crews,
+                'error': error,
+            })
 
         header = OperationsHeader.objects.create(
             shifterid=request.user,
             shiftdate=shiftdate,
             shifttype=shifttype,
-            crewid_id=crewid,
+            crewid=crew,
             coverageid_id=coverage_id,
             section=section,
         )
         return redirect('ops_sheet', pk=header.opsheaderid)
 
-    # Build coverage_sections map for JS: { coverageid: home_shifter.shiftertype }
-    coverage_sections = {
-        str(cov.coverageid): cov.home_shifter.shiftertype or ''
-        for cov in active_coverages
-    }
-
     return render(request, 'timesheets/ops_sheet.html', {
         'header': None,
-        'crews': crews,
         'active_coverages': active_coverages,
         'own_shiftertype': request.user.shiftertype or '',
+        'own_crewname': own_crewname,
         'coverage_sections': coverage_sections,
+        'coverage_crews': coverage_crews,
     })
 
 
@@ -1338,6 +1422,16 @@ def ops_sheet(request, pk):
                 'accountid': last.accountid_id,
             }
 
+    # Sheet-level default: whatever contract/account was last saved on THIS sheet,
+    # so picking it once carries forward to the rest of the crew without reselecting.
+    # Per-person prefill (above) still overrides this when that specific person has
+    # their own distinct last-used contract/account.
+    last_on_sheet = entries.order_by('-opsentryid').first()
+    sheet_default = {
+        'contractid': last_on_sheet.contractid_id if last_on_sheet else None,
+        'accountid': last_on_sheet.accountid_id if last_on_sheet else None,
+    }
+
     stat_dates, stat_labels = _stat_info()
     return render(request, 'timesheets/ops_sheet.html', {
         'header': header,
@@ -1347,6 +1441,7 @@ def ops_sheet(request, pk):
         'contracts': contracts,
         'workcategories': workcategories,
         'prefill': prefill,
+        'sheet_default': sheet_default,
         'hours_remaining': round(hours_remaining, 1),
         'coverage': coverage,
         'is_stat': header.shiftdate in stat_dates,
