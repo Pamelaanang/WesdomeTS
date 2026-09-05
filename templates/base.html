@@ -56,6 +56,7 @@
                 {% else %}
                 <a href="{% url 'superintendent_approved' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'superintendent_approved,superintendent_approved_employee,superintendent_approved_month' %}font-semibold{% endif %}"><i class="fa-solid fa-circle-check"></i> Approved</a>
                 {% endif %}
+                <a href="{% url 'bonus_members' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'bonus_members,bonus_employee_detail' %}font-semibold{% endif %}"><i class="fa-solid fa-gift"></i> Bonuses</a>
             </div>
             {% endif %}
 
@@ -100,6 +101,7 @@
                         class="fa-solid fa-clock-rotate-left"></i> Pending</a>
                 <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
                         class="fa-solid fa-circle-check"></i> Approved</a>
+                <a href="{% url 'bonus_members' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'bonus_members,bonus_employee_detail' %}font-semibold{% endif %}"><i class="fa-solid fa-gift"></i> Bonuses</a>
             </div>
             <button onclick="toggleAccordion('menu-daily-captain')" class="accordion-btn">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-calendar-days"></i> Crew Timesheets</span>
@@ -162,6 +164,7 @@
                 <a href="{% url 'payroll_ops_daily' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_ops_daily,payroll_ops_daily_month' %}font-semibold{% endif %}"><i class="fa-solid fa-calendar-days"></i> Daily</a>
                 <a href="{% url 'payroll_ops_members' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_ops_members,payroll_ops_member_detail,payroll_ops_member_month' %}font-semibold{% endif %}"><i class="fa-solid fa-person"></i> Members</a>
             </div>
+            <a href="{% url 'payroll_employee_bonuses' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name in 'payroll_employee_bonuses,payroll_employee_bonuses_dept' %}active{% endif %}"><i class="fa-solid fa-gift"></i> Employee Bonuses</a>
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-chart-bar"></i> Reports</a>
             {% endif %}
             
@@ -200,14 +203,14 @@
 
                
             <div class="py-4 flex justify-center">
-                <div class="w-25 h-25 rounded-full bg-black overflow-hidden border-4 border-white flex items-center justify-center -mt-10">
+               <a href="{% url 'profile' %}" class="hover:bg-transparent -mt-9"><div class="w-25 h-25 rounded-full bg-black overflow-hidden border-4 border-white flex items-center justify-center -mt-10">
                  {% if request.user.profilepic %}
                     <img src="/media/{{ request.user.profilepic }}" class="w-full h-full object-cover"
                         alt="Profile Photo">
                     {% else %}
                     <i class="fa-solid fa-user text-[3rem] text-white"></i>
                     {% endif %}
-                </div>
+                </div></a> 
             </div>
             <div class="py-4 flex justify-center">
                <a href="{% url 'profile' %}"  class="hover:bg-transparent -mt-9" ><p class="text-base font-semibold">{{ request.user.firstname }} {{ request.user.lastname }}</p>

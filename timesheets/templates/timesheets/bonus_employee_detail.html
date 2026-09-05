@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
+    <a href="{% url 'bonus_members' %}" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline mb-3">
+        <i class="fa-solid fa-arrow-left"></i> My Employees
+    </a>
+    <div class="flex items-center gap-4 justify-center">
+        <div class="w-14 h-14 rounded-full bg-black overflow-hidden flex items-center justify-center flex-shrink-0">
+            {% if employee.profilepic %}
+            <img src="/media/{{ employee.profilepic }}" class="w-full h-full object-cover" alt="">
+            {% else %}
+            <i class="fa-solid fa-user text-white text-xl"></i>
+            {% endif %}
+        </div>
+        <div>
+            <h2 class="text-xl font-bold">{{ employee.firstname }} {{ employee.lastname }}</h2>
+            <p class="text-sm text-gray-500">{{ employee.roleid.rolename }}</p>
+        </div>
+    </div>
+</div>
+
+{% if messages %}
+<div class="container mx-auto mb-4">
+    {% for message in messages %}
+    <div class="text-sm px-4 py-3 rounded-lg {% if message.tags == 'error' %}bg-red-50 border border-red-200 text-red-700{% else %}bg-green-50 border border-green-200 text-green-700{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
+    <div class="overflow-x-auto">
+        <table class="w-full text-xs min-w-[600px]">
+            <thead>
+                <tr class="text-black text-center border-b">
+                    <th class="p-2">Period</th>
+                    <th class="p-2">Type</th>
+                    <th class="p-2">Rate</th>
+                    <th class="p-2">Notes</th>
+                    <th class="p-2">Assigned By</th>
+                    <th class="p-2">Status</th>
+                    <th class="p-2">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in bonuses %}
+                <tr id="row-{{ b.employeebonusid }}" class="border-b text-center hover:bg-gray-50">
+                    <td class="p-2">{{ b.periodstart|date:"M j, Y" }} &ndash; {{ b.periodend|date:"M j, Y" }}</td>
+                    <td class="p-2">{{ b.bonustype }}</td>
+                    <td class="p-2 font-semibold">{{ b.bonusratecode }}</td>
+                    <td class="p-2 text-gray-500">{{ b.notes|default:"—" }}</td>
+                    <td class="p-2">{{ b.assignedby.firstname }} {{ b.assignedby.lastname }}</td>
+                    <td class="p-2">
+                        {% if b.appliedbypayroll %}
+                        <span class="text-green-700 font-semibold">Applied</span>
+                        {% else %}
+                        <span class="text-amber-600 font-semibold">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td class="p-2">
+                        {% if not b.appliedbypayroll %}
+                        <div class="flex gap-1 justify-center">
+                            <button type="button" onclick="openEditRow('{{ b.employeebonusid }}')"
+                                class="border border-gray-400 text-gray-600 text-xs px-2 py-1 rounded hover:bg-gray-100">Edit</button>
+                            <form method="post" onsubmit="return confirm('Remove this bonus?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="bonusid" value="{{ b.employeebonusid }}">
+                                <button class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded hover:bg-red-200">Delete</button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr id="edit-{{ b.employeebonusid }}" class="hidden bg-gray-50 border-b">
+                    <td colspan="7" class="p-3">
+                        <form method="post" class="flex flex-wrap gap-3 items-end justify-center">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="edit">
+                            <input type="hidden" name="bonusid" value="{{ b.employeebonusid }}">
+                            <div class="flex flex-col gap-1">
+                                <label class="text-xs text-gray-500">Type</label>
+                                <select name="bonustype" class="border rounded px-2 py-1 text-xs">
+                                    {% for value, label in bonus_type_choices %}
+                                    <option value="{{ value }}" {% if b.bonustype == value %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <label class="text-xs text-gray-500">Period Start</label>
+                                <input type="date" name="periodstart" value="{{ b.periodstart|date:'Y-m-d' }}" class="border rounded px-2 py-1 text-xs">
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <label class="text-xs text-gray-500">Period End</label>
+                                <input type="date" name="periodend" value="{{ b.periodend|date:'Y-m-d' }}" class="border rounded px-2 py-1 text-xs">
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <label class="text-xs text-gray-500">Rate</label>
+                                <select name="bonusratecode" class="border rounded px-2 py-1 text-xs">
+                                    {% for code, label in rate_codes %}
+                                    <option value="{{ code }}" {% if b.bonusratecode == code %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <label class="text-xs text-gray-500">Notes</label>
+                                <input type="text" name="notes" value="{{ b.notes|default:'' }}" class="border rounded px-2 py-1 text-xs">
+                            </div>
+                            <button type="submit" class="bg-[#28348A] text-white text-xs px-3 py-1.5 rounded hover:opacity-90">Save</button>
+                            <button type="button" onclick="closeEditRow('{{ b.employeebonusid }}')" class="border border-gray-400 text-gray-600 text-xs px-3 py-1.5 rounded hover:bg-gray-100">Cancel</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-gray-400 py-6">No bonuses assigned yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-8">
+    <p class="text-sm font-semibold text-gray-700 mb-3">Assign New Bonus</p>
+    <form method="post" class="flex flex-wrap gap-3 items-end">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add">
+        <div class="flex flex-col gap-1">
+            <label class="text-xs text-gray-500">Type</label>
+            <select name="bonustype" required class="border rounded px-2 py-1.5 text-sm">
+                <option value="">-- Select --</option>
+                {% for value, label in bonus_type_choices %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="flex flex-col gap-1">
+            <label class="text-xs text-gray-500">Period Start</label>
+            <input type="date" name="periodstart" required class="border rounded px-2 py-1.5 text-sm">
+        </div>
+        <div class="flex flex-col gap-1">
+            <label class="text-xs text-gray-500">Period End</label>
+            <input type="date" name="periodend" required class="border rounded px-2 py-1.5 text-sm">
+        </div>
+        <div class="flex flex-col gap-1">
+            <label class="text-xs text-gray-500">Rate</label>
+            <select name="bonusratecode" required class="border rounded px-2 py-1.5 text-sm">
+                <option value="">-- Select --</option>
+                {% for code, label in rate_codes %}
+                <option value="{{ code }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="flex flex-col gap-1">
+            <label class="text-xs text-gray-500">Notes <span class="text-gray-400 font-normal">(optional)</span></label>
+            <input type="text" name="notes" class="border rounded px-2 py-1.5 text-sm" placeholder="Optional">
+        </div>
+        <button type="submit" class="bg-[#097d45] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Assign Bonus</button>
+    </form>
+</div>
+
+<script>
+function openEditRow(id) {
+    document.getElementById('row-' + id).classList.add('hidden');
+    document.getElementById('edit-' + id).classList.remove('hidden');
+}
+function closeEditRow(id) {
+    document.getElementById('edit-' + id).classList.add('hidden');
+    document.getElementById('row-' + id).classList.remove('hidden');
+}
+</script>
+
+{% endblock content %}

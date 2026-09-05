@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
+    <a href="{% url 'payroll_employee_bonuses' %}" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline mb-3">
+        <i class="fa-solid fa-arrow-left"></i> Employee Bonuses
+    </a>
+    <h2 class="text-xl font-bold">{{ dept.departmentname }}</h2>
+    {% if bonuses %}
+    <p class="text-sm text-gray-500 mt-1">{{ bonuses|length }} pending bonus{{ bonuses|length|pluralize:"es" }} in this department.</p>
+    {% else %}
+    <p class="text-sm text-gray-500 mt-1">No pending bonuses in this department.</p>
+    {% endif %}
+</div>
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-8">
+    <div class="overflow-x-auto">
+        <table class="w-full text-xs min-w-[600px]">
+            <thead>
+                <tr class="text-black text-center border-b">
+                    <th class="p-2">Employee</th>
+                    <th class="p-2">Role</th>
+                    <th class="p-2">Period</th>
+                    <th class="p-2">Type</th>
+                    <th class="p-2">Rate</th>
+                    <th class="p-2">Notes</th>
+                    <th class="p-2">Assigned By</th>
+                    <th class="p-2">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in bonuses %}
+                <tr class="border-b text-center hover:bg-gray-50">
+                    <td class="p-2 font-medium">{{ b.employeeid.firstname }} {{ b.employeeid.lastname }}</td>
+                    <td class="p-2 text-gray-500">{{ b.employeeid.roleid.rolename }}</td>
+                    <td class="p-2">{{ b.periodstart|date:"M j, Y" }} &ndash; {{ b.periodend|date:"M j, Y" }}</td>
+                    <td class="p-2">{{ b.bonustype }}</td>
+                    <td class="p-2 font-semibold">{{ b.bonusratecode }}</td>
+                    <td class="p-2 text-gray-500">{{ b.notes|default:"—" }}</td>
+                    <td class="p-2">{{ b.assignedby.firstname }} {{ b.assignedby.lastname }}</td>
+                    <td class="p-2">
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="apply">
+                            <input type="hidden" name="bonusid" value="{{ b.employeebonusid }}">
+                            <button class="bg-[#097d45] text-white text-xs px-3 py-1 rounded hover:opacity-90">Mark Applied</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center text-gray-400 py-6">No pending bonuses in this department.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>window._pageBackLabel = 'Employee Bonuses';</script>
+{% endblock content %}

@@ -56,8 +56,15 @@ class EmployeeManager(BaseUserManager):
 
 
 class User(AbstractBaseUser, PermissionsMixin):
+    #Surrogate primary key — EmployeeID stays a stable, human-editable business
+    #identifier (unique, not the PK), so renaming it never has to touch every
+    #table that references this employee. Every ForeignKey(User, ...) elsewhere
+    #in the codebase targets whatever this model's PK is with no to_field
+    #override, so they all automatically follow EID instead of EmployeeID.
+    eid = models.AutoField(db_column='EID', primary_key=True)
+
     #Identity required fields
-    employeeid = models.CharField(db_column='EmployeeID', max_length=255, primary_key=True)  # Field name made lowercase.
+    employeeid = models.CharField(db_column='EmployeeID', max_length=255, unique=True)  # Field name made lowercase.
     #Django uses. 'password' internally. Hence we point 'passpin' to its internal 'password'
     password = models.CharField(db_column='Passpin', max_length=255, blank=True, null=True)  # Field name made lowercase.
 
@@ -97,6 +104,16 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     #Home crew (A/B/C/D) for Shifters — fixed while active, independent of CrewAssignment roster membership
     crewid = models.ForeignKey('timesheets.Crews', models.SET_NULL, db_column='CrewID', blank=True, null=True, related_name='shifters')
+
+    #HR/payroll classification — Staff vs Contract labor. Contract cost is charged to
+    #a designated contract/account for reporting, separate from per-entry billing.
+    EMPLOYMENT_TYPE_CHOICES = [
+        ('Staff', 'Staff'),
+        ('Contract', 'Contract'),
+    ]
+    employmenttype = models.CharField(db_column='EmploymentType', max_length=10, choices=EMPLOYMENT_TYPE_CHOICES, default='Staff')
+    contractid = models.ForeignKey('timesheets.Contract', models.SET_NULL, db_column='ContractID', blank=True, null=True, related_name='contract_employees')
+    accountid = models.ForeignKey('timesheets.Account', models.SET_NULL, db_column='AccountID', blank=True, null=True, related_name='account_employees')
 
     objects = EmployeeManager()
 

@@ -30,18 +30,16 @@
 </div>
 {% endif %}
 
-{% regroup users by roleid.departmentid.departmentname as department_list %}
-
 {% for dept in department_list %}
 <div class="mb-4">
     <div class="w-full flex items-center justify-between bg-[#28348A] text-white px-5 py-3 rounded font-semibold text-sm">
         <div class="flex items-center gap-2 cursor-pointer flex-1" onclick="toggleDept('dept-{{ forloop.counter }}')">
-            <span>{{ dept.grouper }}</span>
-            <span class="text-xs font-normal text-blue-200">({{ dept.list|length }})</span>
+            <span>{{ dept.department.departmentname }}</span>
+            <span class="text-xs font-normal text-blue-200">({{ dept.users|length }})</span>
             <i class="fa-solid fa-chevron-down dept-icon transition-transform duration-200"></i>
         </div>
         <button type="button"
-            onclick="openAddModal('{{ dept.list.0.roleid.departmentid.departmentid }}', '{{ dept.grouper }}')"
+            onclick="openAddModal('{{ dept.department.departmentid }}', '{{ dept.department.departmentname }}')"
             class="flex items-center gap-1 text-xs bg-white text-[#28348A] font-semibold px-3 py-1 rounded hover:bg-blue-50 transition">
             <i class="fa-solid fa-plus"></i> New Member
         </button>
@@ -60,11 +58,16 @@
                 </tr>
             </thead>
             <tbody>
-                {% for user in dept.list %}
+                {% for user in dept.users %}
                 <tr class="border-t border-gray-100 hover:bg-gray-50">
                     <td class="px-4 py-3">{{ user.employeeid }}</td>
                     <td class="px-4 py-3">{{ user.firstname }} {{ user.lastname }}</td>
-                    <td class="px-4 py-3">{{ user.roleid.rolename }}</td>
+                    <td class="px-4 py-3">
+                        {{ user.roleid.rolename }}
+                        {% if user.employmenttype == 'Contract' %}
+                        <span class="ml-1 inline-block bg-amber-100 text-amber-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full align-middle">Contract</span>
+                        {% endif %}
+                    </td>
                     <td class="px-4 py-3">
                         {% if not user.isactive %}
                             <span class="text-xs text-gray-400">Inactive</span>
@@ -75,6 +78,12 @@
                         {% endif %}
                     </td>
                     <td class="px-4 py-3 flex gap-2">
+                        {% if user.isactive %}
+                        <button type="button" onclick="openEditModal('{{ user.employeeid }}')"
+                            class="bg-gray-100 text-gray-700 text-xs px-3 py-1 rounded hover:bg-gray-200">
+                            Edit
+                        </button>
+                        {% endif %}
                         <form method="post" action="{% url 'reset_password' user.employeeid %}">
                             {% csrf_token %}
                             <button class="bg-[#28348A] text-white text-xs px-3 py-1 rounded hover:bg-blue-800">Reset Password</button>
@@ -87,6 +96,10 @@
                         {% endif %}
                     </td>
                 </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="px-4 py-4 text-center text-gray-400 text-xs">No members in this department yet.</td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -98,7 +111,7 @@
 
 <!-- Add Employee Modal -->
 <div id="addModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-5xl mx-4 p-6 max-h-[90vh] overflow-y-auto">
 
         <div class="flex items-center justify-between mb-5">
             <div>
@@ -112,7 +125,7 @@
 
         <form method="post" action="{% url 'add_employee' %}">
             {% csrf_token %}
-            <div class="space-y-4">
+            <div class="grid grid-cols-3 gap-4">
 
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Employee ID <span class="text-red-500">*</span></label>
@@ -122,17 +135,15 @@
                     <p id="empIdError" class="text-xs text-red-500 mt-1 hidden">This Employee ID already exists.</p>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-700 mb-1">First Name <span class="text-red-500">*</span></label>
-                        <input type="text" name="firstname" required
-                            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-700 mb-1">Last Name <span class="text-red-500">*</span></label>
-                        <input type="text" name="lastname" required
-                            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
-                    </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">First Name <span class="text-red-500">*</span></label>
+                    <input type="text" name="firstname" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Last Name <span class="text-red-500">*</span></label>
+                    <input type="text" name="lastname" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
                 </div>
 
                 <div>
@@ -141,7 +152,6 @@
                         class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]"
                         placeholder="+1 (555) 000-0000">
                 </div>
-
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Role <span class="text-red-500">*</span></label>
                     <select name="roleid" id="modalRoleSelect" required
@@ -149,45 +159,73 @@
                         <option value="">— Select a role —</option>
                     </select>
                 </div>
-
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Supervisor <span class="text-gray-400 font-normal">(optional)</span></label>
                     <select name="supervisorid"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
                         <option value="">— None —</option>
                         {% for sup in active_supervisors %}
-                        <option value="{{ sup.employeeid }}">{{ sup.lastname }}, {{ sup.firstname }} — {{ sup.roleid.rolename }}</option>
+                        <option value="{{ sup.eid }}">{{ sup.lastname }}, {{ sup.firstname }} — {{ sup.roleid.rolename }}</option>
                         {% endfor %}
                     </select>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-700 mb-1">Shifter Type <span class="text-gray-400 font-normal">(Shifters only)</span></label>
-                        <select name="shiftertype"
-                            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
-                            <option value="">— N/A —</option>
-                            {% for value, label in shifter_type_choices %}
-                            <option value="{{ value }}">{{ label }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-700 mb-1">Home Crew <span class="text-gray-400 font-normal">(Shifters only)</span></label>
-                        <select name="crewid"
-                            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
-                            <option value="">— N/A —</option>
-                            {% for crew in crews %}
-                            <option value="{{ crew.crewid }}">{{ crew.crewname }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Shifter Type <span class="text-gray-400 font-normal">(Shifters only)</span></label>
+                    <select name="shiftertype"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for value, label in shifter_type_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Home Crew <span class="text-gray-400 font-normal">(Shifters only)</span></label>
+                    <select name="crewid"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for crew in crews %}
+                        <option value="{{ crew.crewid }}">{{ crew.crewname }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Employment Type</label>
+                    <select name="employmenttype"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        {% for value, label in employment_type_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
 
-                <label class="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" name="hasaccess" checked class="w-4 h-4 accent-[#28348A]">
-                    <span class="text-sm text-gray-800">Grant application access <span class="text-gray-400 font-normal text-xs">(uncheck for crew-only records)</span></span>
-                </label>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Charged to Contract <span class="text-gray-400 font-normal">(Contract labor only)</span></label>
+                    <select name="contractid"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for c in contracts %}
+                        <option value="{{ c.contractid }}">{{ c.contractcode }} — {{ c.contracttitle }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Charged to Account <span class="text-gray-400 font-normal">(Contract labor only)</span></label>
+                    <select name="accountid"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for a in accounts %}
+                        <option value="{{ a.accountid }}">{{ a.accountcode }} — {{ a.accounttitle }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" name="hasaccess" checked class="w-4 h-4 accent-[#28348A]">
+                        <span class="text-sm text-gray-800">Grant application access <span class="text-gray-400 font-normal text-xs">(uncheck for crew-only records)</span></span>
+                    </label>
+                </div>
 
             </div>
 
@@ -206,17 +244,209 @@
 </div>
 
 
+<!-- Edit Employee Modal -->
+<div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-5xl mx-4 p-6 max-h-[90vh] overflow-y-auto">
+
+        <div class="flex items-center justify-between mb-5">
+            <div>
+                <p class="font-bold text-gray-900 text-lg">Edit Employee</p>
+                <p id="editModalEmpId" class="text-sm text-gray-500"></p>
+            </div>
+            <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <form method="post" id="editForm">
+            {% csrf_token %}
+            <div class="grid grid-cols-3 gap-4">
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Employee ID <span class="text-red-500">*</span></label>
+                    <input type="text" name="employeeid" id="editEmployeeid" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">First Name <span class="text-red-500">*</span></label>
+                    <input type="text" name="firstname" id="editFirstname" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Last Name <span class="text-red-500">*</span></label>
+                    <input type="text" name="lastname" id="editLastname" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Phone Number <span class="text-red-500">*</span></label>
+                    <input type="text" name="phonenumber" id="editPhonenumber" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Email <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <input type="email" name="email" id="editEmail"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Role <span class="text-red-500">*</span></label>
+                    <select name="roleid" id="editRoleSelect" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        {% for role in roles %}
+                        <option value="{{ role.roleid }}">{{ role.departmentid.departmentname }} — {{ role.rolename }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Supervisor <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <select name="supervisorid" id="editSupervisorSelect"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— None —</option>
+                        {% for sup in active_supervisors %}
+                        <option value="{{ sup.eid }}">{{ sup.lastname }}, {{ sup.firstname }} — {{ sup.roleid.rolename }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <p class="col-span-3 -mt-2 text-xs text-gray-400">Changing role changes system access immediately — use this for temporary reassignments (e.g. a crew member acting as Shifter).</p>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Shifter Type <span class="text-gray-400 font-normal">(Shifters only)</span></label>
+                    <select name="shiftertype" id="editShiftertype"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for value, label in shifter_type_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Home Crew <span class="text-gray-400 font-normal">(Shifters only)</span></label>
+                    <select name="crewid" id="editCrewid"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for crew in crews %}
+                        <option value="{{ crew.crewid }}">{{ crew.crewname }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Employment Type</label>
+                    <select name="employmenttype" id="editEmploymenttype"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        {% for value, label in employment_type_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Charged to Contract <span class="text-gray-400 font-normal">(Contract labor only)</span></label>
+                    <select name="contractid" id="editContractid"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for c in contracts %}
+                        <option value="{{ c.contractid }}">{{ c.contractcode }} — {{ c.contracttitle }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Charged to Account <span class="text-gray-400 font-normal">(Contract labor only)</span></label>
+                    <select name="accountid" id="editAccountid"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for a in accounts %}
+                        <option value="{{ a.accountid }}">{{ a.accountcode }} — {{ a.accounttitle }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" name="hasaccess" id="editHasaccess" class="w-4 h-4 accent-[#28348A]">
+                        <span class="text-sm text-gray-800">Grant application access <span class="text-gray-400 font-normal text-xs">(uncheck to revoke login without deactivating the record)</span></span>
+                    </label>
+                </div>
+
+            </div>
+
+            <div class="mt-6 flex justify-center gap-4">
+                <button type="submit"
+                    class="bg-[#28348A] hover:bg-blue-900 text-white text-sm font-semibold px-8 py-2.5 rounded-lg transition">
+                    Save Changes
+                </button>
+                <button type="button" onclick="closeEditModal()"
+                    class="bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold px-8 py-2.5 rounded-lg transition">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
 <!-- Roles data for JS filtering -->
 <script>
 const allRoles = [
     {% for role in roles %}
-    { id: {{ role.roleid }}, name: "{{ role.rolename }}", deptId: {{ role.departmentid.departmentid }} },
+    { id: {{ role.roleid }}, name: "{{ role.rolename|escapejs }}", deptId: {{ role.departmentid.departmentid }} },
     {% endfor %}
 ];
 
 const existingIds = new Set([
-    {% for user in users %}"{{ user.employeeid }}",{% endfor %}
+    {% for user in users %}"{{ user.employeeid|escapejs }}",{% endfor %}
 ]);
+
+// Employee data for the Edit modal
+const employeeData = {
+    {% for user in users %}
+    "{{ user.employeeid }}": {
+        firstname: "{{ user.firstname|escapejs }}",
+        lastname: "{{ user.lastname|escapejs }}",
+        phonenumber: "{{ user.phonenumber|escapejs }}",
+        email: "{{ user.email|default:''|escapejs }}",
+        roleid: "{{ user.roleid_id|default:'' }}",
+        supervisorid: "{{ user.supervisorid_id|default:'' }}",
+        shiftertype: "{{ user.shiftertype|default:'' }}",
+        crewid: "{{ user.crewid_id|default:'' }}",
+        hasaccess: {{ user.hasaccess|yesno:"true,false" }},
+        employmenttype: "{{ user.employmenttype|default:'Staff' }}",
+        contractid: "{{ user.contractid_id|default:'' }}",
+        accountid: "{{ user.accountid_id|default:'' }}",
+    },
+    {% endfor %}
+};
+const editUrlTemplate = "{% url 'edit_employee' 'PLACEHOLDER' %}";
+
+function openEditModal(employeeid) {
+    const emp = employeeData[employeeid];
+    if (!emp) return;
+
+    document.getElementById('editModalEmpId').textContent = employeeid;
+    document.getElementById('editForm').action = editUrlTemplate.replace('PLACEHOLDER', employeeid);
+    document.getElementById('editEmployeeid').value = employeeid;
+    document.getElementById('editFirstname').value = emp.firstname;
+    document.getElementById('editLastname').value = emp.lastname;
+    document.getElementById('editPhonenumber').value = emp.phonenumber;
+    document.getElementById('editEmail').value = emp.email;
+    document.getElementById('editRoleSelect').value = emp.roleid;
+    document.getElementById('editSupervisorSelect').value = emp.supervisorid;
+    document.getElementById('editShiftertype').value = emp.shiftertype;
+    document.getElementById('editCrewid').value = emp.crewid;
+    document.getElementById('editHasaccess').checked = emp.hasaccess;
+    document.getElementById('editEmploymenttype').value = emp.employmenttype;
+    document.getElementById('editContractid').value = emp.contractid;
+    document.getElementById('editAccountid').value = emp.accountid;
+
+    document.getElementById('editModal').classList.remove('hidden');
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.add('hidden');
+}
+
+document.getElementById('editModal').addEventListener('click', function(e) {
+    if (e.target === this) closeEditModal();
+});
 
 function openAddModal(deptId, deptName) {
     document.getElementById('modalDeptName').textContent = deptName;
@@ -241,10 +471,6 @@ function closeAddModal() {
     document.getElementById('addModal').classList.add('hidden');
 }
 
-// Close on backdrop click
-document.getElementById('addModal').addEventListener('click', function(e) {
-    if (e.target === this) closeAddModal();
-});
 
 // Client-side duplicate ID check
 document.getElementById('modalEmpId').addEventListener('blur', function() {

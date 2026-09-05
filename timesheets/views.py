@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from users.models import User, Department, CrewAssignment, CrewCoverage
-from .models import MainHeader, MainEntry, Crews, Workcategory, LeaveType, OperationsHeader, OperationsEntry, Contract, Account, ContractAccount, ContractSeries, OperationsBonus, BONUS_RATE_CODES, StatHoliday, BusinessHeader, BusinessEntry, Businesscategory, MONTH_CHOICES
+from .models import MainHeader, MainEntry, Crews, Workcategory, LeaveType, OperationsHeader, OperationsEntry, Contract, Account, ContractAccount, ContractSeries, OperationsBonus, BONUS_RATE_CODES, StatHoliday, BusinessHeader, BusinessEntry, Businesscategory, MONTH_CHOICES, EmployeeBonus, BONUS_TYPE_CHOICES
 from django.utils import timezone
 from django.db.models import Sum, Count, Min, Max, Q, Case, When, IntegerField, Prefetch
 from django.db.models.functions import TruncMonth
@@ -838,6 +838,46 @@ def payroll_ops_member_month(request, employee_id, year, month):
 
 
 @login_required(login_url='login')
+def payroll_employee_bonuses(request):
+    if request.user.access_level != 7:
+        return redirect('profile')
+    departments = Department.objects.filter(isactive=1).annotate(
+        pending_count=Count(
+            'roles__user__bonuses',
+            filter=Q(roles__user__bonuses__appliedbypayroll__isnull=True),
+            distinct=True,
+        )
+    )
+    return render(request, 'timesheets/payroll_employee_bonuses.html', {'departments': departments})
+
+
+@login_required(login_url='login')
+def payroll_employee_bonuses_dept(request, dept_id):
+    if request.user.access_level != 7:
+        return redirect('profile')
+    dept = get_object_or_404(Department, departmentid=dept_id)
+
+    if request.method == 'POST' and request.POST.get('action') == 'apply':
+        bonus = get_object_or_404(
+            EmployeeBonus, employeebonusid=request.POST.get('bonusid'),
+            employeeid__roleid__departmentid=dept_id, appliedbypayroll__isnull=True,
+        )
+        bonus.appliedbypayroll = request.user
+        bonus.appliedatpayroll = timezone.now()
+        bonus.save()
+        return redirect('payroll_employee_bonuses_dept', dept_id=dept_id)
+
+    bonuses = EmployeeBonus.objects.filter(
+        employeeid__roleid__departmentid=dept_id, appliedbypayroll__isnull=True,
+    ).select_related('employeeid', 'assignedby').order_by('employeeid__lastname', 'employeeid__firstname', '-periodend')
+
+    return render(request, 'timesheets/payroll_employee_bonuses_dept.html', {
+        'dept': dept,
+        'bonuses': bonuses,
+    })
+
+
+@login_required(login_url='login')
 def superintendent_approved(request):
     if request.user.access_level != 2:
         return redirect('profile')
@@ -1292,6 +1332,31 @@ def new_ops_sheet(request):
             coverageid_id=coverage_id,
             section=section,
         )
+
+        # Pre-populate one row per active crew member, carrying forward each
+        # person's contract/account from their own most recent entry. Guests
+        # aren't crew, so they're never auto-added — still only reachable via
+        # + Add Row. A crew member with no prior entry anywhere has no
+        # contract to carry forward (ContractID is required), so they're
+        # skipped here and stay available in the + Add Row picker instead.
+        effective_shifter = cov.home_shifter if coverage_id and cov else request.user
+        active_assignments = CrewAssignment.objects.filter(
+            shifter=effective_shifter, enddate__isnull=True
+        ).select_related('employee')
+        for assignment in active_assignments:
+            last = OperationsEntry.objects.filter(
+                employeeid=assignment.employee
+            ).order_by('-opsentryid').first()
+            if last:
+                OperationsEntry.objects.create(
+                    opsheaderid=header,
+                    employeeid=assignment.employee,
+                    contractid_id=last.contractid_id,
+                    accountid_id=last.accountid_id,
+                    hoursworked=0,
+                    linestatus='Draft',
+                )
+
         return redirect('ops_sheet', pk=header.opsheaderid)
 
     return render(request, 'timesheets/ops_sheet.html', {
@@ -2131,4 +2196,74 @@ def review_business_timesheet(request, pk):
         'month_names': _MONTH_NAMES,
         'stat_dates': stat_dates,
         'stat_labels': stat_labels,
+    })
+
+
+@login_required(login_url='login')
+def bonus_members(request):
+    if request.user.access_level not in _BUSINESS_REVIEWERS:
+        return redirect('profile')
+    employees = User.objects.filter(
+        supervisorid=request.user, isactive=True,
+    ).order_by('lastname', 'firstname')
+    return render(request, 'timesheets/bonus_members.html', {'employees': employees})
+
+
+@login_required(login_url='login')
+def bonus_employee_detail(request, employee_id):
+    if request.user.access_level not in _BUSINESS_REVIEWERS:
+        return redirect('profile')
+    employee = get_object_or_404(User, employeeid=employee_id, supervisorid=request.user)
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'add':
+            bonustype = request.POST.get('bonustype', '').strip()
+            periodstart = request.POST.get('periodstart', '').strip()
+            periodend = request.POST.get('periodend', '').strip()
+            bonusratecode = request.POST.get('bonusratecode', '').strip()
+            notes = request.POST.get('notes', '').strip() or None
+            if not all([bonustype, periodstart, periodend, bonusratecode]):
+                messages.error(request, "All fields are required to assign a bonus.")
+            else:
+                EmployeeBonus.objects.create(
+                    employeeid=employee,
+                    bonustype=bonustype,
+                    periodstart=periodstart,
+                    periodend=periodend,
+                    bonusratecode=bonusratecode,
+                    notes=notes,
+                    assignedby=request.user,
+                )
+                messages.success(request, "Bonus assigned.")
+
+        elif action == 'edit':
+            bonus = get_object_or_404(
+                EmployeeBonus, employeebonusid=request.POST.get('bonusid'),
+                employeeid=employee, appliedbypayroll__isnull=True,
+            )
+            bonus.bonustype = request.POST.get('bonustype', '').strip() or bonus.bonustype
+            bonus.periodstart = request.POST.get('periodstart') or bonus.periodstart
+            bonus.periodend = request.POST.get('periodend') or bonus.periodend
+            bonus.bonusratecode = request.POST.get('bonusratecode', '').strip() or bonus.bonusratecode
+            bonus.notes = request.POST.get('notes', '').strip() or None
+            bonus.save()
+            messages.success(request, "Bonus updated.")
+
+        elif action == 'delete':
+            EmployeeBonus.objects.filter(
+                employeebonusid=request.POST.get('bonusid'),
+                employeeid=employee, appliedbypayroll__isnull=True,
+            ).delete()
+            messages.success(request, "Bonus removed.")
+
+        return redirect('bonus_employee_detail', employee_id=employee_id)
+
+    bonuses = EmployeeBonus.objects.filter(employeeid=employee).select_related('assignedby').order_by('-periodend')
+    return render(request, 'timesheets/bonus_employee_detail.html', {
+        'employee': employee,
+        'bonuses': bonuses,
+        'bonus_type_choices': BONUS_TYPE_CHOICES,
+        'rate_codes': BONUS_RATE_CODES,
     })

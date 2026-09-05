@@ -37,6 +37,8 @@ urlpatterns = [
     path('payroll/ops/processed/members/', views.payroll_ops_members, name='payroll_ops_members'),
     path('payroll/ops/processed/members/<str:employee_id>/', views.payroll_ops_member_detail, name='payroll_ops_member_detail'),
     path('payroll/ops/processed/members/<str:employee_id>/<int:year>/<int:month>/', views.payroll_ops_member_month, name='payroll_ops_member_month'),
+    path('payroll/bonuses/', views.payroll_employee_bonuses, name='payroll_employee_bonuses'),
+    path('payroll/bonuses/<int:dept_id>/', views.payroll_employee_bonuses_dept, name='payroll_employee_bonuses_dept'),
     path('operations/new/', views.new_ops_sheet, name='new_ops_sheet'),
     path('operations/my-sheets/', views.my_ops_sheets, name='my_ops_sheets'),
     path('operations/my-sheets/approved/', views.my_ops_approvals, name='my_ops_approvals'),
@@ -65,4 +67,6 @@ urlpatterns = [
     path('business/paid/<int:year>/<int:month>/', views.my_business_paid_month, name='my_business_paid_month'),
     path('business/inbox/', views.business_approval_inbox, name='business_approval_inbox'),
     path('business/review/<int:pk>/', views.review_business_timesheet, name='review_business_timesheet'),
+    path('bonuses/', views.bonus_members, name='bonus_members'),
+    path('bonuses/<str:employee_id>/', views.bonus_employee_detail, name='bonus_employee_detail'),
 ]

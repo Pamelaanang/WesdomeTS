@@ -15,7 +15,12 @@
                 {% endif %}
             </div>
             <div>
-                <h2 class="text-xl font-bold">{{ header.employeeid.firstname }} {{ header.employeeid.lastname }}</h2>
+                <h2 class="text-xl font-bold">
+                    {{ header.employeeid.firstname }} {{ header.employeeid.lastname }}
+                    {% if header.employeeid.employmenttype == 'Contract' %}
+                    <span class="ml-1 inline-block bg-amber-100 text-amber-700 text-xs font-semibold px-2 py-0.5 rounded-full align-middle">Contract</span>
+                    {% endif %}
+                </h2>
                 <p class="text-sm text-gray-500 mt-0.5">
                     {% if header.employeeid.access_level == 3 %}Supervisor
                     {% elif header.employeeid.access_level == 4 %}Mine Captain
@@ -23,6 +28,11 @@
                     {% endif %}
                     &mdash; {{ header.get_periodmonth_display }} {{ header.periodyear }}
                 </p>
+                {% if header.employeeid.employmenttype == 'Contract' and header.employeeid.contractid %}
+                <p class="text-xs text-amber-700 mt-0.5">
+                    Charged to {{ header.employeeid.contractid.contractcode }}{% if header.employeeid.accountid %} / {{ header.employeeid.accountid.accountcode }}{% endif %}
+                </p>
+                {% endif %}
                 {% if header.submittedat %}
                 <p class="text-xs text-gray-400 mt-0.5">Submitted {{ header.submittedat|date:"M j, Y" }}</p>
                 {% endif %}

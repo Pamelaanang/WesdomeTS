@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.conf import settings
 from users.forms import UserLoginForm
-from users.models import User, CrewAssignment, Roles, Position, CrewCoverage
+from users.models import User, CrewAssignment, Roles, Position, CrewCoverage, Department
 from django.contrib.auth.decorators import login_required
 import random
 import string
@@ -10,7 +10,7 @@ import os
 from django.utils import timezone
 from django.contrib.auth import update_session_auth_hash
 from django.contrib import messages
-from timesheets.models import MainHeader, MainEntry, OperationsHeader, OperationsEntry, BusinessHeader, BusinessEntry, Crews
+from timesheets.models import MainHeader, MainEntry, OperationsHeader, OperationsEntry, BusinessHeader, BusinessEntry, Crews, Contract, Account
 from django.db.models import Count, Q, Sum
 from calendar import month_name as _month_name
 
@@ -44,11 +44,29 @@ def user_list_view(request):
     roles = Roles.objects.select_related('departmentid').order_by('departmentid__departmentname', 'rolename')
     active_supervisors = User.objects.filter(isactive=True).select_related('roleid').order_by('lastname', 'firstname')
     crews = Crews.objects.filter(isactive=1)
+    contracts = Contract.objects.filter(isactive=1)
+    accounts = Account.objects.filter(isactive=1)
+
+    # Show every active department, not just ones that already have a member —
+    # otherwise a brand-new department's first employee could never be added.
+    users_by_dept = {}
+    for u in users:
+        dept_id = u.roleid.departmentid_id if u.roleid else None
+        users_by_dept.setdefault(dept_id, []).append(u)
+    department_list = [
+        {'department': d, 'users': users_by_dept.get(d.departmentid, [])}
+        for d in Department.objects.filter(isactive=1).order_by('departmentname')
+    ]
+
     return render(request, 'user_list.html', {
         'users': users,
+        'department_list': department_list,
         'roles': roles,
         'active_supervisors': active_supervisors,
         'crews': crews,
+        'contracts': contracts,
+        'accounts': accounts,
+        'employment_type_choices': User.EMPLOYMENT_TYPE_CHOICES,
         'shifter_type_choices': User.SHIFTER_TYPE_CHOICES,
     })
 
@@ -339,6 +357,9 @@ def add_employee(request):
         hasaccess    = request.POST.get('hasaccess') == 'on'
         shiftertype  = request.POST.get('shiftertype', '').strip() or None
         crewid       = request.POST.get('crewid', '').strip() or None
+        employmenttype = request.POST.get('employmenttype', 'Staff').strip() or 'Staff'
+        contractid   = request.POST.get('contractid', '').strip() or None
+        accountid    = request.POST.get('accountid', '').strip() or None
 
         if User.objects.filter(employeeid=employeeid).exists():
             messages.error(request, f"Employee ID '{employeeid}' already exists.")
@@ -358,11 +379,62 @@ def add_employee(request):
                 is_temporary=True,
                 shiftertype=shiftertype,
                 crewid_id=crewid,
+                employmenttype=employmenttype,
+                contractid_id=contractid,
+                accountid_id=accountid,
             )
             new_user.set_password(temp_password)
             new_user.save()
             print(f"SMS to {phonenumber}: Temp password for {firstname} {lastname} is {temp_password}")
             messages.success(request, f"{firstname} {lastname} added successfully.")
+
+    return redirect('user_list')
+
+
+@login_required(login_url='login')
+def edit_employee(request, employeeid):
+    if request.user.access_level != 1:
+        return redirect('profile')
+
+    employee = get_object_or_404(User, employeeid=employeeid)
+
+    if request.method == 'POST':
+        new_employeeid = request.POST.get('employeeid', '').strip()
+        firstname = request.POST.get('firstname', '').strip()
+        lastname = request.POST.get('lastname', '').strip()
+        phonenumber = request.POST.get('phonenumber', '').strip()
+        email = request.POST.get('email', '').strip() or None
+        roleid = request.POST.get('roleid', '').strip()
+        supervisorid = request.POST.get('supervisorid', '').strip() or None
+        shiftertype = request.POST.get('shiftertype', '').strip() or None
+        crewid = request.POST.get('crewid', '').strip() or None
+        hasaccess = request.POST.get('hasaccess') == 'on'
+        employmenttype = request.POST.get('employmenttype', 'Staff').strip() or 'Staff'
+        contractid = request.POST.get('contractid', '').strip() or None
+        accountid = request.POST.get('accountid', '').strip() or None
+
+        if not all([new_employeeid, firstname, lastname, phonenumber, roleid]):
+            messages.error(request, "All required fields must be filled.")
+        elif User.objects.exclude(eid=employee.eid).filter(employeeid=new_employeeid).exists():
+            messages.error(request, f"Employee ID '{new_employeeid}' is already in use.")
+        elif supervisorid == str(employee.eid):
+            messages.error(request, "An employee cannot supervise themselves.")
+        else:
+            employee.employeeid = new_employeeid
+            employee.firstname = firstname
+            employee.lastname = lastname
+            employee.phonenumber = phonenumber
+            employee.email = email
+            employee.roleid_id = roleid
+            employee.supervisorid_id = supervisorid
+            employee.shiftertype = shiftertype
+            employee.crewid_id = crewid
+            employee.hasaccess = hasaccess
+            employee.employmenttype = employmenttype
+            employee.contractid_id = contractid
+            employee.accountid_id = accountid
+            employee.save()
+            messages.success(request, f"{firstname} {lastname} updated successfully.")
 
     return redirect('user_list')
 
@@ -468,7 +540,7 @@ def crew_assignment_detail(request, shifter_id):
     ).select_related('employee')
 
     assigned_ids = CrewAssignment.objects.filter(enddate__isnull=True).values_list('employee_id', flat=True)
-    available_employees = User.objects.filter(roleid__accessid__accessid=8, isactive=True).exclude(employeeid__in=assigned_ids)
+    available_employees = User.objects.filter(roleid__accessid__accessid=8, isactive=True).exclude(eid__in=assigned_ids)
 
     if request.method == 'POST':
         action = request.POST.get('action')

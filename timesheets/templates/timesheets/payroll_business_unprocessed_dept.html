@@ -43,6 +43,9 @@
                 {% else %}
                 <i class="fa-solid fa-helmet-safety mr-1"></i> Shifter
                 {% endif %}
+                {% if sub.employeeid.employmenttype == 'Contract' %}
+                <span class="ml-1 inline-block bg-amber-100 text-amber-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full align-middle">Contract</span>
+                {% endif %}
             </p>
 
             <!-- Photo + name -->

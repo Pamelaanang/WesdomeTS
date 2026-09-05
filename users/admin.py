@@ -32,21 +32,19 @@ class PositionAdmin(admin.ModelAdmin):
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ('employeeid', 'firstname', 'lastname', 'roleid', 'shiftertype', 'crewid', 'isactive', 'hasaccess')
-    list_filter = ('isactive', 'hasaccess', 'shiftertype', 'crewid')
+    list_display = ('employeeid', 'firstname', 'lastname', 'roleid', 'shiftertype', 'crewid', 'employmenttype', 'isactive', 'hasaccess')
+    list_filter = ('isactive', 'hasaccess', 'shiftertype', 'crewid', 'employmenttype')
     search_fields = ('employeeid', 'firstname', 'lastname', 'email')
     ordering = ('lastname', 'firstname')
     fields = (
-        'employeeid', 'firstname', 'lastname', 'email', 'phonenumber',
+        'eid', 'employeeid', 'firstname', 'lastname', 'email', 'phonenumber',
         'roleid', 'supervisorid', 'shiftertype', 'crewid',
+        'employmenttype', 'contractid', 'accountid',
         'isactive', 'hasaccess', 'is_temporary',
     )
-
-    def get_readonly_fields(self, request, obj=None):
-        # employeeid is the primary key — editing it on an existing row doesn't rename
-        # the record, it silently no-ops (see users/management/commands/rename_employee_ids.py
-        # for the correct way to do that). Lock it once the object exists.
-        return ('employeeid',) if obj else ()
+    # employeeid is a plain unique field now (eid is the primary key), so editing
+    # it here is a normal, safely-validated update — no FK cascading needed.
+    readonly_fields = ('eid',)
 
 
 @admin.register(CrewCoverage)
