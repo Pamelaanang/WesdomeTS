@@ -28,6 +28,7 @@
         <table class="w-full text-xs min-w-[800px]">
             <thead>
                 <tr class="text-black text-center border-b">
+                    <th class="p-2"></th>
                     <th class="p-2">Shift Date</th>
                     <th class="p-2">Shifter</th>
                     <th class="p-2">Crew</th>
@@ -42,27 +43,29 @@
                 {% for entry in entries %}
                 <tr class="border-b text-center hover:bg-gray-50">
                     <td class="p-2">
-                        {{ entry.opsheaderid.shiftdate|date:"M j, Y" }}
-                        {% if entry.opsheaderid.shiftdate in stat_dates %}<span class="ml-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_labels|get_item:entry.opsheaderid.shiftdate }}">Stat</span>{% endif %}
+                        {% if entry.opsheaderid.shiftdate in stat_dates %}<span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_labels|get_item:entry.opsheaderid.shiftdate }}">Stat</span>{% endif %}
                     </td>
+                    <td class="p-2">{{ entry.opsheaderid.shiftdate|date:"M j, Y" }}</td>
                     <td class="p-2">{{ entry.opsheaderid.shifterid.firstname }} {{ entry.opsheaderid.shifterid.lastname }}</td>
                     <td class="p-2">{{ entry.opsheaderid.crewid.crewname }}</td>
                     <td class="p-2">{{ entry.contractid.contractcode }}</td>
                     <td class="p-2">{{ entry.accountid.accountcode|default:"—" }}</td>
-                    <td class="p-2">{{ entry.workcategoryid.categoryname|default:"—" }}</td>
+                    <td class="p-2">{{ entry.opscategoryid.categoryname|default:"—" }}</td>
                     <td class="p-2">{{ entry.hoursworked }}</td>
                     <td class="p-2">{{ entry.remarks|default:"—" }}</td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" class="text-center text-gray-400 py-6">No entries found.</td>
+                    <td colspan="9" class="text-center text-gray-400 py-6">No entries found.</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-    <div class="mt-4 pt-3 border-t flex justify-between items-center text-sm text-gray-700">
+    <div class="mt-4 pt-3 flex flex-wrap justify-between items-center gap-2 text-sm text-gray-700">
         <span>Total entries: <span class="font-bold">{{ entries|length }}</span></span>
+        <span>Payable: <span class="font-bold">{{ payable_hours }}</span></span>
+        <span>Non-Payable: <span class="font-bold">{{ non_payable_hours }}</span></span>
         <span>Total hours: <span class="font-bold">{{ total_hours }}</span></span>
     </div>
 </div>

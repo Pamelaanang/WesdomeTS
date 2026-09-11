@@ -193,7 +193,7 @@
                             {% if entry.accountid.accounttitle %}<div class="text-gray-400 text-xs">{{ entry.accountid.accounttitle }}</div>{% endif %}
                             {% else %}&mdash;{% endif %}
                         </td>
-                        <td class="p-2">{{ entry.workcategoryid.categoryname|default:"—" }}</td>
+                        <td class="p-2">{% if entry.opscategoryid %}{{ entry.opscategoryid.categoryname }}{% elif entry.leavetypeid %}{{ entry.leavetypeid.leavetypename }}{% else %}—{% endif %}</td>
                         <td class="p-2">{{ entry.hoursworked }}</td>
                         <td class="p-2 text-gray-500">
                             {% if entry.tonnesorehauled %}Ore: {{ entry.tonnesorehauled }}t &nbsp;{% endif %}
@@ -259,12 +259,23 @@
                             <p id="account-info-edit-{{ entry.opsentryid }}" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
                         </td>
                         <td class="p-2">
-                            <select id="workcategory-edit-{{ entry.opsentryid }}" class="border rounded px-1 py-1 w-full text-xs">
+                            <select id="category-edit-{{ entry.opsentryid }}"
+                                data-employee-id="{{ entry.employeeid_id }}"
+                                onchange="onEditCategoryChange('{{ entry.opsentryid }}')"
+                                class="border rounded px-1 py-1 w-full text-xs">
                                 <option value="">-- None --</option>
-                                {% for wc in workcategories %}
-                                <option value="{{ wc.categoryid }}" {% if wc.categoryid == entry.workcategoryid_id %}selected{% endif %}>{{ wc.categoryname }}</option>
-                                {% endfor %}
+                                <optgroup label="Work Categories">
+                                    {% for oc in opscategories %}
+                                    <option value="oc_{{ oc.opscategoryid }}" {% if oc.opscategoryid == entry.opscategoryid_id %}selected{% endif %}>{{ oc.categoryname }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                                <optgroup label="Leave">
+                                    {% for lt in leavetypes %}
+                                    <option value="lt_{{ lt.leavetypeid }}" {% if lt.leavetypeid == entry.leavetypeid_id %}selected{% endif %}>{{ lt.leavetypename }}</option>
+                                    {% endfor %}
+                                </optgroup>
                             </select>
+                            <p id="leave-info-edit-{{ entry.opsentryid }}" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
                         </td>
                         <td class="p-2">
                             <input type="number" id="hours-edit-{{ entry.opsentryid }}" value="{{ entry.hoursworked }}"
@@ -323,12 +334,23 @@
                             <p id="account-info-edit-{{ entry.opsentryid }}" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
                         </td>
                         <td class="p-2">
-                            <select id="workcategory-edit-{{ entry.opsentryid }}" class="border rounded px-1 py-1 w-full text-xs">
+                            <select id="category-edit-{{ entry.opsentryid }}"
+                                data-employee-id="{{ entry.employeeid_id }}"
+                                onchange="onEditCategoryChange('{{ entry.opsentryid }}')"
+                                class="border rounded px-1 py-1 w-full text-xs">
                                 <option value="">-- None --</option>
-                                {% for wc in workcategories %}
-                                <option value="{{ wc.categoryid }}" {% if wc.categoryid == entry.workcategoryid_id %}selected{% endif %}>{{ wc.categoryname }}</option>
-                                {% endfor %}
+                                <optgroup label="Work Categories">
+                                    {% for oc in opscategories %}
+                                    <option value="oc_{{ oc.opscategoryid }}" {% if oc.opscategoryid == entry.opscategoryid_id %}selected{% endif %}>{{ oc.categoryname }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                                <optgroup label="Leave">
+                                    {% for lt in leavetypes %}
+                                    <option value="lt_{{ lt.leavetypeid }}" {% if lt.leavetypeid == entry.leavetypeid_id %}selected{% endif %}>{{ lt.leavetypename }}</option>
+                                    {% endfor %}
+                                </optgroup>
                             </select>
+                            <p id="leave-info-edit-{{ entry.opsentryid }}" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
                         </td>
                         <td class="p-2">
                             <input type="number" id="hours-edit-{{ entry.opsentryid }}" value="{{ entry.hoursworked }}"
@@ -388,14 +410,14 @@
                                 {% if active_assignments %}
                                 <optgroup label="{% if coverage %}{{ coverage.home_shifter.firstname }} {{ coverage.home_shifter.lastname }}'s Crew{% else %}Your Crew{% endif %}">
                                     {% for a in active_assignments %}
-                                    <option value="{{ a.employee.employeeid }}">{{ a.employee.firstname }} {{ a.employee.lastname }}</option>
+                                    <option value="{{ a.employee.eid }}">{{ a.employee.firstname }} {{ a.employee.lastname }}</option>
                                     {% endfor %}
                                 </optgroup>
                                 {% endif %}
                                 {% if guest_employees %}
                                 <optgroup label="Guests">
                                     {% for g in guest_employees %}
-                                    <option value="{{ g.employeeid }}">{{ g.firstname }} {{ g.lastname }}</option>
+                                    <option value="{{ g.eid }}">{{ g.firstname }} {{ g.lastname }}</option>
                                     {% endfor %}
                                 </optgroup>
                                 {% endif %}
@@ -417,12 +439,21 @@
                             <p id="account-info" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
                         </td>
                         <td class="p-2">
-                            <select name="workcategoryid" class="border rounded px-1 py-1 w-full text-xs">
+                            <select name="category_selection" id="category-select"
+                                onchange="showLeaveInfo()" class="border rounded px-1 py-1 w-full text-xs">
                                 <option value="">-- None --</option>
-                                {% for wc in workcategories %}
-                                <option value="{{ wc.categoryid }}">{{ wc.categoryname }}</option>
-                                {% endfor %}
+                                <optgroup label="Work Categories">
+                                    {% for oc in opscategories %}
+                                    <option value="oc_{{ oc.opscategoryid }}">{{ oc.categoryname }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                                <optgroup label="Leave">
+                                    {% for lt in leavetypes %}
+                                    <option value="lt_{{ lt.leavetypeid }}">{{ lt.leavetypename }}</option>
+                                    {% endfor %}
+                                </optgroup>
                             </select>
+                            <p id="leave-info" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
                         </td>
                         <td class="p-2">
                             <input type="number" name="hoursworked" step="0.5" min="0.5" max="24"
@@ -511,9 +542,42 @@
 </div>
 
 {{ prefill|json_script:"prefill-data" }}
+{{ vacation_balances|json_script:"vacation-balances-data" }}
 
 <script>
     const prefill = JSON.parse(document.getElementById('prefill-data').textContent);
+    const vacationBalances = JSON.parse(document.getElementById('vacation-balances-data').textContent);
+    const VACATION_LT = "{{ vacation_leavetype_id|default:'' }}";
+    const FLOATER_LT = "{{ floater_leavetype_id|default:'' }}";
+
+    function leaveInfoText(employeeId, categoryValue) {
+        if (!employeeId || !categoryValue || !categoryValue.startsWith('lt_')) return '';
+        const ltId = categoryValue.slice(3);
+        const balance = vacationBalances[employeeId];
+        if (!balance) return '';
+        if (VACATION_LT && ltId === VACATION_LT) {
+            return balance.remaining !== null ? `${balance.remaining} hrs vacation remaining` : 'No vacation allocation on file yet';
+        }
+        if (FLOATER_LT && ltId === FLOATER_LT) {
+            return balance.floater_available ? 'Floater day available' : 'Floater day already used this year';
+        }
+        return '';
+    }
+
+    function showLeaveInfo() {
+        const empEl = document.querySelector('[name="employeeid"]');
+        const catEl = document.getElementById('category-select');
+        const infoEl = document.getElementById('leave-info');
+        if (!empEl || !catEl || !infoEl) return;
+        infoEl.textContent = leaveInfoText(empEl.value, catEl.value);
+    }
+
+    function onEditCategoryChange(entryId) {
+        const catEl = document.getElementById('category-edit-' + entryId);
+        const infoEl = document.getElementById('leave-info-edit-' + entryId);
+        if (!catEl || !infoEl) return;
+        infoEl.textContent = leaveInfoText(catEl.dataset.employeeId, catEl.value);
+    }
 
     // Contract lookup map built from template context
     const contractsData = {
@@ -571,13 +635,18 @@
         showContractInfo(this.value, 'contract-info');
     });
 
-    // Seed the sheet-level default (last contract/account saved on this sheet) so the
-    // account dropdown and info text are populated before anyone picks a crew member.
+    // Seed the sheet-level default (last contract/account/category saved on this sheet)
+    // so the dropdowns and info text are populated before anyone picks a crew member.
     const sheetDefaultContract = "{{ sheet_default.contractid|default:'' }}";
     const sheetDefaultAccount = "{{ sheet_default.accountid|default:'' }}";
+    const sheetDefaultCategory = "{{ sheet_default.opscategoryid|default:'' }}";
     if (sheetDefaultContract) {
         showContractInfo(sheetDefaultContract, 'contract-info');
         loadAccounts(sheetDefaultContract, sheetDefaultAccount);
+    }
+    if (sheetDefaultCategory) {
+        const catSel = document.getElementById('category-select');
+        if (catSel) catSel.value = 'oc_' + sheetDefaultCategory;
     }
 
     const accountSelectEl = document.getElementById('account-select');
@@ -586,13 +655,18 @@
     });
 
     function applyPrefill(employeeId) {
-        if (!employeeId || !prefill[employeeId]) return;
+        if (!employeeId || !prefill[employeeId]) { showLeaveInfo(); return; }
         const p = prefill[employeeId];
         if (p.contractid) {
             const cs = document.getElementById('contract-select');
             if (cs) { cs.value = p.contractid; showContractInfo(p.contractid, 'contract-info'); }
             loadAccounts(p.contractid, p.accountid);
         }
+        if (p.opscategoryid) {
+            const catSel = document.getElementById('category-select');
+            if (catSel) catSel.value = 'oc_' + p.opscategoryid;
+        }
+        showLeaveInfo();
     }
 
     function toggleAddRow() {
@@ -687,6 +761,7 @@
         document.getElementById('edit-row-' + entryId).classList.remove('hidden');
         showContractInfo(contractId, 'contract-info-edit-' + entryId);
         if (contractId) loadAccountsForEntry(entryId, accountId && accountId !== '0' ? accountId : null);
+        onEditCategoryChange(entryId);
     }
 
     function closeEditRow(entryId) {
@@ -723,7 +798,7 @@
         };
         addHidden('contractid',          'contract-edit-'             + entryId);
         addHidden('accountid',           'account-edit-'              + entryId);
-        addHidden('workcategoryid',      'workcategory-edit-'         + entryId);
+        addHidden('category_selection',  'category-edit-'             + entryId);
         addHidden('hoursworked',         'hours-edit-'                + entryId);
         addHidden('remarks',             'remarks-edit-'              + entryId);
         addHidden('hauledto',            'hauledto-edit-'             + entryId);

@@ -28,6 +28,7 @@ class Roles(models.Model):
     departmentid = models.ForeignKey(Department, models.DO_NOTHING, db_column='DepartmentID')  # Field name made lowercase.
     accessid = models.ForeignKey(Accesslevel, models.DO_NOTHING, db_column='AccessID')  # Field name made lowercase.
     isuniqueassignment = models.IntegerField(db_column='IsUniqueAssignment', blank=True, null=True)  # Field name made lowercase.
+    showsleavebalance = models.BooleanField(db_column='ShowsLeaveBalance', default=True)
 
     class Meta:
         managed = True
@@ -93,6 +94,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     profilepic = models.CharField(db_column='ProfilePic', max_length=255, blank=True, null=True)  # Field name made lowercase.
     supervisorid = models.ForeignKey('self', models.DO_NOTHING, db_column='SupervisorID', blank=True, null=True)  # Field name made lowercase.
     microsoftid = models.CharField(db_column='MicrosoftID', max_length=255, blank=True, null=True)  # Field name made lowercase.
+
+    #HR dates — nullable since no historical hire dates are on file yet; backfilled manually over time.
+    hiredate = models.DateField(db_column='HireDate', blank=True, null=True)
+    terminationdate = models.DateField(db_column='TerminationDate', blank=True, null=True)
 
     SHIFTER_TYPE_CHOICES = [
         ('Production', 'Production'),

@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import login, logout
 from django.conf import settings
 from users.forms import UserLoginForm
 from users.models import User, CrewAssignment, Roles, Position, CrewCoverage, Department
@@ -13,6 +13,18 @@ from django.contrib import messages
 from timesheets.models import MainHeader, MainEntry, OperationsHeader, OperationsEntry, BusinessHeader, BusinessEntry, Crews, Contract, Account
 from django.db.models import Count, Q, Sum
 from calendar import month_name as _month_name
+from timesheets import leave as leave_rules
+
+
+def _leave_balance_context(user, year):
+    if not user.roleid.showsleavebalance:
+        return {'show_leave_balances': False}
+    return {
+        'show_leave_balances': True,
+        'vacation_remaining': leave_rules.get_vacation_remaining(user, year),
+        'floater_available': leave_rules.get_floater_available(user, year),
+        'lieu_balance': leave_rules.get_lieu_balance(user) if leave_rules.is_lieu_eligible(user) else None,
+    }
 
 
 def login_view(request):
@@ -164,6 +176,7 @@ def profile(request):
             'pending_count': pending_count,
             'revision_count': revision_count,
             'completed_month': completed_month,
+            **_leave_balance_context(user, today.year),
         })
 
     elif al == 2:  # Superintendent
@@ -221,6 +234,7 @@ def profile(request):
             'ops_pending_captain': ops_pending_captain,
             'ops_revision_captain': ops_revision_captain,
             'ops_completed_month': ops_completed_month,
+            **_leave_balance_context(user, today.year),
         })
 
     elif al == 5:  # Shifter
@@ -246,6 +260,7 @@ def profile(request):
             'ops_submitted': ops_submitted,
             'ops_in_progress': ops_in_progress,
             'ops_completed': ops_completed,
+            **_leave_balance_context(user, today.year),
         })
     
     elif al == 7:  # Payroll
@@ -304,6 +319,7 @@ def profile(request):
             'revision_count': revision_count,
             'paid_hours': paid_hours,
             'paid_period': paid_period,
+            **_leave_balance_context(user, today.year),
         })
 
     else:  # Maintenance Crew (9) and anyone else
@@ -320,6 +336,7 @@ def profile(request):
             'revision_count': revision_count,
             'paid_hours': paid_hours,
             'paid_period': paid_period,
+            **_leave_balance_context(user, today.year),
         })
 
 @login_required(login_url='login')
@@ -329,15 +346,24 @@ def upload_profile_photo(request):
         ext = profile_photo.name.rsplit('.', 1)[-1].lower()
 
         if ext in ['jpg', 'jpeg', 'png', 'webp']:
-            filename = f"profile_{request.user.employeeid}.{ext}"
+            # Filename includes a timestamp so every upload gets a new URL —
+            # a fixed filename meant re-uploads kept the old browser-cached image.
+            old_path = request.user.profilepic
+            timestamp = timezone.now().strftime('%Y%m%d%H%M%S%f')
+            filename = f"profile_{request.user.employeeid}_{timestamp}.{ext}"
             save_path = os.path.join(settings.MEDIA_ROOT, 'profile_photos', filename)
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
             with open(save_path, 'wb+') as destination:
-                for chunk in profile_photo.chunks(): 
+                for chunk in profile_photo.chunks():
                     destination.write(chunk)
-            
+
             request.user.profilepic = f"profile_photos/{filename}"
             request.user.save()
+
+            if old_path:
+                old_full_path = os.path.join(settings.MEDIA_ROOT, old_path)
+                if os.path.isfile(old_full_path):
+                    os.remove(old_full_path)
 
     return redirect('profile')
 
@@ -360,6 +386,7 @@ def add_employee(request):
         employmenttype = request.POST.get('employmenttype', 'Staff').strip() or 'Staff'
         contractid   = request.POST.get('contractid', '').strip() or None
         accountid    = request.POST.get('accountid', '').strip() or None
+        hiredate     = request.POST.get('hiredate', '').strip() or None
 
         if User.objects.filter(employeeid=employeeid).exists():
             messages.error(request, f"Employee ID '{employeeid}' already exists.")
@@ -382,6 +409,7 @@ def add_employee(request):
                 employmenttype=employmenttype,
                 contractid_id=contractid,
                 accountid_id=accountid,
+                hiredate=hiredate,
             )
             new_user.set_password(temp_password)
             new_user.save()
@@ -412,6 +440,8 @@ def edit_employee(request, employeeid):
         employmenttype = request.POST.get('employmenttype', 'Staff').strip() or 'Staff'
         contractid = request.POST.get('contractid', '').strip() or None
         accountid = request.POST.get('accountid', '').strip() or None
+        hiredate = request.POST.get('hiredate', '').strip() or None
+        terminationdate = request.POST.get('terminationdate', '').strip() or None
 
         if not all([new_employeeid, firstname, lastname, phonenumber, roleid]):
             messages.error(request, "All required fields must be filled.")
@@ -433,6 +463,8 @@ def edit_employee(request, employeeid):
             employee.employmenttype = employmenttype
             employee.contractid_id = contractid
             employee.accountid_id = accountid
+            employee.hiredate = hiredate
+            employee.terminationdate = terminationdate
             employee.save()
             messages.success(request, f"{firstname} {lastname} updated successfully.")
 
@@ -524,7 +556,24 @@ def crew_assignments(request):
         crew_count=Count('crew_led', filter=Q(crew_led__enddate__isnull=True))
     ).order_by('lastname', 'firstname')
 
-    return render(request, 'users/crew_assignments.html', {'shifters': shifters})
+    if request.method == 'POST' and request.POST.get('action') == 'bulk_update_crews':
+        updated = 0
+        for shifter in shifters:
+            crewid = request.POST.get(f'crewid_{shifter.eid}') or None
+            shiftertype = request.POST.get(f'shiftertype_{shifter.eid}') or None
+            if shifter.crewid_id != (int(crewid) if crewid else None) or shifter.shiftertype != shiftertype:
+                shifter.crewid_id = crewid
+                shifter.shiftertype = shiftertype
+                shifter.save(update_fields=['crewid', 'shiftertype'])
+                updated += 1
+        messages.success(request, f'Updated {updated} shifter{"s" if updated != 1 else ""}.' if updated else 'No changes to save.')
+        return redirect('crew_assignments')
+
+    return render(request, 'users/crew_assignments.html', {
+        'shifters': shifters,
+        'crews': Crews.objects.filter(isactive=1),
+        'shifter_type_choices': User.SHIFTER_TYPE_CHOICES,
+    })
 
 
 @login_required(login_url='login')
@@ -545,25 +594,34 @@ def crew_assignment_detail(request, shifter_id):
     if request.method == 'POST':
         action = request.POST.get('action')
 
-        if action == 'add_member':
-            employee_id = request.POST.get('employee_id')
+        if action == 'bulk_add_members':
             start_date = request.POST.get('startdate')
-            position_id = request.POST.get('positionid') or None
-            employee = get_object_or_404(User, employeeid=employee_id, roleid__accessid__accessid=8, isactive=True)
-            CrewAssignment.objects.create(
-                shifter=shifter,
-                employee=employee,
-                positionid_id=position_id,
-                startdate=start_date
-            )
-            messages.success(request, f'{employee.firstname} {employee.lastname} added to crew.')
+            employee_ids = request.POST.getlist('employee_ids')
+            added = []
+            for employee_id in employee_ids:
+                employee = get_object_or_404(User, employeeid=employee_id, roleid__accessid__accessid=8, isactive=True)
+                position_id = request.POST.get(f'position_{employee_id}') or None
+                CrewAssignment.objects.create(
+                    shifter=shifter,
+                    employee=employee,
+                    positionid_id=position_id,
+                    startdate=start_date,
+                )
+                added.append(f'{employee.firstname} {employee.lastname}')
+            if added:
+                messages.success(request, f'Added {len(added)} member{"s" if len(added) != 1 else ""} to crew: {", ".join(added)}.')
+            else:
+                messages.warning(request, 'No members selected.')
 
-        elif action == 'remove_member':
-            assignment_id = request.POST.get('assignmentid')
-            assignment = get_object_or_404(CrewAssignment, assignmentid=assignment_id, shifter=shifter)
-            assignment.enddate = timezone.now().date()
-            assignment.save()
-            messages.success(request, f'{assignment.employee.firstname} {assignment.employee.lastname} removed from crew.')
+        elif action == 'bulk_remove_members':
+            assignment_ids = request.POST.getlist('assignment_ids')
+            qs = CrewAssignment.objects.filter(assignmentid__in=assignment_ids, shifter=shifter, enddate__isnull=True)
+            count = qs.count()
+            if count:
+                qs.update(enddate=timezone.now().date())
+                messages.success(request, f'Removed {count} member{"s" if count != 1 else ""} from crew.')
+            else:
+                messages.warning(request, 'No members selected.')
 
         return redirect('crew_assignment_detail', shifter_id=shifter_id)
 

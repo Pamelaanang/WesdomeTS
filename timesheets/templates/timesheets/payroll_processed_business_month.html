@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load timesheet_extras %}
 {% block content %}
 
 <div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
@@ -18,6 +19,7 @@
         <table class="w-full text-sm min-w-[550px]">
             <thead class="bg-gray-50 text-gray-600 text-left">
                 <tr>
+                    <th class="px-4 py-3"></th>
                     <th class="px-4 py-3">Date Worked</th>
                     <th class="px-4 py-3">Category / Leave</th>
                     <th class="px-4 py-3">Shift</th>
@@ -29,6 +31,11 @@
             <tbody>
                 {% for entry in entries %}
                 <tr class="border-t">
+                    <td class="px-4 py-3 whitespace-nowrap">
+                        {% if entry.dateworked in stat_dates %}
+                        <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_labels|get_item:entry.dateworked }}">Stat</span>
+                        {% endif %}
+                    </td>
                     <td class="px-4 py-3 whitespace-nowrap">{{ entry.dateworked|date:"M j, Y" }}</td>
                     <td class="px-4 py-3">
                         {% if entry.businesscategoryid %}{{ entry.businesscategoryid.categoryname }}
@@ -42,7 +49,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="text-center text-gray-400 py-6">No processed entries for this month.</td>
+                    <td colspan="7" class="text-center text-gray-400 py-6">No processed entries for this month.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -51,7 +58,7 @@
 </div>
 
 <div class="container mx-auto flex flex-wrap justify-between items-center gap-2 mb-8">
-    <p class="text-sm text-gray-700">Total Hours: <span class="font-bold">{{ total_hours }}</span></p>
+    <p class="text-sm text-gray-700">Payable: <span class="font-bold">{{ payable_hours }}</span> &bull; Non-Payable: <span class="font-bold">{{ non_payable_hours }}</span> &bull; Total Hours: <span class="font-bold">{{ total_hours }}</span></p>
     {% if entries %}
     {% with entries.0.businessheaderid as hdr %}
     {% if hdr.paidby %}

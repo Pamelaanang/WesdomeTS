@@ -78,7 +78,7 @@
                                 <td class="p-2 font-medium text-slate-700">{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</td>
                                 <td class="p-2">{{ entry.contractid.contractcode }}</td>
                                 <td class="p-2">{{ entry.accountid.accountcode|default:"—" }}</td>
-                                <td class="p-2">{{ entry.workcategoryid.categoryname|default:"—" }}</td>
+                                <td class="p-2">{{ entry.opscategoryid.categoryname|default:"—" }}</td>
                                 <td class="p-2 font-semibold">{{ entry.hoursworked }}</td>
                                 <td class="p-2 text-gray-500">
                                     {% if entry.tonnesorehauled %}Ore: {{ entry.tonnesorehauled }}t &nbsp;{% endif %}
@@ -159,7 +159,7 @@
                                 <td class="p-2 font-medium text-slate-700">{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</td>
                                 <td class="p-2">{{ entry.contractid.contractcode }}</td>
                                 <td class="p-2">{{ entry.accountid.accountcode|default:"—" }}</td>
-                                <td class="p-2">{{ entry.workcategoryid.categoryname|default:"—" }}</td>
+                                <td class="p-2">{{ entry.opscategoryid.categoryname|default:"—" }}</td>
                                 <td class="p-2 font-semibold">{{ entry.hoursworked }}</td>
                                 <td class="p-2 text-gray-500">
                                     {% if entry.tonnesorehauled %}Ore: {{ entry.tonnesorehauled }}t &nbsp;{% endif %}

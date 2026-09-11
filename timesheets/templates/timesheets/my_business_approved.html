@@ -15,33 +15,26 @@
     </div>
 </div>
 
-<div class="container mx-auto">
-    {% if periods %}
-    <div class="flex flex-col gap-4">
+<div class="container mx-auto mb-8">
+    <div class="flex flex-wrap gap-4">
         {% for p in periods %}
         <a href="{% url 'my_business_approved_month' p.periodyear p.periodmonth %}"
-            class="flex items-center justify-between px-5 py-4 bg-white rounded-2xl shadow hover:shadow-md transition-all group">
-            <div class="flex items-center gap-4">
-                <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                    <i class="fa-solid fa-file-circle-check text-green-700 text-sm"></i>
-                </div>
-                <div>
-                    <p class="font-semibold text-sm">{{ month_names|get_item:p.periodmonth }} {{ p.periodyear }}</p>
-                    <p class="text-xs text-gray-400">
-                        {{ p.sheet_count }} submission{{ p.sheet_count|pluralize }}
-                        &middot; {{ p.total_hours|default:"0" }} hrs total
-                    </p>
-                </div>
+            class="bg-white rounded-xl shadow p-5 w-44 hover:bg-[#E9F4FB] transition duration-200 ease-in-out cursor-pointer flex flex-col items-center gap-1">
+            <div class="w-full flex justify-center">
+                {% if p.paid_at %}
+                <span class="text-[10px] font-semibold uppercase bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Paid</span>
+                {% else %}
+                <span class="text-[10px] font-semibold uppercase bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Approved</span>
+                {% endif %}
             </div>
-            <i class="fa-solid fa-chevron-right text-gray-400 group-hover:text-[#28348A] transition-colors text-xs"></i>
+            <p class="font-semibold text-slate-800 text-center">{{ month_names|get_item:p.periodmonth }} {{ p.periodyear }}</p>
+            <p class="text-2xl font-bold text-[#28348A] mt-1">{{ p.total_hours|default:"0" }} <span class="text-sm font-semibold">hrs</span></p>
+            <p class="text-xs text-gray-500">{{ p.sheet_count }} submission{{ p.sheet_count|pluralize }}</p>
         </a>
+        {% empty %}
+        <div class="mx-auto text-gray-400 text-sm">No approved timesheets yet.</div>
         {% endfor %}
     </div>
-    {% else %}
-    <div class="bg-white rounded-2xl shadow p-8">
-        <p class="text-center text-gray-400 text-sm">No approved timesheets yet.</p>
-    </div>
-    {% endif %}
 </div>
 
 <script>window._pageBackLabel = 'Approved Timesheets';</script>

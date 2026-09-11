@@ -14,6 +14,8 @@
 
     <div class="flex flex-wrap justify-between items-center mt-4 text-sm gap-y-2 px-4">
         <span>Payroll ID: {{ request.user.employeeid }}</span>
+        <span>Payable: <span class="font-semibold">{{ payable_hours }}</span></span>
+        <span>Non-Payable: <span class="font-semibold">{{ non_payable_hours }}</span></span>
         <span>Total Hours: <span class="font-semibold">{{ total_hours }}</span></span>
         <span>Status:
             {% if header.overallstatus == 'Submitted' %}
@@ -39,6 +41,7 @@
         <table class="w-full text-sm min-w-[600px]">
             <thead class="bg-gray-50 text-gray-600 text-left">
                 <tr>
+                    <th class="px-4 py-3"></th>
                     <th class="px-4 py-3">Date</th>
                     <th class="px-4 py-3">Category / Leave</th>
                     <th class="px-4 py-3">Shift</th>
@@ -52,9 +55,9 @@
                 {% for entry in entries %}
                 <tr class="border-t">
                     <td class="px-4 py-3 whitespace-nowrap">
-                        {{ entry.startdate|date:"M j, Y" }}
-                        {% if entry.startdate in stat_dates %}<span class="ml-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_labels|get_item:entry.startdate }}">Stat</span>{% endif %}
+                        {% if entry.startdate in stat_dates %}<span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_labels|get_item:entry.startdate }}">Stat</span>{% endif %}
                     </td>
+                    <td class="px-4 py-3 whitespace-nowrap">{{ entry.startdate|date:"M j, Y" }}</td>
                     <td class="px-4 py-3">
                         {% if entry.workcategoryid %}{{ entry.workcategoryid.categoryname }}
                         {% elif entry.leavetypeid %}{{ entry.leavetypeid.leavetypename }}
@@ -76,7 +79,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" class="text-center text-gray-400 py-6">No entries on this timesheet.</td>
+                    <td colspan="8" class="text-center text-gray-400 py-6">No entries on this timesheet.</td>
                 </tr>
                 {% endfor %}
             </tbody>

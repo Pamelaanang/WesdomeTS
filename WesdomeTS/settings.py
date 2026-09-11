@@ -28,7 +28,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.app.github.dev']
 CSRF_TRUSTED_ORIGINS = ['https://*.app.github.dev', 'https://friendly-potato-x6q9jp6vx9jfpr9r-8000.app.github.dev', 'http://localhost:8000', 'https://localhost:8000',]
 
 

@@ -21,6 +21,7 @@
         <table class="w-full text-xs min-w-[600px]">
             <thead>
                 <tr class="text-black text-center border-b">
+                    <th class="p-2"></th>
                     <th class="p-2">Date Worked</th>
                     <th class="p-2">Category</th>
                     <th class="p-2">Shift</th>
@@ -36,9 +37,9 @@
                     {% elif entry.linestatus == 'Rejected' %}bg-red-50
                     {% else %}hover:bg-gray-50{% endif %}">
                     <td class="p-2">
-                        {{ entry.dateworked|date:"M j, Y" }}
-                        {% if entry.dateworked in stat_dates %}<span class="ml-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_labels|get_item:entry.dateworked }}">Stat</span>{% endif %}
+                        {% if entry.dateworked in stat_dates %}<span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_labels|get_item:entry.dateworked }}">Stat</span>{% endif %}
                     </td>
+                    <td class="p-2">{{ entry.dateworked|date:"M j, Y" }}</td>
                     <td class="p-2">
                         {% if entry.businesscategoryid %}{{ entry.businesscategoryid.categoryname }}
                         {% else %}{{ entry.leavetypeid.leavetypename }}{% endif %}
@@ -58,14 +59,16 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="text-center text-gray-400 py-6">No entries for this period.</td>
+                    <td colspan="7" class="text-center text-gray-400 py-6">No entries for this period.</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-    <div class="mt-4 pt-3 border-t flex justify-between items-center text-sm text-gray-700">
+    <div class="mt-4 pt-3 flex flex-wrap justify-between items-center gap-2 text-sm text-gray-700">
         <span>Total entries: <span class="font-bold">{{ entries|length }}</span></span>
+        <span>Payable: <span class="font-bold">{{ payable_hours }}</span></span>
+        <span>Non-Payable: <span class="font-bold">{{ non_payable_hours }}</span></span>
         <span>Approved hours: <span class="font-bold">{{ total_hours }}</span></span>
     </div>
 </div>

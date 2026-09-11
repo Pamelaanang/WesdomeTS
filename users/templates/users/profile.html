@@ -45,6 +45,30 @@
     </div>
 </div>
 
+{% if show_leave_balances %}
+<div class="mx-10 mb-6 bg-white rounded-2xl shadow p-6">
+    <p class="font-semibold mb-4">Your Leave Balances</p>
+    <div class="flex flex-wrap gap-x-10 gap-y-3 text-base">
+        <div class="flex items-center gap-3 min-w-[180px]">
+            <span class="flex items-center gap-2"><i class="fa-solid fa-umbrella-beach text-[#28348A]"></i> Vacation</span>
+            <span class="text-lg font-bold">{% if vacation_remaining is not None %}{{ vacation_remaining }} hrs{% else %}No hrs{% endif %}</span>
+        </div>
+        <div class="flex items-center gap-3 min-w-[180px]">
+            <span class="flex items-center gap-2"><i class="fa-solid fa-calendar-day text-[#28348A]"></i> Floater Day</span>
+            <span class="text-lg font-bold">{% if floater_available %}Available{% else %}Used{% endif %}</span>
+        </div>
+        {% if lieu_balance is not None %}
+        <div class="flex items-center gap-3 min-w-[180px]">
+            <span class="flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-[#28348A]"></i> Lieu Days</span>
+            <span class="text-lg font-bold">{{ lieu_balance }}</span>
+        </div>
+        {% endif %}
+    </div>
+    {% if vacation_remaining is None %}
+    <p class="text-xs text-gray-400 mt-3">Vacation balance isn't available yet — your hire date hasn't been set. Contact your System Admin.</p>
+    {% endif %}
+</div>
+{% endif %}
 
 <div class="mx-10 flex gap-6 flex-wrap">
 
@@ -317,9 +341,9 @@
             </a>
             {% elif al == 4 %}
             <p class="text-xs font-medium text-gray-400 uppercase -mb-1">Crew</p>
-            <a href="#"
+            <a href="{% url 'mine_captain_approved' %}"
                 class="flex items-center gap-3 px-4 py-3 bg-[#15803D] text-white rounded-xl text-sm font-medium hover:opacity-90">
-                <i class="fa-solid fa-people-line"></i> My People
+                <i class="fa-solid fa-circle-check"></i> Shifters' Approved
             </a>
             <a href="{% url 'business_approval_inbox' %}"
                 class="flex items-center gap-3 px-4 py-3 bg-[#1D4ED8] text-white rounded-xl text-sm font-medium hover:opacity-90">
@@ -337,6 +361,14 @@
             <a href="{% url 'my_business_drafts' %}"
                 class="flex items-center gap-3 px-4 py-3 bg-[#7C3AED] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-file-pen"></i> My Personal Drafts
+            </a>
+            <a href="{% url 'my_business_approved' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#0F766E] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-circle-check"></i> My Approved and Paid
+            </a>
+            <a href="{% url 'my_bonuses' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#BE185D] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-gift"></i> My Bonuses
             </a>
             {% elif al == 5 %}
             <p class="text-xs font-medium text-gray-400 uppercase -mb-1">Crew Sheets</p>
@@ -361,9 +393,30 @@
                 class="flex items-center gap-3 px-4 py-3 bg-[#7C3AED] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-file-pen"></i> My Personal Drafts
             </a>
-            <a href="{% url 'my_business_paid' %}"
+            <a href="{% url 'my_business_approved' %}"
                 class="flex items-center gap-3 px-4 py-3 bg-[#0F766E] text-white rounded-xl text-sm font-medium hover:opacity-90">
-                <i class="fa-solid fa-money-check-dollar"></i> My Personal Paid
+                <i class="fa-solid fa-circle-check"></i> My Approved and Paid
+            </a>
+            <a href="{% url 'my_bonuses' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#BE185D] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-gift"></i> My Bonuses
+            </a>
+            {% elif al == 6 %}
+            <a href="{% url 'new_business_timesheet' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#4338CA] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-plus"></i> Create Personal Timesheet
+            </a>
+            <a href="{% url 'my_business_drafts' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#7C3AED] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-file-pen"></i> My Personal Drafts
+            </a>
+            <a href="{% url 'my_business_approved' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#0F766E] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-circle-check"></i> My Approved and Paid
+            </a>
+            <a href="{% url 'my_bonuses' %}"
+                class="flex items-center gap-3 px-4 py-3 bg-[#BE185D] text-white rounded-xl text-sm font-medium hover:opacity-90">
+                <i class="fa-solid fa-gift"></i> My Bonuses
             </a>
             {% else %}
             <form method="POST" action="{% url 'new_timesheet' %}">

@@ -37,6 +37,7 @@
     <table class="w-full text-sm">
         <thead class="bg-gray-50 text-gray-600 text-left">
             <tr>
+                <th class="px-4 py-3"></th>
                 <th class="px-4 py-3">Date</th>
                 <th class="px-4 py-3">Category</th>
                 <th class="px-4 py-3">Shift</th>
@@ -50,9 +51,9 @@
             {% for entry in entries %}
             <tr class="border-t">
                 <td class="px-4 py-3">
-                    {{ entry.startdate|date:"M j, Y" }}
-                    {% if entry.startdate in stat_dates %}<span class="ml-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_labels|get_item:entry.startdate }}">Stat</span>{% endif %}
+                    {% if entry.startdate in stat_dates %}<span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_labels|get_item:entry.startdate }}">Stat</span>{% endif %}
                 </td>
+                <td class="px-4 py-3">{{ entry.startdate|date:"M j, Y" }}</td>
                 <td class="px-4 py-3">{% if entry.workcategoryid %}{{ entry.workcategoryid.categoryname }}{% else %}{{ entry.leavetypeid.leavetypename }}{% endif %}</td>
                 <td class="px-4 py-3">{{ entry.shifttype }}</td>
                 <td class="px-4 py-3">{{ entry.hoursworked }} hrs</td>
@@ -74,7 +75,7 @@
 </div>
 
 <div class="container mx-auto flex flex-wrap justify-between items-center">
-    <p class="text-sm text-gray-700">Total Hours: <span class="font-bold">{{ total_hours }}</span></p>
+    <p class="text-sm text-gray-700">Payable: <span class="font-bold">{{ payable_hours }}</span> &bull; Non-Payable: <span class="font-bold">{{ non_payable_hours }}</span> &bull; Total Hours: <span class="font-bold">{{ total_hours }}</span></p>
     <form method="POST">
         {% csrf_token %}
         {% if header.paidat %}

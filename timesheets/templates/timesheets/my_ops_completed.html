@@ -12,30 +12,19 @@
     </div>
 </div>
 
-<div class="container mx-auto">
-    {% if months %}
-    <div class="flex flex-col gap-4">
+<div class="container mx-auto mb-8">
+    <div class="flex flex-wrap gap-4">
         {% for m in months %}
         <a href="{% url 'my_ops_completed_month' m.month.year m.month.month %}"
-            class="flex items-center justify-between px-5 py-4 bg-white rounded-2xl shadow hover:shadow-md transition-all group">
-            <div class="flex items-center gap-4">
-                <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                    <i class="fa-solid fa-calendar-check text-green-700 text-sm"></i>
-                </div>
-                <div>
-                    <p class="font-semibold text-sm">{{ m.month|date:"F Y" }}</p>
-                    <p class="text-xs text-gray-400">{{ m.sheet_count }} sheet{{ m.sheet_count|pluralize }} &middot; {{ m.total_hours|default:"0" }} hrs total</p>
-                </div>
-            </div>
-            <i class="fa-solid fa-chevron-right text-gray-400 group-hover:text-[#28348A] transition-colors text-xs"></i>
+            class="bg-white rounded-xl shadow p-5 w-44 hover:bg-[#E9F4FB] transition duration-200 ease-in-out cursor-pointer flex flex-col items-center gap-1">
+            <p class="font-semibold text-slate-800 text-center">{{ m.month|date:"F Y" }}</p>
+            <p class="text-2xl font-bold text-[#28348A] mt-1">{{ m.total_hours|default:"0" }}</p>
+            <p class="text-xs text-gray-500">hrs &bull; {{ m.sheet_count }} sheet{{ m.sheet_count|pluralize }}</p>
         </a>
+        {% empty %}
+        <div class="mx-auto text-gray-400 text-sm">No completed sheets yet.</div>
         {% endfor %}
     </div>
-    {% else %}
-    <div class="bg-white rounded-2xl shadow p-8">
-        <p class="text-center text-gray-400 text-sm">No completed sheets yet.</p>
-    </div>
-    {% endif %}
 </div>
 
 <script>window._pageBackLabel = 'Completed Sheets';</script>

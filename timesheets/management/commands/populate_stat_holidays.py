@@ -5,6 +5,10 @@ from timesheets.models import StatHoliday
 
 PROVINCES = ['ON', 'QC']
 
+# Wesdome's Eagle River Mine is Ontario-only for now — Quebec holidays are still
+# tracked (in case that changes) but created muted so they don't affect timesheets.
+MUTED_PROVINCES = {'QC'}
+
 
 def _first_monday(year, month):
     """Return the date of the first Monday of a given month."""
@@ -44,11 +48,12 @@ class Command(BaseCommand):
                 _, was_created = StatHoliday.objects.get_or_create(
                     statdate=stat_date,
                     province=prov,
-                    defaults={'statname': name},
+                    defaults={'statname': name, 'isactive': 0 if prov in MUTED_PROVINCES else 1},
                 )
                 if was_created:
                     created += 1
-                    self.stdout.write(f'  [{prov}] {stat_date} — {name}')
+                    muted_note = ' (muted)' if prov in MUTED_PROVINCES else ''
+                    self.stdout.write(f'  [{prov}] {stat_date} — {name}{muted_note}')
                 else:
                     skipped += 1
 
@@ -58,11 +63,12 @@ class Command(BaseCommand):
             _, was_created = StatHoliday.objects.get_or_create(
                 statdate=stat_date,
                 province=prov,
-                defaults={'statname': name},
+                defaults={'statname': name, 'isactive': 0 if prov in MUTED_PROVINCES else 1},
             )
             if was_created:
                 created += 1
-                self.stdout.write(f'  [{prov}] {stat_date} — {name}')
+                muted_note = ' (muted)' if prov in MUTED_PROVINCES else ''
+                self.stdout.write(f'  [{prov}] {stat_date} — {name}{muted_note}')
             else:
                 skipped += 1
 

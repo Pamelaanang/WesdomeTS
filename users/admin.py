@@ -11,8 +11,9 @@ class DepartmentAdmin(admin.ModelAdmin):
 
 @admin.register(Roles)
 class RolesAdmin(admin.ModelAdmin):
-    list_display = ('rolename', 'departmentid', 'accessid', 'vacationhours', 'isuniqueassignment')
-    list_filter = ('departmentid', 'accessid')
+    list_display = ('rolename', 'departmentid', 'accessid', 'vacationhours', 'isuniqueassignment', 'showsleavebalance')
+    list_filter = ('departmentid', 'accessid', 'showsleavebalance')
+    list_editable = ('showsleavebalance',)
     search_fields = ('rolename',)
     ordering = ('departmentid__departmentname', 'rolename')
 

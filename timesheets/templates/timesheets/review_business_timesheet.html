@@ -52,6 +52,7 @@
         <table class="w-full text-xs min-w-[800px]">
             <thead>
                 <tr class="text-black text-center border-b">
+                    <th class="p-2"></th>
                     <th class="p-2">Date</th>
                     <th class="p-2">Category</th>
                     <th class="p-2">Shift</th>
@@ -72,12 +73,12 @@
                 <tr class="border-b hover:bg-gray-50 text-center">
                 {% endif %}
                     <td class="p-2">
-                        {{ entry.dateworked|date:"M j, Y" }}
                         {% if entry.dateworked in stat_dates %}
-                        <span class="ml-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700"
+                        <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700"
                             title="{{ stat_labels|get_item:entry.dateworked }}">Stat</span>
                         {% endif %}
                     </td>
+                    <td class="p-2">{{ entry.dateworked|date:"M j, Y" }}</td>
                     <td class="p-2">
                         {% if entry.businesscategoryid %}{{ entry.businesscategoryid.categoryname }}
                         {% else %}{{ entry.leavetypeid.leavetypename }}{% endif %}
@@ -119,7 +120,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="{% if has_rejected %}8{% else %}7{% endif %}" class="text-center text-gray-400 py-6">No entries on this timesheet.</td>
+                    <td colspan="{% if has_rejected %}9{% else %}8{% endif %}" class="text-center text-gray-400 py-6">No entries on this timesheet.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -129,7 +130,8 @@
     <div class="mt-6 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
         <p class="text-sm text-gray-700">
             {{ header.employeeid.firstname }} {{ header.employeeid.lastname }} logged
-            <span class="font-semibold">{{ total_hours }}</span> hrs.
+            <span class="font-semibold">{{ total_hours }}</span> hrs
+            (<span class="font-semibold">{{ payable_hours }}</span> payable, <span class="font-semibold">{{ non_payable_hours }}</span> non-payable).
             You have approved <span class="font-semibold">{{ hours_approved }}</span> hrs.
         </p>
         <div class="flex flex-col items-end gap-1">

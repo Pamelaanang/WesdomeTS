@@ -23,43 +23,29 @@
     </div>
 </div>
 
-<div class="container mx-auto">
-    {% if months %}
-    <div class="flex flex-col gap-4">
+<div class="container mx-auto mb-8">
+    <div class="flex flex-wrap gap-4">
         {% for m in months %}
         <a href="{% url 'superintendent_ops_member_month' member.employeeid m.month.year m.month.month %}"
-            class="flex items-center justify-between px-5 py-4 bg-white rounded-2xl shadow hover:shadow-md transition-all group">
-            <div class="flex items-center gap-4">
-                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                    <i class="fa-solid fa-calendar-days text-blue-700 text-sm"></i>
-                </div>
-                <div>
-                    <p class="font-semibold text-sm">{{ m.month|date:"F Y" }}</p>
-                    <p class="text-xs text-gray-400">{{ m.entry_count }} entr{{ m.entry_count|pluralize:"y,ies" }}</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-3">
-                {% if m.bonus %}
-                    {% if m.bonus.status == 'Applied' %}
-                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Applied {{ m.bonus.bonusratecode }}</span>
-                    {% elif m.bonus.status == 'Submitted' %}
-                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">Submitted {{ m.bonus.bonusratecode }}</span>
-                    {% else %}
-                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Draft {{ m.bonus.bonusratecode }}</span>
-                    {% endif %}
+            class="bg-white rounded-xl shadow p-5 w-44 hover:bg-[#E9F4FB] transition duration-200 ease-in-out cursor-pointer flex flex-col items-center gap-1">
+            {% if m.bonus %}
+            <div class="w-full flex justify-center">
+                {% if m.bonus.status == 'Applied' %}
+                <span class="text-[10px] font-semibold uppercase bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Applied {{ m.bonus.bonusratecode }}</span>
+                {% elif m.bonus.status == 'Submitted' %}
+                <span class="text-[10px] font-semibold uppercase bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">Submitted {{ m.bonus.bonusratecode }}</span>
                 {% else %}
-                <span class="text-xs text-gray-300">No bonus</span>
+                <span class="text-[10px] font-semibold uppercase bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Draft {{ m.bonus.bonusratecode }}</span>
                 {% endif %}
-                <i class="fa-solid fa-chevron-right text-gray-400 group-hover:text-[#28348A] transition-colors text-xs"></i>
             </div>
+            {% endif %}
+            <p class="font-semibold text-slate-800 text-center">{{ m.month|date:"F Y" }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ m.entry_count }} entr{{ m.entry_count|pluralize:"y,ies" }}</p>
         </a>
+        {% empty %}
+        <div class="mx-auto text-gray-400 text-sm">No completed entries found for this member.</div>
         {% endfor %}
     </div>
-    {% else %}
-    <div class="bg-white rounded-2xl shadow p-8">
-        <p class="text-center text-gray-400 text-sm">No completed entries found for this member.</p>
-    </div>
-    {% endif %}
 </div>
 
 <script>window._pageBackLabel = '{{ member.firstname }} {{ member.lastname }}';</script>

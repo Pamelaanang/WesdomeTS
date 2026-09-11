@@ -20,6 +20,8 @@
         <div class="flex flex-wrap justify-between items-center mt-4 text-sm gap-y-2 px-4">
             <span>Payroll ID: <span class="font-medium">{{ request.user.employeeid }}</span></span>
             <span>Period: <span class="font-medium">{{ header.get_periodmonth_display }} {{ header.periodyear }}</span></span>
+            <span>Payable: <span class="font-medium">{{ payable_hours }}</span></span>
+            <span>Non-Payable: <span class="font-medium">{{ non_payable_hours }}</span></span>
             <span>Total Hours: <span class="font-medium">{{ total_hours }}</span></span>
             <span>Status:
                 {% if header.overallstatus == 'Submitted' %}
@@ -57,6 +59,7 @@
         <table class="w-full text-sm min-w-[700px] table-fixed">
             <thead>
                 <tr class="text-black text-center">
+                    <th class="p-2 w-10"></th>
                     <th class="p-2 w-36">Date Worked</th>
                     <th class="p-2 w-40">Category</th>
                     <th class="p-2 w-24">Shift</th>
@@ -68,19 +71,19 @@
                 {% for entry in entries %}
                 <tr class="border-b hover:bg-gray-50 text-center">
                     <td class="p-2">
-                        {{ entry.dateworked }}
                         {% if entry.dateworked in stat_dates %}
-                        <span class="ml-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700"
+                        <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700"
                             title="{{ stat_labels|get_item:entry.dateworked }}">Stat</span>
                         {% endif %}
                     </td>
+                    <td class="p-2">{{ entry.dateworked }}</td>
                     <td class="p-2">{% if entry.businesscategoryid %}{{ entry.businesscategoryid.categoryname }}{% else %}{{ entry.leavetypeid.leavetypename }}{% endif %}</td>
                     <td class="p-2">{{ entry.shifttype|default:"—" }}</td>
                     <td class="p-2">{{ entry.hoursworked }}</td>
                     <td class="p-2">{{ entry.entrydescription|default:"—" }}</td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="5" class="text-center text-gray-400 py-6 text-sm">No entries on this timesheet.</td></tr>
+                <tr><td colspan="6" class="text-center text-gray-400 py-6 text-sm">No entries on this timesheet.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -96,6 +99,7 @@
             <table class="w-full text-sm min-w-[700px] table-fixed">
                 <thead>
                     <tr class="text-black text-center">
+                        <th class="p-2 w-10"></th>
                         <th class="p-2 w-36">Date Worked</th>
                         <th class="p-2 w-40">Category</th>
                         <th class="p-2 w-24">Shift</th>
@@ -116,12 +120,12 @@
                     <tr class="border-b hover:bg-gray-50 text-center">
                     {% endif %}
                         <td class="p-2">
-                            {{ entry.dateworked }}
                             {% if entry.dateworked in stat_dates %}
-                            <span class="ml-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700"
+                            <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700"
                                 title="{{ stat_labels|get_item:entry.dateworked }}">Stat</span>
                             {% endif %}
                         </td>
+                        <td class="p-2">{{ entry.dateworked }}</td>
                         <td class="p-2">{% if entry.businesscategoryid %}{{ entry.businesscategoryid.categoryname }}{% else %}{{ entry.leavetypeid.leavetypename }}{% endif %}</td>
                         <td class="p-2">{{ entry.shifttype|default:"—" }}</td>
                         <td class="p-2">{{ entry.hoursworked }}</td>
@@ -167,7 +171,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="{% if revision_mode %}7{% else %}6{% endif %}" class="text-center text-gray-400 py-6 text-sm">
+                        <td colspan="{% if revision_mode %}8{% else %}7{% endif %}" class="text-center text-gray-400 py-6 text-sm">
                             {% if revision_mode %}No entries on this timesheet.{% else %}No entries yet. Click + Add Entry to begin.{% endif %}
                         </td>
                     </tr>
@@ -179,7 +183,7 @@
                             <input type="date" name="dateworked" id="dateworked-input" class="border rounded px-1 py-1 text-xs w-full">
                         </td>
                         <td class="p-2">
-                            <select name="category_selection" id="cat-select" class="border rounded px-1 py-1 w-full text-xs">
+                            <select name="category_selection" id="cat-select" onchange="showOwnLeaveInfo()" class="border rounded px-1 py-1 w-full text-xs">
                                 <option value="">-- Select --</option>
                                 <optgroup label="Work Categories">
                                     {% for cat in business_categories %}
@@ -192,6 +196,7 @@
                                     {% endfor %}
                                 </optgroup>
                             </select>
+                            <p id="leave-info" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
                         </td>
                         <td class="p-2">
                             <select name="shifttype" id="shift-select" class="border rounded px-1 py-1 w-full text-xs">
@@ -244,6 +249,30 @@
 <script>
     const periodMonth = {{ header.periodmonth }};
     const periodYear = {{ header.periodyear }};
+    const VACATION_LT = "{{ vacation_leavetype_id|default:'' }}";
+    const FLOATER_LT = "{{ floater_leavetype_id|default:'' }}";
+    const LIEU_LT = "{{ lieu_leavetype_id|default:'' }}";
+    const OWN_VACATION_REMAINING = {% if vacation_remaining is not None %}"{{ vacation_remaining }}"{% else %}null{% endif %};
+    const OWN_FLOATER_AVAILABLE = {{ floater_available|yesno:"true,false" }};
+    const OWN_LIEU_BALANCE = {% if lieu_balance is not None %}{{ lieu_balance }}{% else %}null{% endif %};
+
+    function showOwnLeaveInfo() {
+        const catEl = document.getElementById('cat-select');
+        const infoEl = document.getElementById('leave-info');
+        if (!catEl || !infoEl) return;
+        const val = catEl.value;
+        if (!val.startsWith('lt_')) { infoEl.textContent = ''; return; }
+        const ltId = val.slice(3);
+        if (VACATION_LT && ltId === VACATION_LT) {
+            infoEl.textContent = OWN_VACATION_REMAINING !== null ? `${OWN_VACATION_REMAINING} hrs vacation remaining` : 'No vacation allocation on file yet';
+        } else if (FLOATER_LT && ltId === FLOATER_LT) {
+            infoEl.textContent = OWN_FLOATER_AVAILABLE ? 'Floater day available' : 'Floater day already used this year';
+        } else if (LIEU_LT && ltId === LIEU_LT && OWN_LIEU_BALANCE !== null) {
+            infoEl.textContent = `${OWN_LIEU_BALANCE} lieu day(s) banked`;
+        } else {
+            infoEl.textContent = '';
+        }
+    }
 
     (function () {
         var d = document.getElementById('dateworked-input');
@@ -262,6 +291,7 @@
         document.getElementById('shift-select').value = '';
         document.getElementById('hours-input').value = '';
         document.getElementById('desc-input').value = '';
+        document.getElementById('leave-info').textContent = '';
         document.getElementById('add-row').classList.toggle('hidden');
     }
 
@@ -317,6 +347,7 @@
         document.getElementById('desc-input').value = btn.dataset.description;
         document.getElementById('add-row').classList.remove('hidden');
         document.getElementById('add-row').scrollIntoView({ behavior: 'smooth' });
+        showOwnLeaveInfo();
     }
 </script>
 {% endif %}

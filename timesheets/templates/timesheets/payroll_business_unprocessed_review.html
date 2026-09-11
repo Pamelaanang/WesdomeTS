@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load timesheet_extras %}
 {% block content %}
 
 <div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
@@ -54,6 +55,7 @@
         <table class="w-full text-sm min-w-[700px]">
             <thead class="bg-gray-50 text-gray-600 text-left">
                 <tr>
+                    <th class="px-4 py-3"></th>
                     <th class="px-4 py-3">Date</th>
                     <th class="px-4 py-3">Category</th>
                     <th class="px-4 py-3">Leave Type</th>
@@ -66,6 +68,11 @@
             <tbody>
                 {% for entry in entries %}
                 <tr class="border-t {% if entry.linestatus == 'Rejected' %}bg-red-50{% elif entry.linestatus == 'Approved' %}{% endif %}">
+                    <td class="px-4 py-3 whitespace-nowrap">
+                        {% if entry.dateworked in stat_dates %}
+                        <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_labels|get_item:entry.dateworked }}">Stat</span>
+                        {% endif %}
+                    </td>
                     <td class="px-4 py-3 whitespace-nowrap">{{ entry.dateworked|date:"M j, Y" }}</td>
                     <td class="px-4 py-3">{{ entry.businesscategoryid.categoryname|default:"—" }}</td>
                     <td class="px-4 py-3 text-gray-500">{{ entry.leavetypeid.leavetypename|default:"—" }}</td>
@@ -84,7 +91,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" class="text-center text-gray-400 py-6">No entries on this timesheet.</td>
+                    <td colspan="8" class="text-center text-gray-400 py-6">No entries on this timesheet.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -93,7 +100,7 @@
 </div>
 
 <div class="container mx-auto flex flex-wrap justify-between items-center">
-    <p class="text-sm text-gray-700">Total Approved Hours: <span class="font-bold">{{ total_hours }}</span></p>
+    <p class="text-sm text-gray-700">Payable: <span class="font-bold">{{ payable_hours }}</span> &bull; Non-Payable: <span class="font-bold">{{ non_payable_hours }}</span> &bull; Total Approved Hours: <span class="font-bold">{{ total_hours }}</span></p>
     {% if not header.paidat %}
     <form method="POST">
         {% csrf_token %}

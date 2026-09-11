@@ -21,6 +21,12 @@
     <p class="text-center text-sm text-gray-500 mt-3">
         <span class="font-semibold text-gray-700">APPROVED HISTORY:</span> Select a month to view entries.
     </p>
+    <div class="flex justify-center mt-3">
+        <a href="{% url 'bonus_employee_detail' employee.employeeid %}"
+            class="inline-flex items-center gap-2 bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">
+            <i class="fa-solid fa-gift"></i> Bonuses
+        </a>
+    </div>
 </div>
 
 <div class="container mx-auto mb-8">

@@ -38,6 +38,7 @@ class LeaveType(models.Model):
     leavetypeid = models.AutoField(db_column='LeaveTypeID', primary_key=True)  # Field name made lowercase.
     leavetypename = models.CharField(db_column='LeaveTypeName', max_length=255)  # Field name made lowercase.
     isactive = models.IntegerField(db_column='IsActive', default=1)  # Field name made lowercase.
+    ispayable = models.BooleanField(db_column='IsPayable', default=True)
 
     class Meta:
         managed = True
@@ -68,6 +69,48 @@ class StatHoliday(models.Model):
     class Meta:
         managed = True
         db_table = 'StatHoliday'
+
+
+class VacationRatePolicy(models.Model):
+    """Effective-dated monthly vacation accrual rate. A rate change (e.g. the
+    10->12 hr/month bump for Ops "other" shifter types) is a new row with a
+    later effective_year, not a code change — lookup takes the latest row at
+    or before the target year."""
+    BUCKET_CHOICES = [
+        ('ops_development', 'Operations - Development'),
+        ('ops_other', 'Operations - Production/Longhole/Logistics'),
+        ('non_operations', 'Non-Operations (Business/Maintenance)'),
+    ]
+    policyid = models.AutoField(db_column='PolicyID', primary_key=True)
+    bucket = models.CharField(db_column='Bucket', max_length=20, choices=BUCKET_CHOICES)
+    effective_year = models.IntegerField(db_column='EffectiveYear')
+    monthly_rate_hours = models.DecimalField(db_column='MonthlyRateHours', max_digits=4, decimal_places=2)
+
+    class Meta:
+        managed = True
+        db_table = 'VacationRatePolicy'
+        unique_together = ('bucket', 'effective_year')
+        ordering = ['bucket', '-effective_year']
+
+
+class LieuDayLedger(models.Model):
+    """One row per stat holiday an eligible (salaried) employee banks a lieu
+    day for. Earned when the stat date passes with zero hours logged; Used
+    when applied against a Lieu Day entry on approval."""
+    STATUS_CHOICES = [('Banked', 'Banked'), ('Used', 'Used')]
+    ledgerid = models.AutoField(db_column='LedgerID', primary_key=True)
+    employeeid = models.ForeignKey('users.User', models.DO_NOTHING, db_column='EmployeeID')
+    statholidayid = models.ForeignKey(StatHoliday, models.DO_NOTHING, db_column='StatHolidayID')
+    status = models.CharField(db_column='Status', max_length=10, choices=STATUS_CHOICES, default='Banked')
+    earnedat = models.DateTimeField(db_column='EarnedAt', auto_now_add=True)
+    usedat = models.DateTimeField(db_column='UsedAt', blank=True, null=True)
+    used_entry_type = models.CharField(db_column='UsedEntryType', max_length=20, blank=True, null=True)
+    used_entry_id = models.IntegerField(db_column='UsedEntryID', blank=True, null=True)
+
+    class Meta:
+        managed = True
+        db_table = 'LieuDayLedger'
+        unique_together = ('employeeid', 'statholidayid')
 
 
 class MainHeader(models.Model):
@@ -113,6 +156,7 @@ class Workcategory(models.Model):
     categoryname = models.CharField(db_column='CategoryName', max_length=255)  # Field name made lowercase.
     isproductive = models.IntegerField(db_column='IsProductive')  # Field name made lowercase.
     isactive = models.IntegerField(db_column='IsActive', default=1)  # Field name made lowercase.
+    ispayable = models.BooleanField(db_column='IsPayable', default=True)
 
     class Meta:
         managed = True
@@ -124,10 +168,23 @@ class Businesscategory(models.Model):
     categoryname = models.CharField(db_column='CategoryName', max_length=255)  # Field name made lowercase.
     isproductive = models.IntegerField(db_column='IsProductive')  # Field name made lowercase.
     isactive = models.IntegerField(db_column='IsActive', default=1)  # Field name made lowercase.
+    ispayable = models.BooleanField(db_column='IsPayable', default=True)
 
     class Meta:
         managed = True
         db_table = 'BusinessCategory'
+
+
+class Opscategory(models.Model):
+    opscategoryid = models.AutoField(db_column='CategoryID', primary_key=True)
+    categoryname = models.CharField(db_column='CategoryName', max_length=255)
+    isproductive = models.IntegerField(db_column='IsProductive')
+    isactive = models.IntegerField(db_column='IsActive', default=1)
+    ispayable = models.BooleanField(db_column='IsPayable', default=True)
+
+    class Meta:
+        managed = True
+        db_table = 'OpsCategory'
    
 
 MONTH_CHOICES = [(1, 'January'), (2, 'February'), (3, 'March'), (4, 'April'), (5, 'May'), (6, 'June'), (7, 'July'), (8, 'August'), (9, 'September'), (10, 'October'), (11, 'November'), (12, 'December')]
@@ -144,6 +201,7 @@ class BusinessHeader(models.Model):
     completedat = models.DateTimeField(db_column='CompletedAt', blank=True, null=True)
     paidat = models.DateTimeField(db_column='PaidAt', blank=True, null=True)
     paidby = models.ForeignKey('users.User', models.DO_NOTHING, db_column='PaidBy', blank=True, null=True, related_name='paid_%(class)s')
+    bh_approvedby_capt = models.ForeignKey('users.User', models.DO_NOTHING, db_column='BH_ApprovedBy_Capt', blank=True, null=True, related_name='captain_headerapproved_%(class)s')
 
     class Meta:
         managed = True
@@ -264,7 +322,8 @@ class OperationsEntry(models.Model):
     employeeid = models.ForeignKey('users.User', models.DO_NOTHING, db_column='EmployeeID')
     contractid = models.ForeignKey(Contract, models.DO_NOTHING, db_column='ContractID')
     accountid = models.ForeignKey(Account, models.DO_NOTHING, db_column='AccountID', blank=True, null=True)
-    workcategoryid = models.ForeignKey(Workcategory, models.DO_NOTHING, db_column='WorkCategoryID', blank=True, null=True)
+    opscategoryid = models.ForeignKey(Opscategory, models.DO_NOTHING, db_column='OpsCategoryID', blank=True, null=True)
+    leavetypeid = models.ForeignKey('LeaveType', models.DO_NOTHING, db_column='LeaveTypeID', blank=True, null=True)
     hoursworked = models.DecimalField(db_column='HoursWorked', max_digits=5, decimal_places=2)
     remarks = models.TextField(db_column='Remarks', blank=True, null=True)
     hauledto = models.CharField(db_column='HauledTo', max_length=255, blank=True, null=True)

@@ -10,13 +10,23 @@
         <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
         <p class="text-center text-sm text-gray-500 mt-1"><span class="font-semibold text-gray-700">CREW BONUSES:</span> Select a member to review their monthly entries and assign bonus rates.</p>
     </div>
+    {% if members %}
+    <div class="mt-4 max-w-sm mx-auto">
+        <div class="relative">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+            <input type="text" id="member-search" oninput="filterMembers()" placeholder="Search by name or payroll ID…"
+                class="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-[#28348A]">
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <div class="container mx-auto mb-8">
-    <div class="flex flex-wrap gap-4">
+    <div id="member-grid" class="flex flex-wrap gap-4">
         {% for member in members %}
         <a href="{% url 'superintendent_ops_member_detail' member.employeeid %}"
-            class="bg-white rounded-xl shadow p-5 w-44 flex flex-col items-center gap-2 hover:shadow-md hover:border hover:border-[#28348A] transition-all">
+            data-search="{{ member.firstname|lower }} {{ member.lastname|lower }} {{ member.employeeid|lower }}"
+            class="member-card bg-white rounded-xl shadow p-5 w-44 flex flex-col items-center gap-2 hover:shadow-md hover:border hover:border-[#28348A] transition-all">
             <div class="w-24 h-24 rounded-full bg-black overflow-hidden flex items-center justify-center">
                 {% if member.profilepic %}
                 <img src="/media/{{ member.profilepic }}" class="w-full h-full object-cover" alt="Profile Photo">
@@ -31,7 +41,22 @@
         <div class="mx-auto text-gray-400 text-sm py-10">No completed crew members found.</div>
         {% endfor %}
     </div>
+    <div id="member-no-results" class="hidden text-center text-gray-400 text-sm py-10">No crew members match your search.</div>
 </div>
 
-<script>window._pageBackLabel = 'Crew Bonuses';</script>
+<script>
+    window._pageBackLabel = 'Crew Bonuses';
+
+    function filterMembers() {
+        const query = document.getElementById('member-search').value.trim().toLowerCase();
+        const cards = document.querySelectorAll('.member-card');
+        let visibleCount = 0;
+        cards.forEach(card => {
+            const matches = !query || card.dataset.search.includes(query);
+            card.classList.toggle('hidden', !matches);
+            if (matches) visibleCount++;
+        });
+        document.getElementById('member-no-results').classList.toggle('hidden', visibleCount !== 0 || cards.length === 0);
+    }
+</script>
 {% endblock content %}
