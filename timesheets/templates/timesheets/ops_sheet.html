@@ -421,6 +421,11 @@
                                     {% endfor %}
                                 </optgroup>
                                 {% endif %}
+                                {% if request.user.employmenttype == 'Contract' %}
+                                <optgroup label="Yourself">
+                                    <option value="{{ request.user.eid }}">{{ request.user.firstname }} {{ request.user.lastname }} (You)</option>
+                                </optgroup>
+                                {% endif %}
                             </select>
                         </td>
                         <td class="p-2">

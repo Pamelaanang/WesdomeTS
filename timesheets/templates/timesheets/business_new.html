@@ -27,15 +27,16 @@
         <div class="flex flex-col gap-5">
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1">Month</label>
-                <select name="month" class="border border-gray-300 rounded-lg px-3 py-2 w-full text-sm focus:outline-none focus:border-[#28348A]">
+                <select name="month" id="month-select" class="border border-gray-300 rounded-lg px-3 py-2 w-full text-sm focus:outline-none focus:border-[#28348A]">
                     {% for num, name in month_choices %}
-                    <option value="{{ num }}" {% if num == default_month %}selected{% endif %}>{{ name }}</option>
+                    <option value="{{ num }}" data-month="{{ num }}" {% if num == default_month %}selected{% endif %}>{{ name }}</option>
                     {% endfor %}
                 </select>
+                <p class="text-xs text-gray-400 mt-1">A future month can't be selected — the work hasn't happened yet.</p>
             </div>
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1">Year</label>
-                <select name="year" class="border border-gray-300 rounded-lg px-3 py-2 w-full text-sm focus:outline-none focus:border-[#28348A]">
+                <select name="year" id="year-select" class="border border-gray-300 rounded-lg px-3 py-2 w-full text-sm focus:outline-none focus:border-[#28348A]">
                     {% for y in year_choices %}
                     <option value="{{ y }}" {% if y == default_year %}selected{% endif %}>{{ y }}</option>
                     {% endfor %}
@@ -47,5 +48,30 @@
         </div>
     </form>
 </div>
+
+<script>
+    (function () {
+        const CURRENT_YEAR = {{ current_year }};
+        const CURRENT_MONTH = {{ current_month }};
+        const yearSelect = document.getElementById('year-select');
+        const monthSelect = document.getElementById('month-select');
+
+        function applyFutureMonthLimit() {
+            const yearPicked = parseInt(yearSelect.value, 10);
+            let selectedIsNowDisabled = false;
+            monthSelect.querySelectorAll('option').forEach(function (opt) {
+                const isFuture = yearPicked === CURRENT_YEAR && parseInt(opt.dataset.month, 10) > CURRENT_MONTH;
+                opt.disabled = isFuture;
+                if (isFuture && opt.selected) selectedIsNowDisabled = true;
+            });
+            if (selectedIsNowDisabled) {
+                monthSelect.value = String(CURRENT_MONTH);
+            }
+        }
+
+        yearSelect.addEventListener('change', applyFutureMonthLimit);
+        applyFutureMonthLimit();
+    })();
+</script>
 
 {% endblock content %}

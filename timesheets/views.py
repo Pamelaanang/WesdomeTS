@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from users.models import User, Department, CrewAssignment, CrewCoverage
-from .models import MainHeader, MainEntry, Crews, Workcategory, Opscategory, LeaveType, OperationsHeader, OperationsEntry, Contract, Account, ContractAccount, ContractSeries, OperationsBonus, BONUS_RATE_CODES, StatHoliday, BusinessHeader, BusinessEntry, Businesscategory, MONTH_CHOICES, EmployeeBonus, BONUS_TYPE_CHOICES, Auditlog
+from .models import MainHeader, MainEntry, Crews, Workcategory, Opscategory, LeaveType, OperationsHeader, OperationsEntry, Contract, Account, ContractAccount, ContractSeries, OperationsBonus, BONUS_RATE_CODES, StatHoliday, BusinessHeader, BusinessEntry, Businesscategory, MONTH_CHOICES, EmployeeBonus, BONUS_TYPE_CHOICES, Auditlog, submission_deadline
 from django.utils import timezone
 from django.db.models import Sum, Count, Min, Max, Q, Case, When, IntegerField, Prefetch
 from django.db.models.functions import TruncMonth
@@ -57,6 +57,24 @@ def _payable_hours_split(entries, category_field):
         Q(**{f'{category_field}__ispayable': True}) | Q(leavetypeid__ispayable=True)
     ).aggregate(Sum('hoursworked'))['hoursworked__sum'] or 0
     return payable, total - payable, total
+
+
+def _last_entry_prefill(entries, category_field, category_prefix):
+    """Given one employee's entries queryset (any header/month), return
+    (category_selection, shifttype, hours) from their most recently created
+    entry — used to prefill the + Add Entry row, mirroring how a new
+    Operations sheet carries forward each crew member's last category."""
+    last = entries.order_by('-pk').first()
+    if not last:
+        return '', '', None
+    category = getattr(last, category_field)
+    if category:
+        selection = f'{category_prefix}{category.pk}'
+    elif last.leavetypeid_id:
+        selection = f'lt_{last.leavetypeid_id}'
+    else:
+        selection = ''
+    return selection, last.shifttype or '', last.hoursworked
 
 
 # Create your views here.
@@ -127,8 +145,18 @@ def add_entry(request, pk):
             existing_entry = MainEntry.objects.filter(mainentryid=entryid).first() if entryid else None
             leave_error = _validate_leave_entry(request.user, leavetypeid, startdate_str, hoursworked_str, exclude_entry=existing_entry)
 
+            date_error = None
+            if workcategoryid and not revision_mode and not leave_error:
+                try:
+                    if date.fromisoformat(startdate_str) > timezone.now().date():
+                        date_error = 'Date cannot be a future date for this work category.'
+                except (TypeError, ValueError):
+                    date_error = 'Please enter a valid date.'
+
             if leave_error:
                 messages.error(request, leave_error)
+            elif date_error:
+                messages.error(request, date_error)
             elif entryid:
                 if revision_mode:
                     entry = get_object_or_404(MainEntry, mainentryid=entryid, mainheaderid=header, linestatus='Rejected')
@@ -209,6 +237,9 @@ def add_entry(request, pk):
     payable_hours, non_payable_hours, hours = _payable_hours_split(entries, 'workcategoryid')
     stat_dates, stat_labels = _stat_info()
     this_year = timezone.now().year
+    last_category_selection, last_shifttype, last_hours = _last_entry_prefill(
+        MainEntry.objects.filter(mainheaderid__employeeid=request.user), 'workcategoryid', 'wc_'
+    )
 
     context = {
         'header': header,
@@ -223,6 +254,9 @@ def add_entry(request, pk):
         'revision_mode': revision_mode,
         'vacation_remaining': leave_rules.get_vacation_remaining(request.user, this_year),
         'floater_available': leave_rules.get_floater_available(request.user, this_year),
+        'last_category_selection': last_category_selection,
+        'last_shifttype': last_shifttype,
+        'last_hours': last_hours,
         **leave_rules.leave_type_ids_context(),
     }
     if revision_mode:
@@ -231,6 +265,15 @@ def add_entry(request, pk):
         context['crews'] = Crews.objects.all()
         context['today'] = timezone.now().date()
         context['days_remaining'] = 60 - (timezone.now() - header.startedat).days
+        # Soft deadline warning: never blocks submission, just flags it as
+        # late (for the employee now, and for supervisor/payroll afterward
+        # via MainHeader.is_late) so a forgotten timesheet is never
+        # impossible to file — only visibly late.
+        earliest_date = entries.aggregate(Min('startdate'))['startdate__min']
+        if earliest_date:
+            deadline = submission_deadline(earliest_date.year, earliest_date.month)
+            context['would_be_late'] = timezone.now() > deadline
+            context['late_deadline'] = deadline
 
     return render(request, 'timesheets/add_entry.html', context)
 
@@ -302,6 +345,21 @@ def review_timesheet(request, pk):
                  header.save()
                  log_action(request.user, 'Rejected', 'MainEntry', entry.mainentryid,
                             old_values={'linestatus': old_status}, new_values={'linestatus': 'Rejected'})
+
+        elif action == 'bulk_approve':
+            entryids = request.POST.getlist('entryids')
+            to_approve = MainEntry.objects.filter(mainentryid__in=entryids, mainheaderid=header, linestatus='New')
+            if to_approve.exists():
+                for entry in to_approve:
+                    entry.linestatus = 'Approved'
+                    entry.approvedat = timezone.now()
+                    entry.supervisornote = None
+                    entry.approvedby = request.user
+                    entry.save()
+                    log_action(request.user, 'Approved', 'MainEntry', entry.mainentryid,
+                               old_values={'linestatus': 'New'}, new_values={'linestatus': 'Approved'})
+                header.overallstatus = 'In Progress'
+                header.save()
 
         elif action == 'finish_review':
             old_status = header.overallstatus
@@ -786,34 +844,63 @@ def payroll_ops_daily_day(request, year, month, day):
 
     target_date = date(year, month, day)
 
-    headers = OperationsHeader.objects.filter(
+    shifts = OperationsHeader.objects.filter(
         overallstatus='Completed',
         shiftdate=target_date,
     ).exclude(
         opsheaderid__in=unpaid_header_ids
+    ).values('shifttype').annotate(
+        sheet_count=Count('opsheaderid', distinct=True),
+    ).order_by('shifttype')
+
+    return render(request, 'timesheets/payroll_ops_daily_day.html', {
+        'target_date': target_date,
+        'shifts': shifts,
+        'year': year,
+        'month': month,
+        'day': day,
+        'month_date': date(year, month, 1),
+    })
+
+
+@login_required(login_url='login')
+def payroll_ops_daily_shift(request, year, month, day, shifttype):
+    if request.user.access_level != 7:
+        return redirect('profile')
+
+    unpaid_header_ids = OperationsEntry.objects.filter(
+        linestatus='Approved',
+        paidat__isnull=True,
+    ).values_list('opsheaderid', flat=True)
+
+    target_date = date(year, month, day)
+
+    headers = OperationsHeader.objects.filter(
+        overallstatus='Completed',
+        shiftdate=target_date,
+        shifttype=shifttype,
+    ).exclude(
+        opsheaderid__in=unpaid_header_ids
     ).select_related(
-        'shifterid', 'crewid', 'coverageid'
+        'shifterid', 'crewid', 'coverageid__home_shifter', 'ohapprovedby_capt'
     ).prefetch_related(
         Prefetch(
             'operationsentry_set',
             queryset=OperationsEntry.objects.filter(
                 linestatus='Approved'
             ).select_related(
-                'employeeid', 'contractid', 'accountid', 'opscategoryid'
+                'employeeid', 'contractid', 'accountid', 'opscategoryid', 'leavetypeid'
             ).order_by('employeeid__lastname', 'employeeid__firstname'),
-            to_attr='paid_entries'
         )
-    ).order_by('shifttype', 'shifterid__lastname', 'shifterid__firstname')
+    ).order_by('crewid__crewname', 'section', 'shifterid__lastname', 'shifterid__firstname')
 
-    day_sheets = [h for h in headers if h.shifttype == 'Day']
-    night_sheets = [h for h in headers if h.shifttype == 'Night']
-
-    return render(request, 'timesheets/payroll_ops_daily_day.html', {
+    return render(request, 'timesheets/payroll_ops_daily_shift.html', {
+        'headers': headers,
         'target_date': target_date,
-        'day_sheets': day_sheets,
-        'night_sheets': night_sheets,
+        'shifttype': shifttype,
         'year': year,
         'month': month,
+        'day': day,
         'month_date': date(year, month, 1),
     })
 
@@ -1093,32 +1180,54 @@ def superintendent_ops_daily_day(request, year, month, day):
 
     target_date = date(year, month, day)
 
+    shifts = OperationsHeader.objects.filter(
+        overallstatus='Completed',
+        shiftdate=target_date,
+    ).values('shifttype').annotate(
+        sheet_count=Count('opsheaderid', distinct=True),
+    ).order_by('shifttype')
+
+    return render(request, 'timesheets/superintendent_ops_daily_day.html', {
+        'target_date': target_date,
+        'shifts': shifts,
+        'year': year,
+        'month': month,
+        'day': day,
+        'month_date': date(year, month, 1),
+    })
+
+
+@login_required(login_url='login')
+def superintendent_ops_daily_shift(request, year, month, day, shifttype):
+    if request.user.access_level != 2:
+        return redirect('profile')
+
+    target_date = date(year, month, day)
+
     headers = OperationsHeader.objects.filter(
         overallstatus='Completed',
         shiftdate=target_date,
+        shifttype=shifttype,
     ).select_related(
-        'shifterid', 'crewid', 'coverageid'
+        'shifterid', 'crewid', 'coverageid__home_shifter', 'ohapprovedby_capt'
     ).prefetch_related(
         Prefetch(
             'operationsentry_set',
             queryset=OperationsEntry.objects.filter(
                 linestatus='Approved'
             ).select_related(
-                'employeeid', 'contractid', 'accountid', 'opscategoryid'
+                'employeeid', 'contractid', 'accountid', 'opscategoryid', 'leavetypeid'
             ).order_by('employeeid__lastname', 'employeeid__firstname'),
-            to_attr='approved_entries'
         )
-    ).order_by('shifttype', 'shifterid__lastname', 'shifterid__firstname')
+    ).order_by('crewid__crewname', 'section', 'shifterid__lastname', 'shifterid__firstname')
 
-    day_sheets = [h for h in headers if h.shifttype == 'Day']
-    night_sheets = [h for h in headers if h.shifttype == 'Night']
-
-    return render(request, 'timesheets/superintendent_ops_daily_day.html', {
+    return render(request, 'timesheets/superintendent_ops_daily_shift.html', {
+        'headers': headers,
         'target_date': target_date,
-        'day_sheets': day_sheets,
-        'night_sheets': night_sheets,
+        'shifttype': shifttype,
         'year': year,
         'month': month,
+        'day': day,
         'month_date': date(year, month, 1),
     })
 
@@ -1773,6 +1882,8 @@ def ops_sheet(request, pk):
     prefill = {}
     vacation_balances = {}
     crew_members = [a.employee for a in active_assignments] + list(guest_employees)
+    if request.user.employmenttype == 'Contract':
+        crew_members.append(request.user)
     for member in crew_members:
         last = OperationsEntry.objects.filter(
             employeeid=member
@@ -1863,13 +1974,11 @@ def my_ops_completed(request):
     if request.user.access_level != 4:
         return redirect('profile')
     months = OperationsHeader.objects.filter(
-        ohapprovedby_capt=request.user,
         overallstatus='Completed'
     ).annotate(
         month=TruncMonth('shiftdate')
     ).values('month').annotate(
-        sheet_count=Count('opsheaderid', distinct=True),
-        total_hours=Sum('operationsentry__hoursworked')
+        day_count=Count('shiftdate', distinct=True),
     ).order_by('-month')
     return render(request, 'timesheets/my_ops_completed.html', {'months': months})
 
@@ -1878,19 +1987,104 @@ def my_ops_completed(request):
 def my_ops_completed_month(request, year, month):
     if request.user.access_level != 4:
         return redirect('profile')
-    sheets = OperationsHeader.objects.filter(
-        ohapprovedby_capt=request.user,
+    days = OperationsHeader.objects.filter(
         overallstatus='Completed',
         shiftdate__year=year,
         shiftdate__month=month,
+    ).values('shiftdate').annotate(
+        sheet_count=Count('opsheaderid', distinct=True),
+        day_count=Count('opsheaderid', filter=Q(shifttype='Day'), distinct=True),
+        night_count=Count('opsheaderid', filter=Q(shifttype='Night'), distinct=True),
+    ).order_by('shiftdate')
+    return render(request, 'timesheets/my_ops_completed_month.html', {
+        'days': days,
+        'year': year,
+        'month': month,
+    })
+
+
+@login_required(login_url='login')
+def my_ops_completed_day(request, year, month, day):
+    if request.user.access_level != 4:
+        return redirect('profile')
+    shift_date = date(year, month, day)
+    shifts = OperationsHeader.objects.filter(
+        overallstatus='Completed',
+        shiftdate=shift_date,
+    ).values('shifttype').annotate(
+        sheet_count=Count('opsheaderid', distinct=True),
+    ).order_by('shifttype')
+    return render(request, 'timesheets/my_ops_completed_day.html', {
+        'shifts': shifts,
+        'shift_date': shift_date,
+        'year': year,
+        'month': month,
+        'day': day,
+    })
+
+
+@login_required(login_url='login')
+def my_ops_completed_shift(request, year, month, day, shifttype):
+    if request.user.access_level != 4:
+        return redirect('profile')
+    shift_date = date(year, month, day)
+    headers = OperationsHeader.objects.filter(
+        overallstatus='Completed',
+        shiftdate=shift_date,
+        shifttype=shifttype,
     ).select_related(
         'shifterid', 'crewid', 'coverageid__home_shifter', 'ohapprovedby_capt'
+    ).prefetch_related(
+        Prefetch(
+            'operationsentry_set',
+            queryset=OperationsEntry.objects.select_related(
+                'employeeid', 'contractid', 'accountid', 'opscategoryid', 'leavetypeid'
+            ).order_by('employeeid__firstname', 'employeeid__lastname'),
+        )
+    ).order_by('crewid__crewname', 'section', 'shifterid__lastname', 'shifterid__firstname')
+    return render(request, 'timesheets/my_ops_completed_shift.html', {
+        'headers': headers,
+        'shift_date': shift_date,
+        'shifttype': shifttype,
+        'year': year,
+        'month': month,
+        'day': day,
+    })
+
+
+def _is_contract_shifter(user):
+    return user.access_level == 5 and user.employmenttype == 'Contract'
+
+
+@login_required(login_url='login')
+def my_pay_history(request):
+    if not _is_contract_shifter(request.user):
+        return redirect('profile')
+    months = OperationsEntry.objects.filter(
+        employeeid=request.user,
+        opsheaderid__overallstatus='Completed',
     ).annotate(
-        entry_count=Count('operationsentry'),
-        total_hours=Sum('operationsentry__hoursworked')
-    ).order_by('shiftdate', 'shifttype')
-    return render(request, 'timesheets/my_ops_completed_month.html', {
-        'sheets': sheets,
+        month=TruncMonth('opsheaderid__shiftdate')
+    ).values('month').annotate(
+        day_count=Count('opsheaderid__shiftdate', distinct=True),
+    ).order_by('-month')
+    return render(request, 'timesheets/my_pay_history.html', {'months': months})
+
+
+@login_required(login_url='login')
+def my_pay_history_month(request, year, month):
+    if not _is_contract_shifter(request.user):
+        return redirect('profile')
+    entries = OperationsEntry.objects.filter(
+        employeeid=request.user,
+        opsheaderid__overallstatus='Completed',
+        opsheaderid__shiftdate__year=year,
+        opsheaderid__shiftdate__month=month,
+    ).select_related(
+        'opsheaderid', 'opsheaderid__shifterid', 'contractid', 'accountid', 'opscategoryid', 'leavetypeid'
+    ).order_by('opsheaderid__shiftdate', 'opsheaderid__shifttype')
+    return render(request, 'timesheets/my_pay_history_month.html', {
+        'entries': entries,
         'year': year,
         'month': month,
     })
@@ -1936,27 +2130,14 @@ def ops_approval_inbox(request):
     if request.user.access_level != 4:
         return redirect('profile')
 
-    action_needed = OperationsHeader.objects.filter(
-        overallstatus='Submitted',
+    action_needed_dates = OperationsHeader.objects.filter(
+        overallstatus__in=['Submitted', 'In Progress'],
     ).filter(
         Q(ohapprovedby_capt__isnull=True) | Q(ohapprovedby_capt=request.user)
-    ).select_related(
-        'shifterid', 'crewid', 'coverageid__home_shifter', 'ohapprovedby_capt'
-    ).annotate(
-        entry_count=Count('operationsentry'),
-        total_hours=Sum('operationsentry__hoursworked'),
-    ).order_by('shiftdate', 'shifttype')
-
-    in_progress_sheets = OperationsHeader.objects.filter(
-        overallstatus='In Progress', ohapprovedby_capt=request.user
-    ).select_related(
-        'shifterid', 'crewid', 'coverageid__home_shifter'
-    ).annotate(
-        entry_count=Count('operationsentry'),
-        total_hours=Sum('operationsentry__hoursworked'),
-        approved_count=Count('operationsentry', filter=Q(operationsentry__linestatus='Approved')),
-        new_count=Count('operationsentry', filter=Q(operationsentry__linestatus='New')),
-    ).order_by('shiftdate', 'shifttype')
+    ).values('shiftdate').annotate(
+        sheet_count=Count('opsheaderid', distinct=True),
+        in_progress_count=Count('opsheaderid', filter=Q(overallstatus='In Progress'), distinct=True),
+    ).order_by('shiftdate')
 
     pending_revision_sheets = OperationsHeader.objects.filter(
         overallstatus='Revision Required', ohapprovedby_capt=request.user
@@ -1968,9 +2149,71 @@ def ops_approval_inbox(request):
     ).order_by('shiftdate', 'shifttype')
 
     return render(request, 'timesheets/ops_approval_inbox.html', {
-        'action_needed': action_needed,
-        'in_progress_sheets': in_progress_sheets,
+        'action_needed_dates': action_needed_dates,
         'pending_revision_sheets': pending_revision_sheets,
+    })
+
+
+@login_required(login_url='login')
+def ops_approval_inbox_date(request, year, month, day):
+    if request.user.access_level != 4:
+        return redirect('profile')
+
+    target_date = date(year, month, day)
+    shifts = OperationsHeader.objects.filter(
+        overallstatus__in=['Submitted', 'In Progress'], shiftdate=target_date,
+    ).filter(
+        Q(ohapprovedby_capt__isnull=True) | Q(ohapprovedby_capt=request.user)
+    ).values('shifttype').annotate(
+        sheet_count=Count('opsheaderid', distinct=True),
+        in_progress_count=Count('opsheaderid', filter=Q(overallstatus='In Progress'), distinct=True),
+    ).order_by('shifttype')
+
+    return render(request, 'timesheets/ops_approval_inbox_date.html', {
+        'shifts': shifts,
+        'target_date': target_date,
+        'year': year,
+        'month': month,
+        'day': day,
+    })
+
+
+@login_required(login_url='login')
+def ops_approval_inbox_shift(request, year, month, day, shifttype):
+    if request.user.access_level != 4:
+        return redirect('profile')
+
+    target_date = date(year, month, day)
+    headers = OperationsHeader.objects.filter(
+        overallstatus__in=['Submitted', 'In Progress'], shiftdate=target_date, shifttype=shifttype,
+    ).filter(
+        Q(ohapprovedby_capt__isnull=True) | Q(ohapprovedby_capt=request.user)
+    ).select_related(
+        'shifterid', 'crewid', 'coverageid__home_shifter'
+    ).order_by('crewid__crewname', 'section', 'shifterid__lastname', 'shifterid__firstname')
+
+    stat_dates, stat_labels = _stat_info()
+    panels = []
+    for header in headers:
+        entries = OperationsEntry.objects.filter(opsheaderid=header).select_related(
+            'employeeid', 'contractid', 'accountid', 'opscategoryid', 'approvedby_capt'
+        )
+        panels.append({
+            'header': header,
+            'entries': entries,
+            'has_unreviewed': entries.filter(linestatus='New').exists(),
+            'has_rejected': entries.filter(linestatus='Rejected').exists(),
+            'is_stat': header.shiftdate in stat_dates,
+            'stat_label': stat_labels.get(header.shiftdate, ''),
+        })
+
+    return render(request, 'timesheets/ops_approval_inbox_shift.html', {
+        'panels': panels,
+        'shifttype': shifttype,
+        'target_date': target_date,
+        'year': year,
+        'month': month,
+        'day': day,
     })
 
 
@@ -1992,6 +2235,10 @@ def review_ops_sheet(request,pk):
 
     if request.method == 'POST' and not readonly:
         action = request.POST.get('action')
+        next_url = request.POST.get('next')
+
+        def _redirect_here():
+            return redirect(next_url) if next_url else redirect('review_ops_sheet', pk=pk)
 
         if action in ('approve', 'reject'):
             entry = get_object_or_404(OperationsEntry, opsentryid=request.POST.get('entryid'), opsheaderid=header)
@@ -2007,7 +2254,7 @@ def review_ops_sheet(request,pk):
             elif action == 'reject':
                 note = request.POST.get('captainnote', '').strip()
                 if not note:
-                    return redirect('review_ops_sheet', pk=pk)
+                    return _redirect_here()
                 entry.captainnote = note
                 entry.linestatus = 'Rejected'
                 entry.approvedby_capt = request.user
@@ -2024,12 +2271,33 @@ def review_ops_sheet(request,pk):
             elif header.overallstatus == 'Submitted':
                 header.overallstatus = 'In Progress'
                 header.save()
-            return redirect('review_ops_sheet', pk=pk)
+            return _redirect_here()
+
+        elif action == 'bulk_approve':
+            entryids = request.POST.getlist('entryids')
+            to_approve = OperationsEntry.objects.filter(opsentryid__in=entryids, opsheaderid=header, linestatus='New')
+            if to_approve.exists():
+                for entry in to_approve:
+                    entry.linestatus = 'Approved'
+                    entry.approvedby_capt = request.user
+                    entry.approvedat_capt = timezone.now()
+                    entry.captainnote = None
+                    entry.save()
+                    log_action(request.user, 'Approved', 'OperationsEntry', entry.opsentryid,
+                               old_values={'linestatus': 'New'}, new_values={'linestatus': 'Approved'})
+                if not header.ohapprovedby_capt:
+                    header.ohapprovedby_capt = request.user
+                    header.overallstatus = 'In Progress'
+                    header.save()
+                elif header.overallstatus == 'Submitted':
+                    header.overallstatus = 'In Progress'
+                    header.save()
+            return _redirect_here()
 
         elif action == 'finish_review':
             all_entries = OperationsEntry.objects.filter(opsheaderid=header)
             if all_entries.filter(linestatus='New').exists():
-                return redirect('review_ops_sheet', pk=pk)
+                return _redirect_here()
             old_status = header.overallstatus
             if all_entries.filter(linestatus='Rejected').exists():
                 header.overallstatus = 'Revision Required'
@@ -2039,7 +2307,7 @@ def review_ops_sheet(request,pk):
             header.save()
             log_action(request.user, 'ReviewCompleted', 'OperationsHeader', header.opsheaderid,
                        old_values={'overallstatus': old_status}, new_values={'overallstatus': header.overallstatus})
-            return redirect('ops_approval_inbox')
+            return redirect(next_url) if next_url else redirect('ops_approval_inbox')
 
     entries = OperationsEntry.objects.filter(opsheaderid=header).select_related(
         'employeeid', 'contractid', 'accountid', 'opscategoryid', 'approvedby_capt'
@@ -2151,6 +2419,8 @@ _MONTH_NAMES = dict(MONTH_CHOICES)
 def new_business_timesheet(request):
     if request.user.access_level not in _BUSINESS_SUBMITTERS:
         return redirect('profile')
+    if request.user.access_level == 5 and request.user.employmenttype == 'Contract':
+        return redirect('profile')
 
     now = timezone.now()
 
@@ -2163,6 +2433,10 @@ def new_business_timesheet(request):
 
         if not (1 <= month <= 12) or year < 2020:
             messages.error(request, 'Please select a valid month and year.')
+            return redirect('new_business_timesheet')
+
+        if (year, month) > (now.year, now.month):
+            messages.error(request, "You can't start a timesheet for a future month.")
             return redirect('new_business_timesheet')
 
         existing = BusinessHeader.objects.filter(
@@ -2188,9 +2462,11 @@ def new_business_timesheet(request):
     current_year = now.year
     return render(request, 'timesheets/business_new.html', {
         'month_choices': MONTH_CHOICES,
-        'year_choices': [current_year - 1, current_year, current_year + 1],
+        'year_choices': [current_year - 1, current_year],
         'default_month': now.month,
         'default_year': current_year,
+        'current_year': current_year,
+        'current_month': now.month,
     })
 
 
@@ -2368,6 +2644,15 @@ def add_business_entry(request, pk):
     payable_hours, non_payable_hours, total_hours = _payable_hours_split(entries, 'businesscategoryid')
     stat_dates, stat_labels = _stat_info()
     this_year = timezone.now().year
+    last_category_selection, last_shifttype, last_hours = _last_entry_prefill(
+        BusinessEntry.objects.filter(businessheaderid__employeeid=request.user), 'businesscategoryid', 'bc_'
+    )
+    # Soft deadline warning: never blocks submission, just flags it as late
+    # (for the employee now, and for supervisor/payroll afterward via
+    # BusinessHeader.is_late) so a forgotten timesheet is never impossible
+    # to file — only visibly late.
+    deadline = submission_deadline(header.periodyear, header.periodmonth)
+    would_be_late = timezone.now() > deadline
 
     return render(request, 'timesheets/add_business_entry.html', {
         'header': header,
@@ -2383,6 +2668,11 @@ def add_business_entry(request, pk):
         'vacation_remaining': leave_rules.get_vacation_remaining(request.user, this_year),
         'floater_available': leave_rules.get_floater_available(request.user, this_year),
         'lieu_balance': leave_rules.get_lieu_balance(request.user),
+        'last_category_selection': last_category_selection,
+        'last_shifttype': last_shifttype,
+        'last_hours': last_hours,
+        'would_be_late': would_be_late,
+        'late_deadline': deadline,
         **leave_rules.leave_type_ids_context(),
     })
 
@@ -2546,6 +2836,25 @@ def review_business_timesheet(request, pk):
                            old_values={'linestatus': old_status}, new_values={'linestatus': entry.linestatus})
                 if action == 'approve' and entry.leavetypeid_id and entry.leavetypeid.leavetypename == leave_rules.LIEU_DAY_TYPE_NAME:
                     leave_rules.consume_lieu_day(header.employeeid, entry)
+
+        elif action == 'bulk_approve':
+            entryids = request.POST.getlist('entryids')
+            to_approve = BusinessEntry.objects.filter(businessentryid__in=entryids, businessheaderid=header, linestatus='New')
+            if to_approve.exists():
+                for entry in to_approve:
+                    entry.linestatus = 'Approved'
+                    entry.approvedat = timezone.now()
+                    entry.supervisornote = None
+                    entry.approvedby = request.user
+                    entry.save()
+                    log_action(request.user, 'Approved', 'BusinessEntry', entry.businessentryid,
+                               old_values={'linestatus': 'New'}, new_values={'linestatus': 'Approved'})
+                    if entry.leavetypeid_id and entry.leavetypeid.leavetypename == leave_rules.LIEU_DAY_TYPE_NAME:
+                        leave_rules.consume_lieu_day(header.employeeid, entry)
+                header.overallstatus = 'In Progress'
+                if header.employeeid.access_level == 5 and not header.bh_approvedby_capt:
+                    header.bh_approvedby_capt = request.user
+                header.save()
 
         elif action == 'finish_review':
             old_status = header.overallstatus

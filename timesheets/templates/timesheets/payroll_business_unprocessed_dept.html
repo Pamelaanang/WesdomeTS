@@ -49,13 +49,7 @@
             </p>
 
             <!-- Photo + name -->
-            <div class="w-16 h-16 rounded-full bg-black overflow-hidden flex items-center justify-center mb-3 mx-auto">
-                {% if sub.employeeid.profilepic %}
-                <img src="/media/{{ sub.employeeid.profilepic }}" class="w-full h-full object-cover" alt="">
-                {% else %}
-                <i class="fa-solid fa-user text-white text-2xl"></i>
-                {% endif %}
-            </div>
+            {% include 'timesheets/_avatar.html' with person=sub.employeeid extra_class='mb-3 mx-auto' %}
             <p class="font-semibold text-slate-800 text-center">{{ sub.employeeid.firstname }} {{ sub.employeeid.lastname }}</p>
             <p class="text-xs text-gray-500 text-center mt-0.5 mb-3">{{ sub.get_periodmonth_display }} {{ sub.periodyear }}</p>
 
@@ -63,6 +57,11 @@
                 <span class="text-gray-500">{{ sub.entry_count }} entr{{ sub.entry_count|pluralize:"y,ies" }}</span>
                 <span class="font-semibold text-slate-800">{{ sub.total_hours }} hrs</span>
             </div>
+            {% if sub.is_late %}
+            <div class="mt-2 flex justify-center">
+                <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700" title="Submitted after the normal deadline">Late</span>
+            </div>
+            {% endif %}
         </a>
         {% endfor %}
     </div>

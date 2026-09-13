@@ -191,6 +191,16 @@
                     </select>
                 </div>
                 <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Miner Level <span class="text-gray-400 font-normal">(Miners only — Lead/1/2 are Spare Shifter eligible)</span></label>
+                    <select name="minerlevel"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for value, label in minerlevel_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Employment Type</label>
                     <select name="employmenttype"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
@@ -336,6 +346,16 @@
                     </select>
                 </div>
                 <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Miner Level <span class="text-gray-400 font-normal">(Miners only — Lead/1/2 are Spare Shifter eligible)</span></label>
+                    <select name="minerlevel" id="editMinerlevel"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for value, label in minerlevel_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Employment Type</label>
                     <select name="employmenttype" id="editEmploymenttype"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
@@ -423,6 +443,7 @@ const employeeData = {
         supervisorid: "{{ user.supervisorid_id|default:'' }}",
         shiftertype: "{{ user.shiftertype|default:'' }}",
         crewid: "{{ user.crewid_id|default:'' }}",
+        minerlevel: "{{ user.minerlevel|default:'' }}",
         hasaccess: {{ user.hasaccess|yesno:"true,false" }},
         employmenttype: "{{ user.employmenttype|default:'Staff' }}",
         contractid: "{{ user.contractid_id|default:'' }}",
@@ -449,6 +470,7 @@ function openEditModal(employeeid) {
     document.getElementById('editSupervisorSelect').value = emp.supervisorid;
     document.getElementById('editShiftertype').value = emp.shiftertype;
     document.getElementById('editCrewid').value = emp.crewid;
+    document.getElementById('editMinerlevel').value = emp.minerlevel;
     document.getElementById('editHasaccess').checked = emp.hasaccess;
     document.getElementById('editEmploymenttype').value = emp.employmenttype;
     document.getElementById('editContractid').value = emp.contractid;

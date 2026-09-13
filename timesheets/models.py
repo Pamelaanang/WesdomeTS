@@ -6,7 +6,23 @@
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
 
+from datetime import datetime
+
 from django.db import models
+from django.db.models import Min
+from django.utils import timezone
+
+
+def submission_deadline(year, month):
+    """5th of the month after (year, month), end of day, tz-aware — the
+    normal (soft) cutoff for submitting that month's personal timesheet.
+    Submitting after this is still allowed; it's just flagged late."""
+    if month == 12:
+        deadline_year, deadline_month = year + 1, 1
+    else:
+        deadline_year, deadline_month = year, month + 1
+    naive = datetime(deadline_year, deadline_month, 5, 23, 59, 59)
+    return timezone.make_aware(naive) if timezone.is_naive(naive) else naive
 
 
 class Auditlog(models.Model):
@@ -123,10 +139,22 @@ class MainHeader(models.Model):
     completedat = models.DateTimeField(db_column='CompletedAt', blank=True, null=True)
     paidat = models.DateTimeField(db_column='PaidAt', blank=True, null=True)
     paidby = models.ForeignKey('users.User', models.DO_NOTHING, db_column='PaidBy', blank=True, null=True, related_name='paid_%(class)s')
-    
+
     class Meta:
         managed = True
         db_table = 'MainHeader'
+
+    @property
+    def is_late(self):
+        """Submitted after the normal deadline for the earliest-dated entry
+        it contains. MainHeader has no period field of its own — the oldest
+        entry's month stands in for 'which month was this submission for'."""
+        if not self.submittedat:
+            return False
+        earliest = self.mainentry_set.aggregate(Min('startdate'))['startdate__min']
+        if not earliest:
+            return False
+        return self.submittedat > submission_deadline(earliest.year, earliest.month)
 
 
 class MainEntry(models.Model):
@@ -206,6 +234,13 @@ class BusinessHeader(models.Model):
     class Meta:
         managed = True
         db_table = 'BusinessHeader'
+
+    @property
+    def is_late(self):
+        """Submitted after the normal deadline (the 5th of the following month)."""
+        if not self.submittedat:
+            return False
+        return self.submittedat > submission_deadline(self.periodyear, self.periodmonth)
 
 
 class BusinessEntry(models.Model):

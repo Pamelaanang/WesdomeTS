@@ -58,7 +58,15 @@
         {% endif %}
     </div>
 </div>
-{% elif days_remaining <= 14 %}
+{% elif would_be_late %}
+<div class="container mx-auto mt-2 px-4">
+    <div class="flex items-center gap-3 bg-amber-50 border border-amber-300 text-amber-800 text-sm rounded-xl px-4 py-2">
+        <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
+        The normal deadline for this timesheet was {{ late_deadline|date:"M j, Y" }}. You can still submit — it will just be marked as a late submission for your supervisor and payroll.
+    </div>
+</div>
+{% endif %}
+{% if not revision_mode and days_remaining <= 14 %}
 <div class="container mx-auto mt-2 px-4">
     <div class="bg-yellow-100 border border-yellow-400 text-yellow-800 text-sm rounded px-4 py-2">
         ⚠ This draft will be automatically deleted in {{ days_remaining }} day{{ days_remaining|pluralize }} if not submitted.
@@ -194,6 +202,7 @@
                             <input type="text" name="entrydescription" id="desc-input" placeholder="Optional"
                                 class="border rounded px-1 py-1 w-full text-xs">
                         </td>
+                        <td class="p-2"></td>
                         <td class="p-2">
                             <input type="date" name="startdate" id="date-input" class="border rounded px-1 py-1 text-xs w-full">
                         </td>
@@ -235,6 +244,9 @@
     const FLOATER_LT = "{{ floater_leavetype_id|default:'' }}";
     const OWN_VACATION_REMAINING = {% if vacation_remaining is not None %}"{{ vacation_remaining }}"{% else %}null{% endif %};
     const OWN_FLOATER_AVAILABLE = {{ floater_available|yesno:"true,false" }};
+    const LAST_CATEGORY_SELECTION = "{{ last_category_selection|default:'' }}";
+    const LAST_SHIFTTYPE = "{{ last_shifttype|default:'' }}";
+    const LAST_HOURS = "{{ last_hours|default:'' }}";
 
     function showOwnLeaveInfo() {
         const catEl = document.getElementById('cat-select');
@@ -255,13 +267,15 @@
     function toggleAddRow() {
         document.getElementById('form-entryid').value = '';
         document.getElementById('sap-input').value = '';
-        document.getElementById('cat-select').value = '';
-        document.getElementById('leave-info').textContent = '';
-        document.getElementById('shift-select').value = 'Day';
-        document.getElementById('hours-input').value = '';
+        // Prefill category/shift/hours from the employee's last entry, so a
+        // recurring pattern (e.g. Regular, Day, 8) doesn't need reselecting daily.
+        document.getElementById('cat-select').value = LAST_CATEGORY_SELECTION;
+        document.getElementById('shift-select').value = LAST_SHIFTTYPE || 'Day';
+        document.getElementById('hours-input').value = LAST_HOURS;
         document.getElementById('desc-input').value = '';
         document.getElementById('date-input').value = '';
         document.getElementById('add-row').classList.toggle('hidden');
+        showOwnLeaveInfo();
     }
 
     function saveEntry() {

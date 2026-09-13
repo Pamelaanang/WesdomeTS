@@ -1,0 +1,18 @@
+{% comment %}
+Standard profile-picture avatar circle. Usage:
+  {% include 'timesheets/_avatar.html' with person=emp %}
+  {% include 'timesheets/_avatar.html' with person=emp size='w-10 h-10' icon_size='text-sm' %}
+  {% include 'timesheets/_avatar.html' with person=emp extra_class='mb-3 mx-auto' %}
+size/icon_size default to w-16 h-16 / text-2xl, the site-wide standard for a
+card's identifying avatar. Only pass a smaller size for a compact inline
+layout (name/avatar side by side), never to fit a differently-sized card.
+extra_class is for caller-specific spacing/positioning only (margins,
+centering) — never for re-sizing the circle itself.
+{% endcomment %}
+<div class="{{ size|default:'w-16 h-16' }} rounded-full bg-black overflow-hidden flex-shrink-0 flex items-center justify-center{% if extra_class %} {{ extra_class }}{% endif %}">
+    {% if person.profilepic %}
+    <img src="/media/{{ person.profilepic }}" class="w-full h-full object-cover" alt="">
+    {% else %}
+    <i class="fa-solid fa-user text-white {{ icon_size|default:'text-2xl' }}"></i>
+    {% endif %}
+</div>

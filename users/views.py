@@ -14,6 +14,7 @@ from timesheets.models import MainHeader, MainEntry, OperationsHeader, Operation
 from django.db.models import Count, Q, Sum
 from calendar import month_name as _month_name
 from timesheets import leave as leave_rules
+from timesheets.audit import log_action
 
 
 def _leave_balance_context(user, year):
@@ -80,6 +81,7 @@ def user_list_view(request):
         'accounts': accounts,
         'employment_type_choices': User.EMPLOYMENT_TYPE_CHOICES,
         'shifter_type_choices': User.SHIFTER_TYPE_CHOICES,
+        'minerlevel_choices': User.MINER_LEVEL_CHOICES,
     })
 
 
@@ -158,10 +160,8 @@ def profile(request):
 
     elif al == 3:  # Supervisor
         direct_reports = User.objects.filter(supervisorid=user)
-        pending_count = (
-            MainHeader.objects.filter(employeeid__in=direct_reports, overallstatus__in=['Submitted', 'In Progress']).count() +
-            BusinessHeader.objects.filter(employeeid__in=direct_reports, overallstatus__in=['Submitted', 'In Progress']).count()
-        )
+        pending_maintenance = MainHeader.objects.filter(employeeid__in=direct_reports, overallstatus__in=['Submitted', 'In Progress']).count()
+        pending_business = BusinessHeader.objects.filter(employeeid__in=direct_reports, overallstatus__in=['Submitted', 'In Progress']).count()
         revision_count = (
             MainHeader.objects.filter(employeeid__in=direct_reports, overallstatus='Revision Required').count() +
             BusinessHeader.objects.filter(employeeid__in=direct_reports, overallstatus='Revision Required').count()
@@ -173,7 +173,8 @@ def profile(request):
 
         return render(request, 'users/profile.html', {
             'today': today,
-            'pending_count': pending_count,
+            'pending_maintenance': pending_maintenance,
+            'pending_business': pending_business,
             'revision_count': revision_count,
             'completed_month': completed_month,
             **_leave_balance_context(user, today.year),
@@ -196,11 +197,18 @@ def profile(request):
             ohapprovedat_capt__month=today.month,
         ).count()
 
+        # Workforce headcount — active Shifters (al=5, Spare Shifters included)
+        # and active Miners (al=8), mine-wide, not scoped to direct reports.
+        total_shifters = User.objects.filter(roleid__accessid__accessid=5, isactive=True).count()
+        total_miners = User.objects.filter(roleid__accessid__accessid=8, isactive=True).count()
+
         return render(request, 'users/profile.html', {
             'today': today,
             'personal_pending': personal_pending,
             'personal_completed': personal_completed,
             'ops_completed_month': ops_completed_month,
+            'total_shifters': total_shifters,
+            'total_miners': total_miners,
         })
 
     elif al == 4:  # Mine Captain
@@ -210,19 +218,45 @@ def profile(request):
         latest_paid = BusinessHeader.objects.filter(employeeid=user, paidat__isnull=False).order_by('-paidat').first()
         paid_hours = BusinessEntry.objects.filter(businessheaderid=latest_paid).aggregate(Sum('hoursworked'))['hoursworked__sum'] if latest_paid else None
         paid_period = f"{_month_name[latest_paid.periodmonth]} {latest_paid.periodyear}" if latest_paid else None
-        shifters = User.objects.filter(supervisorid=user)
+        # Crew daily sheets are claim-model owned, same as Shifters' personal
+        # timesheets — any captain can see an unclaimed Submitted sheet, and
+        # a claimed one belongs to whichever captain claimed it, regardless
+        # of the shifter's own supervisorid (which may not even be set).
+        # Mirrors ops_approval_inbox's three buckets exactly.
         ops_pending_captain = OperationsHeader.objects.filter(
-            shifterid__in=shifters, overallstatus='Submitted'
+            overallstatus='Submitted'
+        ).filter(
+            Q(ohapprovedby_capt__isnull=True) | Q(ohapprovedby_capt=user)
         ).count()
         ops_revision_captain = OperationsHeader.objects.filter(
-            shifterid__in=shifters, overallstatus='Revision Required'
+            overallstatus='Revision Required', ohapprovedby_capt=user
         ).count()
         ops_completed_month = OperationsHeader.objects.filter(
-            shifterid__in=shifters,
             overallstatus='Completed',
+            ohapprovedby_capt=user,
             ohapprovedat_capt__year=today.year,
             ohapprovedat_capt__month=today.month,
         ).count()
+
+        # Shifters' personal Business timesheets awaiting this captain's claim-
+        # based review — mirrors business_approval_inbox's al=4 ownership
+        # query exactly (any non-Shifter direct report, plus any Shifter
+        # submission that's unclaimed or already claimed by this captain).
+        business_subordinates = User.objects.filter(supervisorid=user).exclude(roleid__accessid__accessid=5)
+        shifter_ownership = Q(employeeid__in=business_subordinates) | (
+            Q(employeeid__roleid__accessid__accessid=5) &
+            (Q(bh_approvedby_capt__isnull=True) | Q(bh_approvedby_capt=user))
+        )
+        shifters_pending = BusinessHeader.objects.filter(
+            Q(overallstatus__in=['Submitted', 'In Progress']), shifter_ownership
+        ).distinct().count()
+        shifters_revision = BusinessHeader.objects.filter(
+            Q(overallstatus='Revision Required'), shifter_ownership
+        ).distinct().count()
+        shifters_completed_month = BusinessHeader.objects.filter(
+            Q(overallstatus='Completed', completedat__year=today.year, completedat__month=today.month),
+            shifter_ownership,
+        ).distinct().count()
 
         return render(request, 'users/profile.html', {
             'today': today,
@@ -234,31 +268,58 @@ def profile(request):
             'ops_pending_captain': ops_pending_captain,
             'ops_revision_captain': ops_revision_captain,
             'ops_completed_month': ops_completed_month,
+            'shifters_pending': shifters_pending,
+            'shifters_revision': shifters_revision,
+            'shifters_completed_month': shifters_completed_month,
             **_leave_balance_context(user, today.year),
         })
 
     elif al == 5:  # Shifter
-        draft_count = BusinessHeader.objects.filter(employeeid=user, overallstatus='Draft').count()
-        awaiting_count = BusinessHeader.objects.filter(employeeid=user, overallstatus__in=['Submitted', 'In Progress']).count()
-        revision_count = BusinessHeader.objects.filter(employeeid=user, overallstatus='Revision Required').count()
-        latest_paid = BusinessHeader.objects.filter(employeeid=user, paidat__isnull=False).order_by('-paidat').first()
-        paid_hours = BusinessEntry.objects.filter(businessheaderid=latest_paid).aggregate(Sum('hoursworked'))['hoursworked__sum'] if latest_paid else None
-        paid_period = f"{_month_name[latest_paid.periodmonth]} {latest_paid.periodyear}" if latest_paid else None
+        is_contract_shifter = user.employmenttype == 'Contract'
+        draft_count = awaiting_count = revision_count = None
+        pay_history_pending = pay_history_paid_month = None
+        paid_hours = paid_period = None
+
+        if is_contract_shifter:
+            pay_history_pending = OperationsEntry.objects.filter(
+                employeeid=user, opsheaderid__overallstatus='Completed',
+                linestatus='Approved', paidat__isnull=True,
+            ).count()
+            pay_history_paid_month = OperationsEntry.objects.filter(
+                employeeid=user, paidat__year=today.year, paidat__month=today.month,
+            ).count()
+            latest_paid_entry = OperationsEntry.objects.filter(
+                employeeid=user, paidat__isnull=False,
+            ).select_related('opsheaderid').order_by('-paidat').first()
+            if latest_paid_entry:
+                paid_hours = latest_paid_entry.hoursworked
+                paid_period = f"{_month_name[latest_paid_entry.opsheaderid.shiftdate.month]} {latest_paid_entry.opsheaderid.shiftdate.year}"
+        else:
+            draft_count = BusinessHeader.objects.filter(employeeid=user, overallstatus='Draft').count()
+            awaiting_count = BusinessHeader.objects.filter(employeeid=user, overallstatus__in=['Submitted', 'In Progress']).count()
+            revision_count = BusinessHeader.objects.filter(employeeid=user, overallstatus='Revision Required').count()
+            latest_paid = BusinessHeader.objects.filter(employeeid=user, paidat__isnull=False).order_by('-paidat').first()
+            paid_hours = BusinessEntry.objects.filter(businessheaderid=latest_paid).aggregate(Sum('hoursworked'))['hoursworked__sum'] if latest_paid else None
+            paid_period = f"{_month_name[latest_paid.periodmonth]} {latest_paid.periodyear}" if latest_paid else None
+
         ops_draft = OperationsHeader.objects.filter(shifterid=user, overallstatus='Draft').count()
-        ops_submitted = OperationsHeader.objects.filter(shifterid=user, overallstatus='Submitted').count()
-        ops_in_progress = OperationsHeader.objects.filter(shifterid=user, overallstatus='In Progress').count()
+        ops_awaiting_review = OperationsHeader.objects.filter(shifterid=user, overallstatus__in=['Submitted', 'In Progress']).count()
+        ops_revision = OperationsHeader.objects.filter(shifterid=user, overallstatus='Revision Required').count()
         ops_completed = OperationsHeader.objects.filter(shifterid=user, overallstatus='Completed', ohapprovedat_capt__year=today.year, ohapprovedat_capt__month=today.month).count()
 
         return render(request, 'users/profile.html', {
             'today': today,
+            'is_contract_shifter': is_contract_shifter,
             'draft_count': draft_count,
             'awaiting_count': awaiting_count,
             'revision_count': revision_count,
+            'pay_history_pending': pay_history_pending,
+            'pay_history_paid_month': pay_history_paid_month,
             'paid_hours': paid_hours,
             'paid_period': paid_period,
             'ops_draft': ops_draft,
-            'ops_submitted': ops_submitted,
-            'ops_in_progress': ops_in_progress,
+            'ops_awaiting_review': ops_awaiting_review,
+            'ops_revision': ops_revision,
             'ops_completed': ops_completed,
             **_leave_balance_context(user, today.year),
         })
@@ -387,6 +448,7 @@ def add_employee(request):
         contractid   = request.POST.get('contractid', '').strip() or None
         accountid    = request.POST.get('accountid', '').strip() or None
         hiredate     = request.POST.get('hiredate', '').strip() or None
+        minerlevel   = request.POST.get('minerlevel', '').strip() or None
 
         if User.objects.filter(employeeid=employeeid).exists():
             messages.error(request, f"Employee ID '{employeeid}' already exists.")
@@ -410,6 +472,7 @@ def add_employee(request):
                 contractid_id=contractid,
                 accountid_id=accountid,
                 hiredate=hiredate,
+                minerlevel=minerlevel,
             )
             new_user.set_password(temp_password)
             new_user.save()
@@ -442,6 +505,7 @@ def edit_employee(request, employeeid):
         accountid = request.POST.get('accountid', '').strip() or None
         hiredate = request.POST.get('hiredate', '').strip() or None
         terminationdate = request.POST.get('terminationdate', '').strip() or None
+        minerlevel = request.POST.get('minerlevel', '').strip() or None
 
         if not all([new_employeeid, firstname, lastname, phonenumber, roleid]):
             messages.error(request, "All required fields must be filled.")
@@ -465,6 +529,7 @@ def edit_employee(request, employeeid):
             employee.accountid_id = accountid
             employee.hiredate = hiredate
             employee.terminationdate = terminationdate
+            employee.minerlevel = minerlevel
             employee.save()
             messages.success(request, f"{firstname} {lastname} updated successfully.")
 
@@ -556,23 +621,54 @@ def crew_assignments(request):
         crew_count=Count('crew_led', filter=Q(crew_led__enddate__isnull=True))
     ).order_by('lastname', 'firstname')
 
+    miners = User.objects.filter(
+        roleid__accessid__accessid=8,
+        isactive=True
+    ).order_by('lastname', 'firstname')
+
     if request.method == 'POST' and request.POST.get('action') == 'bulk_update_crews':
         updated = 0
         for shifter in shifters:
             crewid = request.POST.get(f'crewid_{shifter.eid}') or None
             shiftertype = request.POST.get(f'shiftertype_{shifter.eid}') or None
-            if shifter.crewid_id != (int(crewid) if crewid else None) or shifter.shiftertype != shiftertype:
+            minerlevel = request.POST.get(f'minerlevel_{shifter.eid}') or None
+            employmenttype = request.POST.get(f'employmenttype_{shifter.eid}') or 'Staff'
+            changed = (
+                shifter.crewid_id != (int(crewid) if crewid else None)
+                or shifter.shiftertype != shiftertype
+                or shifter.minerlevel != minerlevel
+                or shifter.employmenttype != employmenttype
+            )
+            if changed:
                 shifter.crewid_id = crewid
                 shifter.shiftertype = shiftertype
-                shifter.save(update_fields=['crewid', 'shiftertype'])
+                shifter.minerlevel = minerlevel
+                shifter.employmenttype = employmenttype
+                shifter.save(update_fields=['crewid', 'shiftertype', 'minerlevel', 'employmenttype'])
                 updated += 1
-        messages.success(request, f'Updated {updated} shifter{"s" if updated != 1 else ""}.' if updated else 'No changes to save.')
+
+        # Miners don't lead a crew/section, but the Superintendent can still reset
+        # their seniority level and Staff/Contract classification here — the same
+        # two fields a demoted Shifter would carry back down with them.
+        for miner in miners:
+            minerlevel = request.POST.get(f'minerlevel_{miner.eid}') or None
+            employmenttype = request.POST.get(f'employmenttype_{miner.eid}') or 'Staff'
+            if miner.minerlevel != minerlevel or miner.employmenttype != employmenttype:
+                miner.minerlevel = minerlevel
+                miner.employmenttype = employmenttype
+                miner.save(update_fields=['minerlevel', 'employmenttype'])
+                updated += 1
+
+        messages.success(request, f'Updated {updated} member{"s" if updated != 1 else ""}.' if updated else 'No changes to save.')
         return redirect('crew_assignments')
 
     return render(request, 'users/crew_assignments.html', {
         'shifters': shifters,
+        'miners': miners,
         'crews': Crews.objects.filter(isactive=1),
         'shifter_type_choices': User.SHIFTER_TYPE_CHOICES,
+        'minerlevel_choices': User.MINER_LEVEL_CHOICES,
+        'employment_type_choices': User.EMPLOYMENT_TYPE_CHOICES,
     })
 
 
@@ -650,16 +746,47 @@ def my_crew(request):
 
 @login_required(login_url='login')
 def crew_coverage(request):
-    if request.user.access_level != 2:
+    # Assigning/ending coverage and promoting a Miner are a Mine Captain's job;
+    # the Superintendent keeps read-only visibility into who's covering whom.
+    if request.user.access_level not in (2, 4):
         return redirect('profile')
 
+    can_manage = request.user.access_level == 4
     today = timezone.now().date()
-    shifters = User.objects.filter(roleid__accessid__accessid=5, isactive=True).order_by('lastname', 'firstname')
 
-    if request.method == 'POST':
+    home_shifters = User.objects.filter(
+        roleid__rolename='Shift Coordinator', isactive=True
+    ).order_by('lastname', 'firstname')
+    covering_shifters = User.objects.filter(
+        roleid__accessid__accessid=5, isactive=True
+    ).order_by('lastname', 'firstname')
+    # Lead, Level 1, and Level 2 miners are eligible for Spare Shifter coverage —
+    # Levels 3/4 are recorded on the full seniority scale but never offered here.
+    miner_candidates = User.objects.filter(
+        roleid__accessid__accessid=8, minerlevel__in=['Lead', '1', '2'], isactive=True
+    ).order_by('lastname', 'firstname') if can_manage else User.objects.none()
+
+    if request.method == 'POST' and can_manage:
         action = request.POST.get('action')
 
-        if action == 'add':
+        if action == 'promote':
+            miner_id = request.POST.get('miner')
+            shiftertype = request.POST.get('shiftertype')
+            crewid = request.POST.get('crewid')
+            if miner_id and shiftertype and crewid:
+                miner = get_object_or_404(User, employeeid=miner_id, roleid__accessid__accessid=8)
+                spare_role = get_object_or_404(Roles, rolename='Spare Shifter')
+                old_values = {'roleid': miner.roleid_id, 'employmenttype': miner.employmenttype}
+                miner.roleid = spare_role
+                miner.employmenttype = 'Contract'
+                miner.shiftertype = shiftertype
+                miner.crewid_id = crewid
+                miner.hasaccess = True
+                miner.save()
+                log_action(request.user, 'Promote to Spare Shifter', 'Employee', miner.eid,
+                           old_values, {'roleid': spare_role.roleid, 'employmenttype': 'Contract'})
+
+        elif action == 'add':
             covering_id = request.POST.get('covering_shifter')
             home_id = request.POST.get('home_shifter')
             startdate = request.POST.get('startdate')
@@ -679,6 +806,21 @@ def crew_coverage(request):
             coverage.enddate = today
             coverage.save()
 
+            covering = coverage.covering_shifter
+            still_covering_elsewhere = CrewCoverage.objects.filter(
+                covering_shifter=covering, enddate__isnull=True
+            ).exclude(pk=coverage.pk).exists()
+            if not still_covering_elsewhere and covering.roleid.rolename == 'Spare Shifter':
+                miner_role = get_object_or_404(Roles, rolename='Underground Mine Operator')
+                old_values = {'roleid': covering.roleid_id, 'employmenttype': covering.employmenttype}
+                covering.roleid = miner_role
+                covering.employmenttype = 'Staff'
+                covering.shiftertype = None
+                covering.crewid = None
+                covering.save()
+                log_action(request.user, 'Revert Spare Shifter to Miner', 'Employee', covering.eid,
+                           old_values, {'roleid': miner_role.roleid, 'employmenttype': 'Staff'})
+
         return redirect('crew_coverage')
 
     active_coverages = CrewCoverage.objects.filter(
@@ -690,7 +832,12 @@ def crew_coverage(request):
     ).select_related('covering_shifter', 'home_shifter').order_by('-enddate')[:20]
 
     return render(request, 'users/crew_coverage.html', {
-        'shifters': shifters,
+        'can_manage': can_manage,
+        'home_shifters': home_shifters,
+        'covering_shifters': covering_shifters,
+        'miner_candidates': miner_candidates,
+        'shiftertype_choices': User.SHIFTER_TYPE_CHOICES,
+        'crews': Crews.objects.all().order_by('crewname'),
         'active_coverages': active_coverages,
         'past_coverages': past_coverages,
         'today': today,

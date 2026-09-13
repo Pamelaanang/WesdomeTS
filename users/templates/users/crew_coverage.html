@@ -12,9 +12,53 @@
     </p>
 </div>
 
-<!-- ADD COVERAGE FORM -->
+{% if can_manage %}
+<!-- STEP 1: PROMOTE A MINER TO SPARE SHIFTER -->
 <div class="container mx-auto mb-6 bg-white rounded-2xl shadow p-5">
-    <h3 class="font-semibold text-sm mb-4 text-gray-700">Assign Coverage</h3>
+    <h3 class="font-semibold text-sm mb-1 text-gray-700">Step 1 &middot; Promote a Miner to Spare Shifter</h3>
+    <p class="text-xs text-gray-400 mb-4">Only needed once per miner &mdash; once promoted, they appear as a covering shifter option below for as long as they're covering.</p>
+    <form method="POST">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="promote">
+        <div class="flex flex-wrap gap-4 items-end">
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Miner</label>
+                <select name="miner" required class="border rounded px-2 py-1.5 text-sm min-w-48">
+                    <option value="">-- Select Miner --</option>
+                    {% for m in miner_candidates %}
+                    <option value="{{ m.employeeid }}">{{ m.firstname }} {{ m.lastname }} (Level {{ m.minerlevel }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Shift Type</label>
+                <select name="shiftertype" required class="border rounded px-2 py-1.5 text-sm">
+                    <option value="">-- Select --</option>
+                    {% for value, label in shiftertype_choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Crew</label>
+                <select name="crewid" required class="border rounded px-2 py-1.5 text-sm">
+                    <option value="">-- Select --</option>
+                    {% for c in crews %}
+                    <option value="{{ c.crewid }}">{{ c.crewname }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit"
+                class="bg-[#B45309] text-white text-sm px-4 py-1.5 rounded-xl hover:opacity-90">
+                Promote
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- STEP 2: ADD COVERAGE FORM -->
+<div class="container mx-auto mb-6 bg-white rounded-2xl shadow p-5">
+    <h3 class="font-semibold text-sm mb-4 text-gray-700">Step 2 &middot; Assign Coverage</h3>
     <form method="POST">
         {% csrf_token %}
         <input type="hidden" name="action" value="add">
@@ -23,7 +67,7 @@
                 <label class="text-xs text-gray-500">Covering Shifter</label>
                 <select name="covering_shifter" required class="border rounded px-2 py-1.5 text-sm min-w-48">
                     <option value="">-- Select Shifter --</option>
-                    {% for s in shifters %}
+                    {% for s in covering_shifters %}
                     <option value="{{ s.employeeid }}">{{ s.firstname }} {{ s.lastname }}</option>
                     {% endfor %}
                 </select>
@@ -32,7 +76,7 @@
                 <label class="text-xs text-gray-500">Is Covering For</label>
                 <select name="home_shifter" required class="border rounded px-2 py-1.5 text-sm min-w-48">
                     <option value="">-- Home Shifter --</option>
-                    {% for s in shifters %}
+                    {% for s in home_shifters %}
                     <option value="{{ s.employeeid }}">{{ s.firstname }} {{ s.lastname }}</option>
                     {% endfor %}
                 </select>
@@ -73,6 +117,11 @@
     coveringSelect.addEventListener('change', syncDisabled);
     homeSelect.addEventListener('change', syncDisabled);
 </script>
+{% else %}
+<div class="container mx-auto mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-700">
+    <i class="fa-solid fa-eye"></i> Read-only view &mdash; assigning and ending coverage is managed by the Mine Captain.
+</div>
+{% endif %}
 
 <!-- ACTIVE COVERAGES -->
 <div class="container mx-auto mb-6">
@@ -93,6 +142,7 @@
                 </p>
                 <p class="text-xs text-gray-400">Assigned by {{ cov.assignedby.firstname }} {{ cov.assignedby.lastname }} on {{ cov.assignedat|date:"M j, Y" }}</p>
             </div>
+            {% if can_manage %}
             <form method="POST" onsubmit="return confirm('End this coverage assignment?')">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="end">
@@ -102,6 +152,7 @@
                     End Coverage
                 </button>
             </form>
+            {% endif %}
         </div>
         {% endfor %}
     </div>

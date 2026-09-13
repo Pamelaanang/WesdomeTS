@@ -18,8 +18,8 @@
     </button>
     <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
     <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
-    <p class="text-center text-sm text-gray-500 mt-1">Set each shifter's crew &amp; section, or click through to manage their crew members.</p>
-    {% if shifters %}
+    <p class="text-center text-sm text-gray-500 mt-1">Set each shifter's crew &amp; section, or click through to manage their crew members. Also reset Miner Level and Staff/Contract for Shifters and Miners.</p>
+    {% if shifters or miners %}
     <div class="mt-4 max-w-sm mx-auto">
         <div class="relative">
             <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
@@ -49,7 +49,8 @@
         </button>
     </div>
 
-    <div id="member-grid" class="flex flex-wrap gap-4">
+    <p class="text-xs font-semibold text-gray-500 uppercase mb-2">Shifters</p>
+    <div id="member-grid" class="flex flex-wrap gap-4 mb-8">
         {% for shifter in shifters %}
         <div data-search="{{ shifter.firstname|lower }} {{ shifter.lastname|lower }} {{ shifter.employeeid|lower }}"
             class="member-card bg-white rounded-xl shadow p-5 w-56 flex flex-col items-center gap-2">
@@ -75,6 +76,14 @@
                     <span class="text-gray-400">Section</span>
                     <span class="font-medium {% if shifter.shiftertype %}text-gray-800{% else %}text-gray-400 italic{% endif %}">{% if shifter.shiftertype %}{{ shifter.get_shiftertype_display }}{% else %}Not set{% endif %}</span>
                 </div>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-gray-400">Miner Level</span>
+                    <span class="font-medium {% if shifter.minerlevel %}text-gray-800{% else %}text-gray-400 italic{% endif %}">{{ shifter.minerlevel|default:"Not set" }}</span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-gray-400">Employment</span>
+                    <span class="font-medium text-gray-800">{{ shifter.employmenttype }}</span>
+                </div>
             </div>
 
             <div class="w-full hidden flex-col gap-1.5 mt-1 pt-2 border-t border-gray-100 crew-edit-mode">
@@ -90,13 +99,71 @@
                     <option value="{{ value }}" {% if shifter.shiftertype == value %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
+                <select name="minerlevel_{{ shifter.eid }}" class="border rounded px-2 py-1 text-xs w-full">
+                    <option value="">— No Miner Level —</option>
+                    {% for value, label in minerlevel_choices %}
+                    <option value="{{ value }}" {% if shifter.minerlevel == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <select name="employmenttype_{{ shifter.eid }}" class="border rounded px-2 py-1 text-xs w-full">
+                    {% for value, label in employment_type_choices %}
+                    <option value="{{ value }}" {% if shifter.employmenttype == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
             </div>
         </div>
         {% empty %}
         <div class="mx-auto text-gray-400 text-sm">No active shifters found.</div>
         {% endfor %}
     </div>
-    <div id="member-no-results" class="hidden text-center text-gray-400 text-sm py-10">No shifters match your search.</div>
+
+    <p class="text-xs font-semibold text-gray-500 uppercase mb-2">Miners</p>
+    <div class="flex flex-wrap gap-4">
+        {% for miner in miners %}
+        <div data-search="{{ miner.firstname|lower }} {{ miner.lastname|lower }} {{ miner.employeeid|lower }}"
+            class="member-card bg-white rounded-xl shadow p-5 w-56 flex flex-col items-center gap-2">
+            <div class="flex flex-col items-center gap-2">
+                <div class="w-20 h-20 rounded-full bg-black overflow-hidden flex items-center justify-center">
+                    {% if miner.profilepic %}
+                    <img src="/media/{{ miner.profilepic }}" class="w-full h-full object-cover" alt="Profile Photo">
+                    {% else %}
+                    <i class="fa-solid fa-user text-white text-2xl"></i>
+                    {% endif %}
+                </div>
+                <p class="font-semibold text-sm text-center">{{ miner.firstname }} {{ miner.lastname }}</p>
+                <p class="text-xs text-gray-500">{{ miner.roleid.rolename }}</p>
+            </div>
+
+            <div class="w-full flex flex-col gap-1 mt-1 pt-2 border-t border-gray-100 crew-view-mode">
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-gray-400">Miner Level</span>
+                    <span class="font-medium {% if miner.minerlevel %}text-gray-800{% else %}text-gray-400 italic{% endif %}">{{ miner.minerlevel|default:"Not set" }}</span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-gray-400">Employment</span>
+                    <span class="font-medium text-gray-800">{{ miner.employmenttype }}</span>
+                </div>
+            </div>
+
+            <div class="w-full hidden flex-col gap-1.5 mt-1 pt-2 border-t border-gray-100 crew-edit-mode">
+                <select name="minerlevel_{{ miner.eid }}" class="border rounded px-2 py-1 text-xs w-full">
+                    <option value="">— No Miner Level —</option>
+                    {% for value, label in minerlevel_choices %}
+                    <option value="{{ value }}" {% if miner.minerlevel == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <select name="employmenttype_{{ miner.eid }}" class="border rounded px-2 py-1 text-xs w-full">
+                    {% for value, label in employment_type_choices %}
+                    <option value="{{ value }}" {% if miner.employmenttype == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        {% empty %}
+        <div class="mx-auto text-gray-400 text-sm">No active miners found.</div>
+        {% endfor %}
+    </div>
+    <div id="member-no-results" class="hidden text-center text-gray-400 text-sm py-10">No members match your search.</div>
 </form>
 
 <script>

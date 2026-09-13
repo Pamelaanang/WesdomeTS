@@ -28,7 +28,7 @@ class Roles(models.Model):
     departmentid = models.ForeignKey(Department, models.DO_NOTHING, db_column='DepartmentID')  # Field name made lowercase.
     accessid = models.ForeignKey(Accesslevel, models.DO_NOTHING, db_column='AccessID')  # Field name made lowercase.
     isuniqueassignment = models.IntegerField(db_column='IsUniqueAssignment', blank=True, null=True)  # Field name made lowercase.
-    showsleavebalance = models.BooleanField(db_column='ShowsLeaveBalance', default=True)
+    showsleavebalance = models.BooleanField(db_column='ShowsLeaveBalance', default=False)
 
     class Meta:
         managed = True
@@ -110,6 +110,18 @@ class User(AbstractBaseUser, PermissionsMixin):
     #Home crew (A/B/C/D) for Shifters — fixed while active, independent of CrewAssignment roster membership
     crewid = models.ForeignKey('timesheets.Crews', models.SET_NULL, db_column='CrewID', blank=True, null=True, related_name='shifters')
 
+    #Full Miner (al=8) seniority scale, independent of Spare Shifter eligibility —
+    #only Lead/1/2 are ever offered as Spare Shifter candidates (see crew_coverage
+    #view); Levels 3/4 are recorded here but never promoted. Null means unclassified.
+    MINER_LEVEL_CHOICES = [
+        ('Lead', 'Lead'),
+        ('1', '1'),
+        ('2', '2'),
+        ('3', '3'),
+        ('4', '4'),
+    ]
+    minerlevel = models.CharField(db_column='MinerLevel', max_length=4, choices=MINER_LEVEL_CHOICES, blank=True, null=True)
+
     #HR/payroll classification — Staff vs Contract labor. Contract cost is charged to
     #a designated contract/account for reporting, separate from per-entry billing.
     EMPLOYMENT_TYPE_CHOICES = [
@@ -141,6 +153,24 @@ class User(AbstractBaseUser, PermissionsMixin):
         if self.roleid and self.roleid.accessid:
             return self.roleid.accessid.accessid
         return None
+
+    @property
+    def has_maintenance_reports(self):
+        """Whether any direct report is Maintenance Crew (al=9) — i.e. whether
+        this supervisor actually has a Maintenance approval queue to see.
+        Mirrors approval_inbox's own ownership query exactly, so the nav link
+        it gates is never a dead end (e.g. an HR Manager with no crew reports
+        never sees it; a real Maintenance Supervisor always does)."""
+        return User.objects.filter(supervisorid=self, roleid__accessid__accessid=9).exists()
+
+    @property
+    def has_business_reports(self):
+        """Whether any direct report is a non-Shifter Business-side filer
+        (Supervisor/Mine Captain/Business Employee) — i.e. whether this
+        supervisor has a Business approval queue to see. Shifters (al=5)
+        route to Mine Captains via the claim model, not their supervisorid,
+        so they're excluded here exactly as business_approval_inbox excludes them."""
+        return User.objects.filter(supervisorid=self, roleid__accessid__accessid__in=[3, 4, 6]).exists()
 
     @property
     def is_staff(self):

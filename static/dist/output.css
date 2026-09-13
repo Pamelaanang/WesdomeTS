@@ -61,6 +61,7 @@
     --color-indigo-100: oklch(93% 0.034 272.788);
     --color-indigo-200: oklch(87% 0.065 274.039);
     --color-indigo-400: oklch(67.3% 0.182 276.935);
+    --color-indigo-500: oklch(58.5% 0.233 277.117);
     --color-indigo-600: oklch(51.1% 0.262 276.966);
     --color-indigo-700: oklch(45.7% 0.24 277.023);
     --color-purple-100: oklch(94.6% 0.033 307.174);
@@ -98,8 +99,6 @@
     --text-xl--line-height: calc(1.75 / 1.25);
     --text-2xl: 1.5rem;
     --text-2xl--line-height: calc(2 / 1.5);
-    --text-3xl: 1.875rem;
-    --text-3xl--line-height: calc(2.25 / 1.875);
     --font-weight-normal: 400;
     --font-weight-medium: 500;
     --font-weight-semibold: 600;
@@ -504,14 +503,8 @@
   .h-20 {
     height: calc(var(--spacing) * 20);
   }
-  .h-24 {
-    height: calc(var(--spacing) * 24);
-  }
   .h-25 {
     height: calc(var(--spacing) * 25);
-  }
-  .h-32 {
-    height: calc(var(--spacing) * 32);
   }
   .h-40 {
     height: calc(var(--spacing) * 40);
@@ -584,6 +577,9 @@
   }
   .w-44 {
     width: calc(var(--spacing) * 44);
+  }
+  .w-48 {
+    width: calc(var(--spacing) * 48);
   }
   .w-50 {
     width: calc(var(--spacing) * 50);
@@ -770,9 +766,6 @@
   .gap-6 {
     gap: calc(var(--spacing) * 6);
   }
-  .gap-8 {
-    gap: calc(var(--spacing) * 8);
-  }
   .space-y-1 {
     :where(& > :not(:last-child)) {
       --tw-space-y-reverse: 0;
@@ -890,17 +883,8 @@
   .border-\[\#28348A\] {
     border-color: #28348A;
   }
-  .border-\[\#cb6ce6\] {
-    border-color: #cb6ce6;
-  }
   .border-\[\#d4a413\] {
     border-color: #d4a413;
-  }
-  .border-\[\#ffbd59\] {
-    border-color: #ffbd59;
-  }
-  .border-amber-100 {
-    border-color: var(--color-amber-100);
   }
   .border-amber-200 {
     border-color: var(--color-amber-200);
@@ -940,9 +924,6 @@
   }
   .border-green-600 {
     border-color: var(--color-green-600);
-  }
-  .border-indigo-100 {
-    border-color: var(--color-indigo-100);
   }
   .border-indigo-200 {
     border-color: var(--color-indigo-200);
@@ -1010,20 +991,17 @@
   .bg-\[\#E9F4FB\] {
     background-color: #E9F4FB;
   }
-  .bg-\[\#e4e5e5\] {
-    background-color: #e4e5e5;
-  }
   .bg-amber-50 {
     background-color: var(--color-amber-50);
   }
   .bg-amber-100 {
     background-color: var(--color-amber-100);
   }
-  .bg-amber-200 {
-    background-color: var(--color-amber-200);
-  }
   .bg-amber-500 {
     background-color: var(--color-amber-500);
+  }
+  .bg-amber-600 {
+    background-color: var(--color-amber-600);
   }
   .bg-black {
     background-color: var(--color-black);
@@ -1073,11 +1051,8 @@
   .bg-indigo-50 {
     background-color: var(--color-indigo-50);
   }
-  .bg-indigo-100 {
-    background-color: var(--color-indigo-100);
-  }
-  .bg-indigo-200 {
-    background-color: var(--color-indigo-200);
+  .bg-indigo-500 {
+    background-color: var(--color-indigo-500);
   }
   .bg-orange-50 {
     background-color: var(--color-orange-50);
@@ -1275,10 +1250,6 @@
     font-size: var(--text-2xl);
     line-height: var(--tw-leading, var(--text-2xl--line-height));
   }
-  .text-3xl {
-    font-size: var(--text-3xl);
-    line-height: var(--tw-leading, var(--text-3xl--line-height));
-  }
   .text-base {
     font-size: var(--text-base);
     line-height: var(--tw-leading, var(--text-base--line-height));
@@ -1346,6 +1317,9 @@
   .text-\[\#28348A\] {
     color: #28348A;
   }
+  .text-\[\#B45309\] {
+    color: #B45309;
+  }
   .text-\[\#FF914D\] {
     color: #FF914D;
   }
@@ -1361,8 +1335,14 @@
   .text-\[\#ffbd59\] {
     color: #ffbd59;
   }
+  .text-amber-100 {
+    color: var(--color-amber-100);
+  }
   .text-amber-400 {
     color: var(--color-amber-400);
+  }
+  .text-amber-500 {
+    color: var(--color-amber-500);
   }
   .text-amber-600 {
     color: var(--color-amber-600);
@@ -1424,11 +1404,11 @@
   .text-green-800 {
     color: var(--color-green-800);
   }
+  .text-indigo-100 {
+    color: var(--color-indigo-100);
+  }
   .text-indigo-400 {
     color: var(--color-indigo-400);
-  }
-  .text-indigo-600 {
-    color: var(--color-indigo-600);
   }
   .text-indigo-700 {
     color: var(--color-indigo-700);
@@ -1441,9 +1421,6 @@
   }
   .text-orange-800 {
     color: var(--color-orange-800);
-  }
-  .text-purple-600 {
-    color: var(--color-purple-600);
   }
   .text-purple-700 {
     color: var(--color-purple-700);
@@ -1583,6 +1560,10 @@
   .outline-none {
     --tw-outline-style: none;
     outline-style: none;
+  }
+  .select-all {
+    -webkit-user-select: all;
+    user-select: all;
   }
   .group-hover\:text-\[\#28348A\] {
     &:is(:where(.group):hover *) {

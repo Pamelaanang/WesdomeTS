@@ -31,7 +31,7 @@
                     <th class="px-4 py-3">Category / Leave</th>
                     <th class="px-4 py-3">Shift</th>
                     <th class="px-4 py-3">Hours</th>
-                    <th class="px-4 py-3">Work Order</th>
+                    {% if employee.access_level == 9 %}<th class="px-4 py-3">Work Order</th>{% endif %}
                     <th class="px-4 py-3">Description</th>
                     <th class="px-4 py-3">Status</th>
                 </tr>
@@ -50,7 +50,7 @@
                     </td>
                     <td class="px-4 py-3">{{ entry.shifttype|default:"—" }}</td>
                     <td class="px-4 py-3 font-medium">{{ entry.hoursworked }} hrs</td>
-                    <td class="px-4 py-3 text-gray-500">{{ entry.sapworkid|default:"—" }}</td>
+                    {% if employee.access_level == 9 %}<td class="px-4 py-3 text-gray-500">{{ entry.sapworkid|default:"—" }}</td>{% endif %}
                     <td class="px-4 py-3 text-gray-500">{{ entry.entrydescription|default:"—" }}</td>
                     <td class="px-4 py-3">
                         {% if entry.linestatus == 'Approved' %}
@@ -64,7 +64,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" class="text-center text-gray-400 py-6">No entries for this month.</td>
+                    <td colspan="{% if employee.access_level == 9 %}8{% else %}7{% endif %}" class="text-center text-gray-400 py-6">No entries for this month.</td>
                 </tr>
                 {% endfor %}
             </tbody>

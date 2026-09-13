@@ -1,0 +1,76 @@
+{% comment %}
+Expects: headers (queryset of OperationsHeader with prefetched operationsentry_set),
+show_status (bool — whether to render a per-entry Status column).
+{% endcomment %}
+<div class="overflow-x-auto">
+    <table class="w-full text-xs min-w-[960px]">
+        {% for header in headers %}
+        <thead>
+            <tr class="{% if header.shifttype == 'Night' %}bg-indigo-500{% else %}bg-amber-600{% endif %} text-white text-left">
+                <th colspan="{% if show_status %}9{% else %}8{% endif %}" class="p-2">
+                    <i class="fa-solid {% if header.shifttype == 'Night' %}fa-moon{% else %}fa-sun{% endif %} mr-1"></i>
+                    {{ header.crewid.crewname }} Crew &mdash; {{ header.section|default:"—" }}
+                    &mdash; {{ header.shifterid.firstname }} {{ header.shifterid.lastname }}
+                    {% if header.coverageid %}
+                    <span class="ml-2 font-normal text-xs {% if header.shifttype == 'Night' %}text-indigo-100{% else %}text-amber-100{% endif %}">
+                        <i class="fa-solid fa-arrows-rotate mr-0.5"></i> Covering {{ header.coverageid.home_shifter.firstname }} {{ header.coverageid.home_shifter.lastname }}
+                    </span>
+                    {% endif %}
+                    <span class="ml-2 font-normal text-xs {% if header.shifttype == 'Night' %}text-indigo-100{% else %}text-amber-100{% endif %}">
+                        <i class="fa-solid fa-user-check mr-0.5"></i>
+                        {% if header.ohapprovedby_capt %}Approved by {{ header.ohapprovedby_capt.firstname }} {{ header.ohapprovedby_capt.lastname }}{% else %}Approver not recorded{% endif %}
+                    </span>
+                </th>
+            </tr>
+            <tr class="text-gray-500 text-center border-b bg-gray-50">
+                <th class="p-2 font-medium">Payroll ID</th>
+                <th class="p-2 font-medium">Employee</th>
+                <th class="p-2 font-medium">Contract</th>
+                <th class="p-2 font-medium">Account</th>
+                <th class="p-2 font-medium">Work Category</th>
+                <th class="p-2 font-medium">Hours</th>
+                <th class="p-2 font-medium">Haulage / Footage</th>
+                <th class="p-2 font-medium">Remarks</th>
+                {% if show_status %}<th class="p-2 font-medium">Status</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in header.operationsentry_set.all %}
+            <tr class="border-b text-center {% if show_status and entry.linestatus == 'Approved' %}bg-green-50{% elif show_status and entry.linestatus == 'Rejected' %}bg-red-50{% else %}hover:bg-gray-50{% endif %}">
+                <td class="p-2 text-gray-500">{{ entry.employeeid.employeeid }}</td>
+                <td class="p-2 font-medium text-slate-700">{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</td>
+                <td class="p-2">{{ entry.contractid.contractcode }}</td>
+                <td class="p-2">{{ entry.accountid.accountcode|default:"—" }}</td>
+                <td class="p-2">{% if entry.opscategoryid %}{{ entry.opscategoryid.categoryname }}{% elif entry.leavetypeid %}{{ entry.leavetypeid.leavetypename }}{% else %}—{% endif %}</td>
+                <td class="p-2 font-semibold">{{ entry.hoursworked }}</td>
+                <td class="p-2 text-gray-500">
+                    {% if entry.tonnesorehauled %}Ore: {{ entry.tonnesorehauled }}t &nbsp;{% endif %}
+                    {% if entry.tonneswastehauled %}Waste: {{ entry.tonneswastehauled }}t &nbsp;{% endif %}
+                    {% if entry.tonnesoreskipped %}Skip: {{ entry.tonnesoreskipped }}t &nbsp;{% endif %}
+                    {% if entry.longholefootage %}LH: {{ entry.longholefootage }}ft{% endif %}
+                    {% if not entry.tonnesorehauled and not entry.tonneswastehauled and not entry.tonnesoreskipped and not entry.longholefootage %}—{% endif %}
+                </td>
+                <td class="p-2 text-gray-500">{{ entry.remarks|default:"—" }}</td>
+                {% if show_status %}
+                <td class="p-2">
+                    {% if entry.linestatus == 'Approved' %}
+                    <span class="text-green-700 font-semibold">Approved</span>
+                    {% elif entry.linestatus == 'Rejected' %}
+                    <span class="text-red-600 font-semibold">Rejected</span>
+                    {% else %}
+                    <span class="text-gray-400">{{ entry.linestatus }}</span>
+                    {% endif %}
+                </td>
+                {% endif %}
+            </tr>
+            {% empty %}
+            <tr><td colspan="{% if show_status %}9{% else %}8{% endif %}" class="p-2 text-center text-gray-400">No entries on this sheet.</td></tr>
+            {% endfor %}
+        </tbody>
+        {% empty %}
+        <tbody>
+            <tr><td class="p-4 text-center text-gray-400">No completed sheets for this shift.</td></tr>
+        </tbody>
+        {% endfor %}
+    </table>
+</div>

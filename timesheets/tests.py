@@ -2,12 +2,14 @@ import datetime
 from decimal import Decimal
 
 from django.test import Client, TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from timesheets import leave as leave_rules
 from timesheets.models import (
-    Contract, Crews, LeaveAllocation, LeaveType, LieuDayLedger, MainEntry,
-    MainHeader, OperationsEntry, OperationsHeader, StatHoliday,
+    Account, BusinessEntry, BusinessHeader, Businesscategory, Contract,
+    Crews, LeaveAllocation, LeaveType, LieuDayLedger, MainEntry,
+    MainHeader, OperationsEntry, OperationsHeader, Opscategory, StatHoliday,
     VacationRatePolicy, Workcategory,
 )
 from users.models import Accesslevel, CrewAssignment, Department, Roles, User
@@ -328,3 +330,230 @@ class OperationsLeaveParityTests(LeaveTestBase):
         })
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(OperationsEntry.objects.filter(opsheaderid=header).count(), 0)
+
+
+class BulkApproveTests(LeaveTestBase):
+    """Bulk-approve lets a reviewer check several still-pending entries and
+    approve them in one request, alongside (not instead of) the existing
+    per-entry Approve/Reject flow. Rejection stays individual since it
+    requires a note."""
+
+    def test_business_bulk_approve_only_touches_selected_new_entries(self):
+        supervisor = self.make_user('BSUP1', 3)
+        employee = self.make_user('BEMP1', 6, supervisorid=supervisor)
+        bcat = Businesscategory.objects.create(categoryname='Regular', isproductive=1)
+        header = BusinessHeader.objects.create(
+            employeeid=employee, periodyear=self.year, periodmonth=1, overallstatus='Submitted',
+        )
+        pending1 = BusinessEntry.objects.create(
+            businessheaderid=header, businesscategoryid=bcat,
+            dateworked=datetime.date(self.year, 1, 5), hoursworked=8, linestatus='New',
+        )
+        pending2 = BusinessEntry.objects.create(
+            businessheaderid=header, businesscategoryid=bcat,
+            dateworked=datetime.date(self.year, 1, 6), hoursworked=8, linestatus='New',
+        )
+        already_approved = BusinessEntry.objects.create(
+            businessheaderid=header, businesscategoryid=bcat,
+            dateworked=datetime.date(self.year, 1, 7), hoursworked=8, linestatus='Approved',
+        )
+
+        c = Client()
+        c.force_login(supervisor)
+        resp = c.post(reverse('review_business_timesheet', args=[header.businessheaderid]), {
+            'action': 'bulk_approve',
+            'entryids': [pending1.businessentryid, pending2.businessentryid],
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        pending1.refresh_from_db()
+        pending2.refresh_from_db()
+        already_approved.refresh_from_db()
+        header.refresh_from_db()
+        self.assertEqual(pending1.linestatus, 'Approved')
+        self.assertEqual(pending2.linestatus, 'Approved')
+        self.assertEqual(pending1.approvedby_id, supervisor.eid)
+        self.assertIsNotNone(pending1.approvedat)
+        self.assertEqual(header.overallstatus, 'In Progress')
+        # Untouched: was already Approved before the bulk action, not re-processed.
+        self.assertEqual(already_approved.approvedby_id, None)
+
+    def test_business_bulk_approve_ignores_entries_from_another_header(self):
+        supervisor = self.make_user('BSUP2', 3)
+        employee = self.make_user('BEMP2', 6, supervisorid=supervisor)
+        other_employee = self.make_user('BEMP2B', 6, supervisorid=supervisor)
+        bcat = Businesscategory.objects.create(categoryname='Regular2', isproductive=1)
+        header = BusinessHeader.objects.create(employeeid=employee, periodyear=self.year, periodmonth=2, overallstatus='Submitted')
+        other_header = BusinessHeader.objects.create(employeeid=other_employee, periodyear=self.year, periodmonth=2, overallstatus='Submitted')
+        mine = BusinessEntry.objects.create(
+            businessheaderid=header, businesscategoryid=bcat,
+            dateworked=datetime.date(self.year, 2, 1), hoursworked=8, linestatus='New',
+        )
+        foreign = BusinessEntry.objects.create(
+            businessheaderid=other_header, businesscategoryid=bcat,
+            dateworked=datetime.date(self.year, 2, 1), hoursworked=8, linestatus='New',
+        )
+
+        c = Client()
+        c.force_login(supervisor)
+        c.post(reverse('review_business_timesheet', args=[header.businessheaderid]), {
+            'action': 'bulk_approve',
+            'entryids': [mine.businessentryid, foreign.businessentryid],
+        })
+
+        mine.refresh_from_db()
+        foreign.refresh_from_db()
+        self.assertEqual(mine.linestatus, 'Approved')
+        self.assertEqual(foreign.linestatus, 'New')  # belongs to a different header — never touched
+
+    def test_maintenance_bulk_approve(self):
+        supervisor = self.make_user('MSUP1', 3)
+        employee = self.make_user('MEMP1', 9, supervisorid=supervisor)
+        header = MainHeader.objects.create(employeeid=employee, overallstatus='Submitted')
+        entry1 = MainEntry.objects.create(
+            mainheaderid=header, workcategoryid=self.workcategory,
+            startdate=datetime.date(self.year, 1, 5), hoursworked=8, linestatus='New',
+        )
+        entry2 = MainEntry.objects.create(
+            mainheaderid=header, workcategoryid=self.workcategory,
+            startdate=datetime.date(self.year, 1, 6), hoursworked=8, linestatus='New',
+        )
+
+        c = Client()
+        c.force_login(supervisor)
+        resp = c.post(reverse('review_timesheet', args=[header.mainheaderid]), {
+            'action': 'bulk_approve',
+            'entryids': [entry1.mainentryid, entry2.mainentryid],
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        entry1.refresh_from_db()
+        entry2.refresh_from_db()
+        header.refresh_from_db()
+        self.assertEqual(entry1.linestatus, 'Approved')
+        self.assertEqual(entry2.linestatus, 'Approved')
+        self.assertEqual(header.overallstatus, 'In Progress')
+
+    def test_operations_bulk_approve_claims_header(self):
+        captain = self.make_user('OCAP1', 4)
+        shifter = self.make_user('OSHIFT1', 5, shiftertype='Production', crewid=self.crew)
+        member1 = self.make_user('OCREW1', 8)
+        member2 = self.make_user('OCREW2', 8)
+        account = Account.objects.create(accountcode='ACC1', accounttitle='Test Account')
+        opscat = Opscategory.objects.create(categoryname='Ops Regular', isproductive=1)
+        header = OperationsHeader.objects.create(
+            shifterid=shifter, shiftdate=timezone.now().date(), shifttype='Day',
+            crewid=self.crew, overallstatus='Submitted',
+        )
+        entry1 = OperationsEntry.objects.create(
+            opsheaderid=header, employeeid=member1, contractid=self.contract,
+            accountid=account, opscategoryid=opscat, hoursworked=8, linestatus='New',
+        )
+        entry2 = OperationsEntry.objects.create(
+            opsheaderid=header, employeeid=member2, contractid=self.contract,
+            accountid=account, opscategoryid=opscat, hoursworked=8, linestatus='New',
+        )
+
+        c = Client()
+        c.force_login(captain)
+        resp = c.post(reverse('review_ops_sheet', args=[header.opsheaderid]), {
+            'action': 'bulk_approve',
+            'entryids': [entry1.opsentryid, entry2.opsentryid],
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        entry1.refresh_from_db()
+        entry2.refresh_from_db()
+        header.refresh_from_db()
+        self.assertEqual(entry1.linestatus, 'Approved')
+        self.assertEqual(entry2.linestatus, 'Approved')
+        self.assertEqual(header.ohapprovedby_capt_id, captain.eid)
+        self.assertEqual(header.overallstatus, 'In Progress')
+
+    def test_bulk_approve_ui_renders_on_all_three_review_pages(self):
+        supervisor = self.make_user('UISUP1', 3)
+        employee = self.make_user('UIEMP1', 6, supervisorid=supervisor)
+        bcat = Businesscategory.objects.create(categoryname='UI Regular', isproductive=1)
+        bheader = BusinessHeader.objects.create(employeeid=employee, periodyear=self.year, periodmonth=3, overallstatus='Submitted')
+        BusinessEntry.objects.create(
+            businessheaderid=bheader, businesscategoryid=bcat,
+            dateworked=datetime.date(self.year, 3, 1), hoursworked=8, linestatus='New',
+        )
+        c = Client()
+        c.force_login(supervisor)
+        resp = c.get(reverse('review_business_timesheet', args=[bheader.businessheaderid]))
+        html = resp.content.decode()
+        self.assertIn('row-checkbox', html)
+        self.assertIn('id="select-all"', html)
+        self.assertIn('Bulk Approve Selected', html)
+
+        maint_supervisor = self.make_user('UISUP2', 3)
+        maint_employee = self.make_user('UIEMP2', 9, supervisorid=maint_supervisor)
+        mheader = MainHeader.objects.create(employeeid=maint_employee, overallstatus='Submitted')
+        MainEntry.objects.create(
+            mainheaderid=mheader, workcategoryid=self.workcategory,
+            startdate=datetime.date(self.year, 1, 10), hoursworked=8, linestatus='New',
+        )
+        c.force_login(maint_supervisor)
+        resp2 = c.get(reverse('review_timesheet', args=[mheader.mainheaderid]))
+        html2 = resp2.content.decode()
+        self.assertIn('row-checkbox', html2)
+        self.assertIn('id="select-all"', html2)
+        self.assertIn('Bulk Approve Selected', html2)
+
+        captain = self.make_user('UICAP1', 4)
+        shifter = self.make_user('UISHIFT1', 5, shiftertype='Production', crewid=self.crew)
+        member = self.make_user('UICREW1', 8)
+        account = Account.objects.create(accountcode='UIACC1', accounttitle='UI Test Account')
+        opscat = Opscategory.objects.create(categoryname='UI Ops Regular', isproductive=1)
+        oheader = OperationsHeader.objects.create(
+            shifterid=shifter, shiftdate=timezone.now().date(), shifttype='Day',
+            crewid=self.crew, overallstatus='Submitted',
+        )
+        OperationsEntry.objects.create(
+            opsheaderid=oheader, employeeid=member, contractid=self.contract,
+            accountid=account, opscategoryid=opscat, hoursworked=8, linestatus='New',
+        )
+        c.force_login(captain)
+        resp3 = c.get(reverse('review_ops_sheet', args=[oheader.opsheaderid]))
+        html3 = resp3.content.decode()
+        self.assertIn('row-checkbox', html3)
+        self.assertIn('toggleSelectAll(this)', html3)
+        self.assertIn('Bulk Approve Selected', html3)
+
+
+class SupervisorApprovedMonthWorkOrderColumnTests(LeaveTestBase):
+    """supervisor_approved_month.html serves both Maintenance (MainEntry, has
+    a real Work Order/SAP ID field) and Business (BusinessEntry, no such
+    concept at all) employees through one shared template. The Work Order
+    column must only render for Maintenance — it was previously always shown,
+    permanently blank ('—') for every Business employee."""
+
+    def test_work_order_column_shown_for_maintenance_hidden_for_business(self):
+        supervisor = self.make_user('WOSUP1', 3)
+        maint_employee = self.make_user('WOMAINT1', 9, supervisorid=supervisor)
+        biz_employee = self.make_user('WOBIZ1', 6, supervisorid=supervisor)
+
+        mheader = MainHeader.objects.create(employeeid=maint_employee, overallstatus='Completed')
+        MainEntry.objects.create(
+            mainheaderid=mheader, workcategoryid=self.workcategory, sapworkid='WO-1000042',
+            startdate=datetime.date(self.year, 1, 5), hoursworked=8, linestatus='Approved',
+        )
+        bcat = Businesscategory.objects.create(categoryname='WO Regular', isproductive=1)
+        bheader = BusinessHeader.objects.create(employeeid=biz_employee, periodyear=self.year, periodmonth=1, overallstatus='Completed')
+        BusinessEntry.objects.create(
+            businessheaderid=bheader, businesscategoryid=bcat,
+            dateworked=datetime.date(self.year, 1, 5), hoursworked=8, linestatus='Approved',
+        )
+
+        c = Client()
+        c.force_login(supervisor)
+
+        resp_maint = c.get(reverse('supervisor_approved_month', args=[maint_employee.employeeid, self.year, 1]))
+        html_maint = resp_maint.content.decode()
+        self.assertIn('Work Order', html_maint)
+        self.assertIn('WO-1000042', html_maint)
+
+        resp_biz = c.get(reverse('supervisor_approved_month', args=[biz_employee.employeeid, self.year, 1]))
+        html_biz = resp_biz.content.decode()
+        self.assertNotIn('Work Order', html_biz)

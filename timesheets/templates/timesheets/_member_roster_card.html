@@ -1,0 +1,15 @@
+{% comment %}
+Standard "browse people" roster card (avatar + name + role, links to a
+per-employee drill-down). Usage:
+  {% include 'timesheets/_member_roster_card.html' with card_url=card_url person=emp %}
+  {% include 'timesheets/_member_roster_card.html' with card_url=card_url person=emp search_term=search_term %}
+Pass search_term (lowercased "firstname lastname employeeid") only on pages
+that render {% include 'timesheets/_member_search_box.html' %} above the grid.
+{% endcomment %}
+<a href="{{ card_url }}"
+    {% if search_term %}data-search="{{ search_term }}"{% endif %}
+    class="{% if search_term %}member-card {% endif %}bg-white rounded-2xl shadow p-5 w-52 flex flex-col items-center gap-2 hover:bg-[#E9F4FB] transition duration-200 ease-in-out cursor-pointer">
+    {% include 'timesheets/_avatar.html' with person=person %}
+    <p class="font-semibold text-slate-800 text-center text-sm mt-1">{{ person.firstname }} {{ person.lastname }}</p>
+    <p class="text-xs text-gray-400 text-center">{{ person.roleid.rolename }}</p>
+</a>

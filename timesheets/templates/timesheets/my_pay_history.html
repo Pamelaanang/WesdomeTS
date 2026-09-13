@@ -4,28 +4,30 @@
 <div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
     <div class="mb-2">
         <button onclick="history.back()" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline cursor-pointer mb-2">
-            <i class="fa-solid fa-arrow-left"></i> <span class="back-label">Back</span>
+            <i class="fa-solid fa-arrow-left"></i> <span class="back-label">My Profile</span>
         </button>
         <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
         <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
-        <p class="text-center text-sm text-gray-500 mt-1"><span class="font-semibold text-gray-700">COMPLETED CREW SHEETS:</span> Select a month to view sheets you approved.</p>
+        <p class="text-center text-sm text-gray-500 mt-1">
+            <span class="font-semibold text-gray-700">MY PAY HISTORY:</span> Select a month to view your entries and payment status.
+        </p>
     </div>
 </div>
 
 <div class="container mx-auto mb-8">
     <div class="flex flex-wrap gap-4">
         {% for m in months %}
-        <a href="{% url 'my_ops_completed_month' m.month.year m.month.month %}"
+        <a href="{% url 'my_pay_history_month' m.month.year m.month.month %}"
             class="bg-white rounded-xl shadow p-5 w-44 hover:bg-[#E9F4FB] transition duration-200 ease-in-out cursor-pointer flex flex-col items-center gap-1">
             <p class="font-semibold text-slate-800 text-center">{{ m.month|date:"F Y" }}</p>
             <p class="text-2xl font-bold text-[#28348A] mt-1">{{ m.day_count }}</p>
             <p class="text-xs text-gray-500">day{{ m.day_count|pluralize }}</p>
         </a>
         {% empty %}
-        <div class="mx-auto text-gray-400 text-sm">No completed sheets yet.</div>
+        <div class="mx-auto text-gray-400 text-sm">No completed entries yet.</div>
         {% endfor %}
     </div>
 </div>
 
-<script>window._pageBackLabel = 'Completed Sheets';</script>
+<script>window._pageBackLabel = 'My Profile';</script>
 {% endblock content %}

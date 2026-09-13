@@ -1,0 +1,12 @@
+{% comment %}
+Standard search input for a #member-grid / .member-card roster. Usage:
+  {% if employees %}{% include 'timesheets/_member_search_box.html' %}{% endif %}
+Relies on the global filterMembers() defined in base.html.
+{% endcomment %}
+<div class="mt-4 max-w-sm mx-auto">
+    <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+        <input type="text" id="member-search" oninput="filterMembers()" placeholder="Search by name or payroll ID…"
+            class="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-[#28348A]">
+    </div>
+</div>

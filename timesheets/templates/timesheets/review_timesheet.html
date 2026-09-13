@@ -51,6 +51,7 @@
         <table class="w-full text-xs min-w-[900px]">
             <thead>
                 <tr class="text-black text-center border-b">
+                    <th class="p-2">{% if has_unreviewed %}<input type="checkbox" id="select-all" onclick="toggleSelectAll(this)" title="Select all pending">{% endif %}</th>
                     <th class="p-2"></th>
                     <th class="p-2">Date</th>
                     <th class="p-2">Shift</th>
@@ -72,6 +73,9 @@
                 {% else %}
                 <tr class="border-b hover:bg-gray-50 text-center">
                 {% endif %}
+                    <td class="p-2">
+                        {% if entry.linestatus == 'New' %}<input type="checkbox" class="row-checkbox" value="{{ entry.mainentryid }}">{% endif %}
+                    </td>
                     <td class="p-2">
                         {% if entry.startdate in stat_dates %}
                         <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700"
@@ -121,7 +125,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="{% if has_rejected %}10{% else %}9{% endif %}" class="text-center text-gray-400 py-6">No entries on this timesheet.</td>
+                    <td colspan="{% if has_rejected %}11{% else %}10{% endif %}" class="text-center text-gray-400 py-6">No entries on this timesheet.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -136,21 +140,34 @@
             You have approved <span class="font-semibold">{{ hours_approved }}</span> hrs.
         </p>
         <div class="flex flex-col items-end gap-1">
-            <form method="POST">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="finish_review">
-                <button type="submit" {% if has_unreviewed %}disabled{% endif %}
-                    class="px-6 py-2 rounded-xl text-sm font-semibold
-                    {% if has_unreviewed %}bg-gray-200 text-gray-400 cursor-not-allowed{% else %}bg-[#28348A] text-white hover:opacity-90{% endif %}">
-                    Finish Review
+            <div class="flex gap-2">
+                {% if has_unreviewed %}
+                <button type="button" onclick="submitBulkApprove()"
+                    class="px-4 py-2 rounded-xl text-sm font-semibold border border-green-600 text-green-700 hover:bg-green-50">
+                    Bulk Approve Selected
                 </button>
-            </form>
+                {% endif %}
+                <form method="POST">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="finish_review">
+                    <button type="submit" {% if has_unreviewed %}disabled{% endif %}
+                        class="px-6 py-2 rounded-xl text-sm font-semibold
+                        {% if has_unreviewed %}bg-gray-200 text-gray-400 cursor-not-allowed{% else %}bg-[#28348A] text-white hover:opacity-90{% endif %}">
+                        Finish Review
+                    </button>
+                </form>
+            </div>
             {% if has_unreviewed %}
             <p class="text-xs text-gray-400">Review all entries before finishing.</p>
             {% endif %}
         </div>
     </div>
 </div>
+
+<form method="POST" id="bulk-approve-form">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="bulk_approve">
+</form>
 
 <!-- REJECT MODAL -->
 <div id="reject-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center">
@@ -187,6 +204,25 @@ function closeRejectModal() {
 document.getElementById('reject-modal').addEventListener('click', function(ev) {
     if (ev.target === this) closeRejectModal();
 });
+
+function toggleSelectAll(headerCheckbox) {
+    document.querySelectorAll('.row-checkbox').forEach(function (cb) { cb.checked = headerCheckbox.checked; });
+}
+
+function submitBulkApprove() {
+    const checked = document.querySelectorAll('.row-checkbox:checked');
+    if (checked.length === 0) { alert('Select at least one pending entry to approve.'); return; }
+    const form = document.getElementById('bulk-approve-form');
+    form.querySelectorAll('input[name="entryids"]').forEach(function (el) { el.remove(); });
+    checked.forEach(function (cb) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'entryids';
+        input.value = cb.value;
+        form.appendChild(input);
+    });
+    form.submit();
+}
 </script>
 
 {% endblock content %}

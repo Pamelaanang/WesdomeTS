@@ -13,7 +13,7 @@
         <p class="text-center text-sm text-gray-500 mt-1">
             <span class="font-semibold text-gray-700">PERSONAL TIMESHEET:</span>
             {{ header.get_periodmonth_display }} {{ header.periodyear }}
-            {% if revision_mode %}&mdash; Revision required
+            {% if revision_mode %}&mdash; Revision required 
             {% elif readonly %}&mdash; View only
             {% else %}&mdash; Fill out your timesheet below{% endif %}
         </p>
@@ -43,6 +43,11 @@
     <div class="flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-800 text-sm px-4 py-3 rounded-xl mb-4">
         <i class="fa-solid fa-circle-info text-blue-500"></i>
         This timesheet has been submitted and is awaiting approval. It cannot be edited.
+    </div>
+    {% elif would_be_late %}
+    <div class="flex items-center gap-3 bg-amber-50 border border-amber-300 text-amber-800 text-sm px-4 py-3 rounded-xl mb-4">
+        <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
+        The normal deadline for {{ header.get_periodmonth_display }} {{ header.periodyear }} was {{ late_deadline|date:"M j, Y" }}. You can still submit — it will just be marked as a late submission for your supervisor and payroll.
     </div>
     {% elif revision_mode %}
     <div class="flex items-center gap-3 {% if has_rejected %}bg-red-50 border-red-300 text-red-800{% else %}bg-green-50 border-green-300 text-green-800{% endif %} border text-sm px-4 py-3 rounded-xl mb-4">
@@ -179,6 +184,7 @@
 
                     <!-- Inline edit / add row -->
                     <tr id="add-row" class="hidden bg-gray-100">
+                        <td class="p-2"></td>
                         <td class="p-2">
                             <input type="date" name="dateworked" id="dateworked-input" class="border rounded px-1 py-1 text-xs w-full">
                         </td>
@@ -255,6 +261,9 @@
     const OWN_VACATION_REMAINING = {% if vacation_remaining is not None %}"{{ vacation_remaining }}"{% else %}null{% endif %};
     const OWN_FLOATER_AVAILABLE = {{ floater_available|yesno:"true,false" }};
     const OWN_LIEU_BALANCE = {% if lieu_balance is not None %}{{ lieu_balance }}{% else %}null{% endif %};
+    const LAST_CATEGORY_SELECTION = "{{ last_category_selection|default:'' }}";
+    const LAST_SHIFTTYPE = "{{ last_shifttype|default:'' }}";
+    const LAST_HOURS = "{{ last_hours|default:'' }}";
 
     function showOwnLeaveInfo() {
         const catEl = document.getElementById('cat-select');
@@ -287,12 +296,14 @@
     function toggleAddRow() {
         document.getElementById('form-entryid').value = '';
         document.getElementById('dateworked-input').value = '';
-        document.getElementById('cat-select').value = '';
-        document.getElementById('shift-select').value = '';
-        document.getElementById('hours-input').value = '';
+        // Prefill category/shift/hours from the employee's last entry, so a
+        // recurring pattern (e.g. Regular, Day, 8) doesn't need reselecting daily.
+        document.getElementById('cat-select').value = LAST_CATEGORY_SELECTION;
+        document.getElementById('shift-select').value = LAST_SHIFTTYPE || 'Day';
+        document.getElementById('hours-input').value = LAST_HOURS;
         document.getElementById('desc-input').value = '';
-        document.getElementById('leave-info').textContent = '';
         document.getElementById('add-row').classList.toggle('hidden');
+        showOwnLeaveInfo();
     }
 
     function saveEntry() {

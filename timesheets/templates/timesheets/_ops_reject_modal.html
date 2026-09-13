@@ -1,0 +1,68 @@
+{% comment %}
+Included once per page (not per panel). Works alongside any number of
+_ops_review_panel.html inclusions on the same page — each Reject button
+tells openRejectModal() which review URL and next-redirect to submit to.
+{% endcomment %}
+<div id="reject-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl p-6 w-96 shadow-xl">
+        <h3 class="font-semibold text-gray-800 mb-1">Rejection Note</h3>
+        <p class="text-xs text-gray-500 mb-3">Required — explain what needs correcting on this entry.</p>
+        <form method="POST" id="reject-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reject">
+            <input type="hidden" name="entryid" id="modal-entry-id">
+            <input type="hidden" name="next" id="modal-next">
+            <textarea name="captainnote" id="modal-note" rows="4" required
+                placeholder="Describe what's incorrect..."
+                class="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-4 focus:outline-none focus:border-[#28348A] resize-none"></textarea>
+            <div class="flex gap-2 justify-end">
+                <button type="button" onclick="closeRejectModal()"
+                    class="text-sm px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit"
+                    class="text-sm px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                    Done
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openRejectModal(entryId, reviewUrl, nextUrl) {
+    document.getElementById('modal-entry-id').value = entryId;
+    document.getElementById('modal-next').value = nextUrl || '';
+    document.getElementById('reject-form').action = reviewUrl;
+    document.getElementById('modal-note').value = '';
+    document.getElementById('reject-modal').classList.remove('hidden');
+    document.getElementById('modal-note').focus();
+}
+function closeRejectModal() {
+    document.getElementById('reject-modal').classList.add('hidden');
+}
+document.getElementById('reject-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeRejectModal();
+});
+
+function toggleSelectAll(headerCheckbox) {
+    var band = headerCheckbox.closest('.ops-review-band');
+    band.querySelectorAll('.row-checkbox').forEach(function (cb) { cb.checked = headerCheckbox.checked; });
+}
+
+function submitBulkApprove(button) {
+    var band = button.closest('.ops-review-band');
+    const checked = band.querySelectorAll('.row-checkbox:checked');
+    if (checked.length === 0) { alert('Select at least one pending entry to approve.'); return; }
+    const form = band.querySelector('.bulk-approve-form');
+    form.querySelectorAll('input[name="entryids"]').forEach(function (el) { el.remove(); });
+    checked.forEach(function (cb) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'entryids';
+        input.value = cb.value;
+        form.appendChild(input);
+    });
+    form.submit();
+}
+</script>
