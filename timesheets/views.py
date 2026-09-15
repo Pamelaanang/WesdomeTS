@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from users.models import User, Department, CrewAssignment, CrewCoverage
-from .models import MainHeader, MainEntry, Crews, Workcategory, Opscategory, LeaveType, OperationsHeader, OperationsEntry, Contract, Account, ContractAccount, ContractSeries, OperationsBonus, BONUS_RATE_CODES, StatHoliday, BusinessHeader, BusinessEntry, Businesscategory, MONTH_CHOICES, EmployeeBonus, BONUS_TYPE_CHOICES, Auditlog, submission_deadline
+from .models import MainHeader, MainEntry, Crews, Workcategory, Opscategory, LeaveType, OperationsHeader, OperationsEntry, Contract, Account, ContractAccount, ContractSeries, MinerLevel, OperationsBonus, BONUS_RATE_CODES, StatHoliday, BusinessHeader, BusinessEntry, Businesscategory, MONTH_CHOICES, EmployeeBonus, BONUS_TYPE_CHOICES, Auditlog, submission_deadline
 from django.utils import timezone
 from django.db.models import Sum, Count, Min, Max, Q, Case, When, IntegerField, Prefetch
 from django.db.models.functions import TruncMonth
@@ -1610,8 +1610,14 @@ def new_ops_sheet(request):
         Q(enddate__isnull=True) | Q(enddate__gte=today)
     ).select_related('home_shifter', 'home_shifter__crewid')
 
-    # Build maps for JS: { coverageid: value } — used to swap the displayed
-    # section/crew when the shifter toggles between "My own crew" and coverage options
+    # Every basket this shifter runs themselves — usually just their one home
+    # basket; more than one only if they've picked up a second (e.g. via
+    # Transfer Basket) while still running their own. Each is its own filing
+    # option, distinct from Coverage (which is someone else's crew, temporarily).
+    own_baskets = request.user.get_active_baskets()
+
+    # Build maps for JS: swap the displayed section/crew when the shifter
+    # toggles between their own basket(s) and coverage options.
     coverage_sections = {
         str(cov.coverageid): cov.home_shifter.shiftertype or ''
         for cov in active_coverages
@@ -1620,47 +1626,64 @@ def new_ops_sheet(request):
         str(cov.coverageid): (cov.home_shifter.crewid.crewname if cov.home_shifter.crewid else '')
         for cov in active_coverages
     }
+    own_basket_sections = {f'{b[0].crewid}:{b[1]}': b[1] for b in own_baskets}
+    own_basket_crews = {f'{b[0].crewid}:{b[1]}': b[0].crewname for b in own_baskets}
     own_crewname = request.user.crewid.crewname if request.user.crewid else ''
+    default_own_basket = f'{own_baskets[0][0].crewid}:{own_baskets[0][1]}' if own_baskets else ''
+
+    base_context = {
+        'header': None,
+        'active_coverages': active_coverages,
+        'own_shiftertype': request.user.shiftertype or '',
+        'own_crewname': own_crewname,
+        'own_baskets': own_baskets,
+        'default_own_basket': default_own_basket,
+        'coverage_sections': coverage_sections,
+        'coverage_crews': coverage_crews,
+        'own_basket_sections': own_basket_sections,
+        'own_basket_crews': own_basket_crews,
+    }
 
     if request.method == 'POST':
         shiftdate = request.POST.get('shiftdate')
         shifttype = request.POST.get('shifttype')
         coverage_id = request.POST.get('coverage_id') or None
+        own_basket = request.POST.get('own_basket') or None
 
         try:
             from datetime import date as _date
             if shiftdate and _date.fromisoformat(shiftdate) > today:
                 return render(request, 'timesheets/ops_sheet.html', {
-                    'header': None,
-                    'active_coverages': active_coverages,
-                    'own_shiftertype': request.user.shiftertype or '',
-                    'own_crewname': own_crewname,
+                    **base_context,
                     'coverage_sections': {},
                     'coverage_crews': {},
+                    'own_basket_sections': {},
+                    'own_basket_crews': {},
                     'error': 'Crew sheets cannot be created for future dates.',
                 })
         except ValueError:
             pass
 
-        existing = OperationsHeader.objects.filter(
-            shifterid=request.user,
-            shiftdate=shiftdate,
-            shifttype=shifttype,
-            coverageid_id=coverage_id,
-        ).first()
-        if existing:
-            return redirect('ops_sheet', pk=existing.opsheaderid)
-
-        # Derive section + crew from the shifter this sheet is actually for —
-        # own account, or the home shifter if this is a coverage sheet — never
-        # asked for manually, so a sheet can't get mislabeled with the wrong crew.
+        # Derive section + crew from the basket this sheet is actually for —
+        # own home basket, a specific other own basket if running more than
+        # one, or the home shifter if this is a coverage sheet — never asked
+        # for manually, so a sheet can't get mislabeled with the wrong crew.
         section = None
         crew = None
+        cov = None
         if coverage_id:
             cov = active_coverages.filter(coverageid=coverage_id).first()
             if cov:
                 section = cov.home_shifter.shiftertype
                 crew = cov.home_shifter.crewid
+        elif own_basket and ':' in own_basket:
+            chosen_crewid, chosen_shiftertype = own_basket.split(':', 1)
+            match = next(
+                (b for b in own_baskets if str(b[0].crewid) == chosen_crewid and b[1] == chosen_shiftertype),
+                None,
+            )
+            if match:
+                crew, section = match
         else:
             section = request.user.shiftertype
             crew = request.user.crewid
@@ -1671,15 +1694,17 @@ def new_ops_sheet(request):
                 if coverage_id else
                 "Your home crew hasn't been set up yet. Contact your System Admin before starting a crew sheet."
             )
-            return render(request, 'timesheets/ops_sheet.html', {
-                'header': None,
-                'active_coverages': active_coverages,
-                'own_shiftertype': request.user.shiftertype or '',
-                'own_crewname': own_crewname,
-                'coverage_sections': coverage_sections,
-                'coverage_crews': coverage_crews,
-                'error': error,
-            })
+            return render(request, 'timesheets/ops_sheet.html', {**base_context, 'error': error})
+
+        existing = OperationsHeader.objects.filter(
+            shifterid=request.user,
+            shiftdate=shiftdate,
+            shifttype=shifttype,
+            coverageid_id=coverage_id,
+            crewid=crew,
+        ).first()
+        if existing:
+            return redirect('ops_sheet', pk=existing.opsheaderid)
 
         header = OperationsHeader.objects.create(
             shifterid=request.user,
@@ -1691,41 +1716,49 @@ def new_ops_sheet(request):
         )
         log_action(request.user, 'Created', 'OperationsHeader', header.opsheaderid, new_values={'overallstatus': 'Draft'})
 
-        # Pre-populate one row per active crew member, carrying forward each
-        # person's contract/account/category from their own most recent entry.
-        # Guests aren't crew, so they're never auto-added — still only
-        # reachable via + Add Row. A crew member with no prior entry anywhere
-        # has no contract to carry forward (ContractID is required), so they're
-        # skipped here and stay available in the + Add Row picker instead.
-        effective_shifter = cov.home_shifter if coverage_id and cov else request.user
+        # Pre-populate one row per active crew member of THIS basket specifically.
+        # Scoped to (shifter, crewid, shiftertype), not just shifter, so a
+        # shifter running two baskets never gets the other basket's roster
+        # bleeding onto this sheet. Guests aren't crew, so they're never
+        # auto-added — still only reachable via + Add Row.
+        #
+        # Contract is sourced from the employee's own current assignment
+        # (User.contractid, set by the Superintendent) whenever they have one
+        # — not from their last entry, which could be stale if they've since
+        # been reclassified. Falls back to their last entry's contract only
+        # if they're not yet classified at all. Account only carries forward
+        # from the last entry when the contract hasn't effectively changed
+        # (still the same one) — an account tied to a now-different contract
+        # wouldn't be valid, so it's left for the Shifter to pick fresh.
+        # A crew member with neither a current assignment nor any prior entry
+        # has no contract to satisfy the NOT NULL column, so they're skipped
+        # here and stay available in the + Add Row picker instead.
+        prefill_shifter = cov.home_shifter if coverage_id and cov else request.user
         active_assignments = CrewAssignment.objects.filter(
-            shifter=effective_shifter, enddate__isnull=True
+            shifter=prefill_shifter, crewid=crew, shiftertype=section, enddate__isnull=True
         ).select_related('employee')
         for assignment in active_assignments:
+            employee = assignment.employee
             last = OperationsEntry.objects.filter(
-                employeeid=assignment.employee
+                employeeid=employee
             ).order_by('-opsentryid').first()
-            if last:
-                OperationsEntry.objects.create(
-                    opsheaderid=header,
-                    employeeid=assignment.employee,
-                    contractid_id=last.contractid_id,
-                    accountid_id=last.accountid_id,
-                    opscategoryid_id=last.opscategoryid_id,
-                    hoursworked=0,
-                    linestatus='Draft',
-                )
+            contract_id = employee.contractid_id or (last.contractid_id if last else None)
+            if not contract_id:
+                continue
+            account_id = last.accountid_id if last and last.contractid_id == contract_id else None
+            OperationsEntry.objects.create(
+                opsheaderid=header,
+                employeeid=employee,
+                contractid_id=contract_id,
+                accountid_id=account_id,
+                opscategoryid_id=last.opscategoryid_id if last else None,
+                hoursworked=0,
+                linestatus='Draft',
+            )
 
         return redirect('ops_sheet', pk=header.opsheaderid)
 
-    return render(request, 'timesheets/ops_sheet.html', {
-        'header': None,
-        'active_coverages': active_coverages,
-        'own_shiftertype': request.user.shiftertype or '',
-        'own_crewname': own_crewname,
-        'coverage_sections': coverage_sections,
-        'coverage_crews': coverage_crews,
-    })
+    return render(request, 'timesheets/ops_sheet.html', base_context)
 
 
 @login_required(login_url='login')
@@ -1762,10 +1795,17 @@ def ops_sheet(request, pk):
             if leave_error:
                 messages.error(request, leave_error)
             else:
+                # Contract is never the Shifter's call once the Superintendent
+                # has classified this employee — always derive it server-side
+                # from their current assignment rather than trust whatever the
+                # (normally disabled) field posted. Only an employee with no
+                # assigned contract yet falls back to the posted value, from
+                # the open picker the form still offers in that case.
+                contract_id = row_employee.contractid_id if row_employee and row_employee.contractid_id else request.POST.get('contractid')
                 entry = OperationsEntry.objects.create(
                     opsheaderid=header,
                     employeeid_id=request.POST.get('employeeid'),
-                    contractid_id=request.POST.get('contractid'),
+                    contractid_id=contract_id,
                     accountid_id=request.POST.get('accountid') or None,
                     opscategoryid_id=opscategoryid,
                     leavetypeid_id=leavetypeid,
@@ -1825,7 +1865,10 @@ def ops_sheet(request, pk):
                 messages.error(request, leave_error)
             else:
                 old_values = {'hoursworked': str(entry.hoursworked)}
-                entry.contractid_id = request.POST.get('contractid')
+                # Same server-authoritative derivation as add_row — the employee's
+                # current assignment wins over whatever was posted, whenever they
+                # have one.
+                entry.contractid_id = entry.employeeid.contractid_id if entry.employeeid.contractid_id else request.POST.get('contractid')
                 entry.accountid_id = request.POST.get('accountid') or None
                 entry.opscategoryid_id = opscategoryid
                 entry.leavetypeid_id = leavetypeid
@@ -1888,12 +1931,17 @@ def ops_sheet(request, pk):
         last = OperationsEntry.objects.filter(
             employeeid=member
         ).order_by('-opsentryid').first()
-        if last:
-            prefill[member.eid] = {
-                'contractid': last.contractid_id,
-                'accountid': last.accountid_id,
-                'opscategoryid': last.opscategoryid_id,
-            }
+        # assigned_contractid is the Superintendent's current classification —
+        # when set, the entry form locks Contract to it entirely (the Shifter
+        # never picks it). contractid/accountid below are only ever used as
+        # the fallback/starting point for an employee who isn't classified yet.
+        prefill[member.eid] = {
+            'assigned_contractid': member.contractid_id,
+            'assigned_contract_label': f'{member.contractid.contractcode} — {member.contractid.contracttitle}' if member.contractid_id else None,
+            'contractid': last.contractid_id if last else None,
+            'accountid': last.accountid_id if last else None,
+            'opscategoryid': last.opscategoryid_id if last else None,
+        }
         remaining = leave_rules.get_vacation_remaining(member, header.shiftdate.year)
         vacation_balances[member.eid] = {
             'remaining': str(remaining) if remaining is not None else None,
@@ -2366,6 +2414,19 @@ def contract_account_management(request):
             contract = get_object_or_404(Contract, contractid=contract_id)
             contract.series.remove(remove_series_id)
 
+        elif action == 'add_level':
+            contract_id = request.POST.get('contractid')
+            new_level_id = request.POST.get('new_level_id')
+            if contract_id and new_level_id:
+                contract = get_object_or_404(Contract, contractid=contract_id)
+                contract.levels.add(new_level_id)
+
+        elif action == 'remove_level':
+            contract_id = request.POST.get('contractid')
+            remove_level_id = request.POST.get('remove_level_id')
+            contract = get_object_or_404(Contract, contractid=contract_id)
+            contract.levels.remove(remove_level_id)
+
         elif action == 'bulk_assign_account':
             bulk_series_id = request.POST.get('bulk_series_id')
             bulk_account_id = request.POST.get('bulk_account_id')
@@ -2383,9 +2444,10 @@ def contract_account_management(request):
     # the page itself now, so an empty series still needs to be visible.
     all_series = ContractSeries.objects.prefetch_related('contracts__contractaccount_set__accountid', 'contracts__series')
 
-    unassigned = Contract.objects.filter(isactive=1).exclude(series__isnull=False).prefetch_related('contractaccount_set__accountid', 'series')
+    unassigned = Contract.objects.filter(isactive=1).exclude(series__isnull=False).prefetch_related('contractaccount_set__accountid', 'series', 'levels')
     all_accounts = Account.objects.filter(isactive=1)
-    all_contracts = Contract.objects.filter(isactive=1).prefetch_related('series').order_by('contractcode')
+    all_contracts = Contract.objects.filter(isactive=1).prefetch_related('series', 'levels').order_by('contractcode')
+    all_levels = MinerLevel.objects.all()
 
     return render(request, 'timesheets/contract_account_management.html', {
         'series_list': all_series,
@@ -2393,6 +2455,7 @@ def contract_account_management(request):
         'all_series': all_series,
         'unassigned': unassigned,
         'all_accounts': all_accounts,
+        'all_levels': all_levels,
     })
 
 

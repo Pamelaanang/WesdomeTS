@@ -16,4 +16,6 @@ urlpatterns = [
     path('crew/assignments/<str:shifter_id>/', views.crew_assignment_detail, name='crew_assignment_detail'),
     path('crew/my-crew/', views.my_crew, name='my_crew'),
     path('crew/coverage/', views.crew_coverage, name='crew_coverage'),
+    path('crew/positions/', views.position_catalog, name='position_catalog'),
+    path('crew/grid/', views.crew_grid, name='crew_grid'),
 ]

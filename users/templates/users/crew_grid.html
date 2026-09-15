@@ -1,0 +1,872 @@
+{% extends 'base.html' %}
+{% block content %}
+
+{% if messages %}
+<div class="container mx-auto mb-4">
+    {% for message in messages %}
+    <div class="flex items-center gap-3 text-sm px-4 py-3 rounded-xl {% if message.tags == 'error' %}bg-red-50 border border-red-200 text-red-800{% elif message.tags == 'warning' %}bg-amber-50 border border-amber-200 text-amber-800{% else %}bg-green-50 border border-green-200 text-green-800{% endif %}">
+        <i class="fa-solid {% if message.tags == 'error' %}fa-circle-exclamation{% elif message.tags == 'warning' %}fa-triangle-exclamation{% else %}fa-circle-check{% endif %}"></i>
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
+    <button onclick="history.back()" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline cursor-pointer mb-3">
+        <i class="fa-solid fa-arrow-left"></i> <span class="back-label">Back</span>
+    </button>
+    <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+    <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+    <p class="text-center text-sm text-gray-500 mt-1">
+        <span class="font-semibold text-gray-700">CREW GRID:</span> One-page view of every basket, mimicking the paper crew/position sheet.
+        Click a name to replace, an empty slot to add, or a crew header to manage that basket. Drag a name onto an empty slot to move them.
+    </p>
+</div>
+
+<div class="container mx-auto mb-8 overflow-x-auto">
+    <table class="w-full text-sm border-separate border-spacing-0 bg-white rounded-2xl shadow overflow-hidden border border-gray-200">
+        <colgroup>
+            <col style="width: 220px;">
+            {% for cn in main_crews %}<col>{% endfor %}
+        </colgroup>
+        <thead>
+            <tr>
+                <td colspan="{{ main_crews|length|add:1 }}" class="px-4 py-3 bg-gray-100 border-b border-gray-300 text-center">
+                    <span class="text-sm text-gray-600 font-semibold mr-2">Mine Captains:</span>
+                    {% for captain in active_captains %}
+                    <span class="inline-block bg-[#28348A] text-white text-sm font-semibold px-3 py-1 rounded-full mr-1">{{ captain.firstname }} {{ captain.lastname }}</span>
+                    {% empty %}
+                    <span class="text-sm text-gray-400">None on file</span>
+                    {% endfor %}
+                </td>
+            </tr>
+            <tr>
+                <th class="text-left text-sm text-gray-500 font-bold px-4 py-3 bg-gray-100 border-b border-r border-gray-300">Crew</th>
+                {% for cn in main_crews %}
+                <th class="text-center text-lg font-extrabold text-gray-800 px-3 py-3 bg-gray-100 border-b border-r border-gray-300 last:border-r-0">{{ cn }}</th>
+                {% endfor %}
+            </tr>
+            <tr>
+                <th class="text-left text-xs text-gray-500 font-semibold px-4 py-2 border-b border-r border-gray-200 bg-gray-50">Room Allocation</th>
+                <th colspan="2" class="px-2 py-2 border-b border-r border-gray-200 bg-gray-50">
+                    <input type="text" class="room-allocation w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-center text-gray-700 font-medium"
+                        data-crew="AB" placeholder="&mdash;">
+                </th>
+                <th colspan="2" class="px-2 py-2 border-b border-gray-200 bg-gray-50">
+                    <input type="text" class="room-allocation w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-center text-gray-700 font-medium"
+                        data-crew="CD" placeholder="&mdash;">
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for band in grid %}
+            <tr>
+                <td colspan="{{ main_crews|length|add:1 }}" class="bg-[#28348A] text-white text-sm font-bold uppercase tracking-wide px-4 py-2 border-b border-gray-300">
+                    {{ band.label }}
+                </td>
+            </tr>
+            <tr class="bg-indigo-50">
+                <td class="px-4 py-2.5 text-xs font-bold text-gray-500 uppercase border-b border-r border-gray-200">Shifter</td>
+                {% for col in band.columns %}
+                <td colspan="{{ col.colspan }}" class="px-3 py-2.5 text-center border-b border-r border-gray-200 last:border-r-0 align-top">
+                    {% if col.shifter %}
+                    {% if col.coverage %}
+                    <span class="text-sm font-bold text-[#28348A]">{{ col.shifter.firstname }} {{ col.shifter.lastname }}</span>
+                    <div class="text-[10px] text-amber-600 font-medium mt-0.5">covering for {{ col.coverage.home_shifter.firstname }} {{ col.coverage.home_shifter.lastname }}</div>
+                    {% else %}
+                    <span class="grid-manage-trigger text-sm font-bold text-[#28348A] hover:underline cursor-pointer" title="Transfer or start coverage"
+                        data-post-url="{% url 'crew_assignment_detail' col.shifter.employeeid %}"
+                        data-basket="{{ col.basket }}"
+                        data-shifter-eid="{{ col.shifter.employeeid }}"
+                        data-shifter-name="{{ col.shifter.firstname }} {{ col.shifter.lastname }}"
+                        data-basket-label="Crew {{ col.crew.crewname }} &mdash; {{ band.label }}">
+                        {{ col.shifter.firstname }} {{ col.shifter.lastname }}
+                    </span>
+                    {% endif %}
+                    <div>
+                        <button type="button"
+                            class="grid-level-trigger text-[10px] leading-tight px-1.5 py-0.5 rounded-full mt-0.5 {% if col.shifter.minerlevel or col.shifter.contractid %}bg-purple-50 text-purple-700 hover:bg-purple-100{% else %}bg-gray-100 text-gray-400 hover:bg-gray-200{% endif %}"
+                            data-employee-id="{{ col.shifter.employeeid }}"
+                            data-employee-name="{{ col.shifter.firstname }} {{ col.shifter.lastname }}"
+                            data-minerlevel="{{ col.shifter.minerlevel|default:'' }}"
+                            data-contractid="{{ col.shifter.contractid_id|default:'' }}"
+                            title="Edit Level / Contract Code">
+                            {% if col.shifter.minerlevel or col.shifter.contractid %}
+                            Lvl {{ col.shifter.minerlevel|default:"—" }}{% if col.shifter.contractid %} &middot; {{ col.shifter.contractid.contractcode }}{% endif %}
+                            {% else %}
+                            Unclassified
+                            {% endif %}
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-center gap-3 mt-1">
+                        <button type="button"
+                            class="grid-add-trigger text-xs text-gray-500 hover:text-[#28348A]" title="Add member"
+                            data-post-url="{% url 'crew_assignment_detail' col.shifter.employeeid %}"
+                            data-basket="{{ col.basket }}"
+                            data-shiftertype="{{ band.label }}"
+                            data-basket-label="Crew {{ col.crew.crewname }} &mdash; {{ band.label }}">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                        {% if col.coverage %}
+                        <button type="button"
+                            class="grid-end-coverage-trigger text-xs text-amber-600 hover:text-amber-800" title="End coverage"
+                            data-coverage-id="{{ col.coverage.coverageid }}"
+                            data-covering-name="{{ col.shifter.firstname }} {{ col.shifter.lastname }}"
+                            data-home-name="{{ col.coverage.home_shifter.firstname }} {{ col.coverage.home_shifter.lastname }}">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </button>
+                        {% else %}
+                        <button type="button"
+                            class="grid-demote-trigger text-xs text-gray-500 hover:text-red-600" title="Demote to Miner (permanent)"
+                            data-employee-id="{{ col.shifter.employeeid }}"
+                            data-employee-name="{{ col.shifter.firstname }} {{ col.shifter.lastname }}">
+                            <i class="fa-solid fa-arrow-down"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <button type="button"
+                        class="grid-assign-trigger text-sm font-semibold text-gray-400 hover:text-[#28348A]" title="Assign a shifter to this basket"
+                        data-basket="{{ col.basket }}"
+                        data-basket-label="Crew {{ col.crew.crewname }} &mdash; {{ band.label }}">
+                        &mdash; Unassigned &mdash;
+                    </button>
+                    {% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% for row in band.position_rows %}
+            <tr class="hover:bg-amber-50 {% cycle 'bg-white' 'bg-gray-50' %}">
+                {% if row.is_first %}
+                <td rowspan="{{ row.rowspan }}" class="px-4 py-2.5 text-sm font-medium text-gray-700 border-b border-r border-gray-200 align-top">{{ row.position.positionname }}</td>
+                {% endif %}
+                {% for cell in row.cells %}
+                <td colspan="{{ cell.col.colspan }}" class="px-3 py-2.5 text-center border-b border-r border-gray-200 last:border-r-0">
+                    <div class="flex items-center justify-center gap-2 flex-wrap">
+                        {% for assignment in cell.items %}
+                        {% if assignment %}
+                        <div class="flex flex-col items-center">
+                            {% if cell.col.shifter %}
+                            <span class="grid-name-chip text-sm font-semibold text-gray-800 hover:text-amber-600 hover:underline cursor-pointer" draggable="true"
+                                data-post-url="{% url 'crew_assignment_detail' cell.col.shifter.employeeid %}"
+                                data-basket="{{ cell.col.basket }}"
+                                data-assignment-id="{{ assignment.assignmentid }}"
+                                data-employee-id="{{ assignment.employee.employeeid }}"
+                                data-employee-name="{{ assignment.employee.firstname }} {{ assignment.employee.lastname }}"
+                                data-position-name="{{ row.position.positionname }}">
+                                {{ assignment.employee.firstname }} {{ assignment.employee.lastname }}
+                            </span>
+                            {% else %}
+                            <span class="text-sm font-semibold text-gray-500" title="Basket has no shifter — assign one to manage this member">
+                                {{ assignment.employee.firstname }} {{ assignment.employee.lastname }}
+                            </span>
+                            {% endif %}
+                            <button type="button"
+                                class="grid-level-trigger text-[10px] leading-tight px-1.5 py-0.5 rounded-full mt-0.5 {% if assignment.employee.minerlevel or assignment.employee.contractid %}bg-purple-50 text-purple-700 hover:bg-purple-100{% else %}bg-gray-100 text-gray-400 hover:bg-gray-200{% endif %}"
+                                data-employee-id="{{ assignment.employee.employeeid }}"
+                                data-employee-name="{{ assignment.employee.firstname }} {{ assignment.employee.lastname }}"
+                                data-minerlevel="{{ assignment.employee.minerlevel|default:'' }}"
+                                data-contractid="{{ assignment.employee.contractid_id|default:'' }}"
+                                title="Edit Level / Contract Code">
+                                {% if assignment.employee.minerlevel or assignment.employee.contractid %}
+                                Lvl {{ assignment.employee.minerlevel|default:"—" }}{% if assignment.employee.contractid %} &middot; {{ assignment.employee.contractid.contractcode }}{% endif %}
+                                {% else %}
+                                Unclassified
+                                {% endif %}
+                            </button>
+                        </div>
+                        {% elif cell.col.shifter %}
+                        <button type="button"
+                            class="grid-add-trigger grid-drop-target text-sm font-semibold text-gray-300 hover:text-[#28348A] py-1 rounded transition-colors"
+                            data-post-url="{% url 'crew_assignment_detail' cell.col.shifter.employeeid %}"
+                            data-basket="{{ cell.col.basket }}"
+                            data-shiftertype="{{ band.label }}"
+                            data-position-id="{{ row.position.positionid }}"
+                            data-basket-label="Crew {{ cell.col.crew.crewname }} &mdash; {{ band.label }}">
+                            <i class="fa-solid fa-plus"></i> Add
+                        </button>
+                        {% else %}
+                        <span class="text-gray-300 text-sm">&mdash;</span>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="container mx-auto mb-8">
+    <a href="{% url 'position_catalog' %}" class="inline-flex items-center gap-2 text-sm text-[#28348A] hover:underline">
+        <i class="fa-solid fa-plus"></i> Add a new position to the catalog
+    </a>
+</div>
+
+{% if needs_attention %}
+<div class="container mx-auto mb-8 bg-amber-50 border border-amber-200 rounded-2xl p-4">
+    <p class="text-sm font-semibold text-amber-700 mb-2"><i class="fa-solid fa-triangle-exclamation"></i> Needs Attention ({{ needs_attention|length }})</p>
+    <p class="text-xs text-amber-600 mb-3">These active assignments don't line up cleanly with the grid above and won't appear in it &mdash; fix them from their shifter's page.</p>
+    <div class="flex flex-col gap-2">
+        {% for assignment, reason in needs_attention %}
+        <div class="bg-white rounded-xl px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span>
+                <span class="font-semibold">{{ assignment.employee.firstname }} {{ assignment.employee.lastname }}</span>
+                {% if assignment.positionid %}&mdash; {{ assignment.positionid.positionname }}{% endif %}
+                {% if assignment.shifter %}
+                <span class="text-gray-400">under {{ assignment.shifter.firstname }} {{ assignment.shifter.lastname }}</span>
+                {% else %}
+                <span class="text-gray-400">no shifter assigned</span>
+                {% endif %}
+                <span class="block text-amber-600 mt-0.5">{{ reason }}</span>
+            </span>
+            {% if assignment.shifter %}
+            <a href="{% url 'crew_assignment_detail' assignment.shifter.employeeid %}?open={{ assignment.assignmentid }}"
+                class="border border-amber-400 text-amber-700 px-2 py-1 rounded-lg hover:bg-amber-50">Review</a>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- ===================== Inline action modals ===================== -->
+
+<div id="grid-add-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-5">
+        <div class="flex items-center justify-between mb-1">
+            <p class="text-sm font-semibold text-gray-700">Add Crew Member</p>
+            <button type="button" onclick="closeGridModal('grid-add-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p id="grid-add-basket-label" class="text-xs text-gray-400 mb-3"></p>
+        <form method="POST" id="grid-add-form" class="flex flex-col gap-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="bulk_add_members">
+            <input type="hidden" name="basket" id="grid-add-basket">
+            <input type="hidden" name="next" value="{% url 'crew_grid' %}">
+            <input type="hidden" name="employee_ids" id="grid-add-employee-id">
+            <input type="hidden" id="grid-add-position-hidden">
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Employee</label>
+                <select id="grid-add-employee-select" required class="border rounded px-2 py-1.5 text-sm"></select>
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Position</label>
+                <select id="grid-add-position-select" class="border rounded px-2 py-1.5 text-sm"></select>
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Start Date</label>
+                <input type="date" name="startdate" id="grid-add-startdate" required class="border rounded px-2 py-1.5 text-sm">
+            </div>
+            <button type="submit" class="self-start bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Add</button>
+        </form>
+    </div>
+</div>
+
+<div id="grid-replace-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5">
+        <div class="flex items-center justify-between mb-3">
+            <p id="grid-replace-title" class="text-sm font-semibold text-gray-700">Replace</p>
+            <button type="button" onclick="closeGridModal('grid-replace-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="flex gap-4 mb-3 text-xs">
+            <label class="flex items-center gap-1 cursor-pointer">
+                <input type="radio" name="grid_replace_mode" checked
+                    onchange="document.getElementById('grid-replace-existing').classList.remove('hidden'); document.getElementById('grid-replace-new').classList.add('hidden')">
+                Existing Employee
+            </label>
+            <label class="flex items-center gap-1 cursor-pointer">
+                <input type="radio" name="grid_replace_mode"
+                    onchange="document.getElementById('grid-replace-existing').classList.add('hidden'); document.getElementById('grid-replace-new').classList.remove('hidden')">
+                New Hire
+            </label>
+        </div>
+
+        <form method="POST" id="grid-replace-existing" class="flex flex-wrap gap-2 items-end">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="replace_position">
+            <input type="hidden" name="assignment_id" id="grid-replace-assignment-id-1">
+            <input type="hidden" name="basket" id="grid-replace-basket-1">
+            <input type="hidden" name="next" value="{% url 'crew_grid' %}">
+            <div class="flex flex-col gap-1 grow">
+                <label class="text-xs text-gray-500">Employee</label>
+                <select name="existing_employeeid" id="grid-replace-employee-select" required class="border rounded px-2 py-1.5 text-sm w-full"></select>
+            </div>
+            <button type="submit" class="bg-amber-600 text-white text-sm px-3 py-2 rounded-lg hover:opacity-90">Replace</button>
+        </form>
+
+        <form method="POST" id="grid-replace-new" class="hidden flex flex-col gap-3 mt-2">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="replace_position">
+            <input type="hidden" name="assignment_id" id="grid-replace-assignment-id-2">
+            <input type="hidden" name="basket" id="grid-replace-basket-2">
+            <input type="hidden" name="next" value="{% url 'crew_grid' %}">
+            <div class="grid grid-cols-2 gap-3">
+                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Employee ID</label><input type="text" name="new_employeeid" class="border rounded px-2 py-1.5 text-sm"></div>
+                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">First Name</label><input type="text" name="new_firstname" class="border rounded px-2 py-1.5 text-sm"></div>
+                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Last Name</label><input type="text" name="new_lastname" class="border rounded px-2 py-1.5 text-sm"></div>
+                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Phone</label><input type="text" name="new_phonenumber" class="border rounded px-2 py-1.5 text-sm"></div>
+            </div>
+            <button type="submit" class="self-start bg-amber-600 text-white text-sm px-3 py-2 rounded-lg hover:opacity-90">Hire &amp; Replace</button>
+        </form>
+
+        <form method="POST" id="grid-remove-form" class="mt-3 pt-3 border-t border-gray-100">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="bulk_remove_members">
+            <input type="hidden" name="assignment_ids" id="grid-remove-assignment-id">
+            <input type="hidden" name="basket" id="grid-remove-basket">
+            <input type="hidden" name="next" value="{% url 'crew_grid' %}">
+            <button type="submit" onclick="return confirm('Remove this crew member without replacing them?');"
+                class="text-xs text-red-500 hover:underline"><i class="fa-solid fa-trash mr-1"></i> Remove without replacing</button>
+        </form>
+    </div>
+</div>
+
+<div id="grid-assign-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5">
+        <div class="flex items-center justify-between mb-3">
+            <p id="grid-assign-title" class="text-sm font-semibold text-gray-700">Fill This Basket</p>
+            <button type="button" onclick="closeGridModal('grid-assign-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="flex flex-col gap-2.5 mb-4 text-xs">
+            <label class="flex items-start gap-2 cursor-pointer">
+                <input type="radio" name="grid_fill_mode" checked class="mt-0.5"
+                    onchange="['grid-fill-existing','grid-fill-temporary','grid-fill-permanent'].forEach(function(id){document.getElementById(id).classList.toggle('hidden', id !== 'grid-fill-existing');})">
+                <span><span class="font-semibold text-gray-700">Assign an Existing Shifter</span><br>
+                <span class="text-gray-400">Give this basket to a shifter already in the system. If they already run another basket, they keep it and take this one on as a second.</span></span>
+            </label>
+            <label class="flex items-start gap-2 cursor-pointer">
+                <input type="radio" name="grid_fill_mode" class="mt-0.5"
+                    onchange="['grid-fill-existing','grid-fill-temporary','grid-fill-permanent'].forEach(function(id){document.getElementById(id).classList.toggle('hidden', id !== 'grid-fill-temporary');})">
+                <span><span class="font-semibold text-gray-700">Promote a Miner — Temporary</span><br>
+                <span class="text-gray-400">Promote a Miner to Spare Shifter and place them here. Meant to be reversible — demote them back to Miner once this basket doesn't need them anymore.</span></span>
+            </label>
+            <label class="flex items-start gap-2 cursor-pointer">
+                <input type="radio" name="grid_fill_mode" class="mt-0.5"
+                    onchange="['grid-fill-existing','grid-fill-temporary','grid-fill-permanent'].forEach(function(id){document.getElementById(id).classList.toggle('hidden', id !== 'grid-fill-permanent');})">
+                <span><span class="font-semibold text-gray-700">Promote a Miner — Permanent</span><br>
+                <span class="text-gray-400">Permanently promote a Miner into the Shifter role and place them here. A lasting change, not a temporary fill.</span></span>
+            </label>
+        </div>
+
+        <form method="POST" action="{% url 'crew_assignments' %}" id="grid-fill-existing" class="flex flex-wrap gap-2 items-end">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="assign_basket">
+            <input type="hidden" name="crewid" id="grid-fill-crewid-1">
+            <input type="hidden" name="shiftertype" id="grid-fill-shiftertype-1">
+            <input type="hidden" name="next" value="{% url 'crew_grid' %}">
+            <div class="flex flex-col gap-1 grow">
+                <label class="text-xs text-gray-500">Shifter</label>
+                <select name="shifter_id" id="grid-fill-existing-select" required class="border rounded px-2 py-1.5 text-sm w-full"></select>
+            </div>
+            <button type="submit" class="bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Assign</button>
+        </form>
+
+        <form method="POST" action="{% url 'crew_assignments' %}" id="grid-fill-temporary" class="hidden flex flex-wrap gap-2 items-end">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="promote_and_assign_basket_temporary">
+            <input type="hidden" name="crewid" id="grid-fill-crewid-2">
+            <input type="hidden" name="shiftertype" id="grid-fill-shiftertype-2">
+            <input type="hidden" name="next" value="{% url 'crew_grid' %}">
+            <div class="flex flex-col gap-1 grow">
+                <label class="text-xs text-gray-500">Miner (Lead / 1 / 2 only)</label>
+                <select name="employee_id" id="grid-fill-temporary-select" required class="border rounded px-2 py-1.5 text-sm w-full"></select>
+            </div>
+            <button type="submit" class="bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Promote &amp; Assign</button>
+        </form>
+
+        <form method="POST" action="{% url 'crew_assignments' %}" id="grid-fill-permanent" class="hidden flex flex-wrap gap-2 items-end">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="promote_and_assign_basket">
+            <input type="hidden" name="crewid" id="grid-fill-crewid-3">
+            <input type="hidden" name="shiftertype" id="grid-fill-shiftertype-3">
+            <input type="hidden" name="next" value="{% url 'crew_grid' %}">
+            <div class="flex flex-col gap-1 grow">
+                <label class="text-xs text-gray-500">Miner</label>
+                <select name="employee_id" id="grid-fill-permanent-select" required class="border rounded px-2 py-1.5 text-sm w-full"></select>
+            </div>
+            <button type="submit" class="bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Promote &amp; Assign</button>
+        </form>
+    </div>
+</div>
+
+<div id="grid-manage-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5">
+        <div class="flex items-center justify-between mb-3">
+            <p id="grid-manage-title" class="text-sm font-semibold text-gray-700">Manage This Basket</p>
+            <button type="button" onclick="closeGridModal('grid-manage-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="flex flex-col gap-2.5 mb-4 text-xs">
+            <label class="flex items-start gap-2 cursor-pointer">
+                <input type="radio" name="grid_manage_mode" checked class="mt-0.5"
+                    onchange="['grid-manage-transfer','grid-manage-coverage'].forEach(function(id){document.getElementById(id).classList.toggle('hidden', id !== 'grid-manage-transfer');})">
+                <span><span class="font-semibold text-gray-700">Transfer</span><br>
+                <span id="grid-manage-transfer-desc" class="text-gray-400">Permanently hand this basket to someone else. They stop running it — their own home crew/section clears if this was it. Use this when they're not coming back to this basket at all.</span></span>
+            </label>
+            <label class="flex items-start gap-2 cursor-pointer">
+                <input type="radio" name="grid_manage_mode" class="mt-0.5"
+                    onchange="['grid-manage-transfer','grid-manage-coverage'].forEach(function(id){document.getElementById(id).classList.toggle('hidden', id !== 'grid-manage-coverage');})">
+                <span><span class="font-semibold text-gray-700">Start Coverage</span><br>
+                <span id="grid-manage-coverage-desc" class="text-gray-400">Keep them as the basket's real owner, but temporarily hand the day-to-day running to someone else. They resume automatically once you end the coverage.</span></span>
+            </label>
+        </div>
+
+        <form method="POST" id="grid-manage-transfer" class="flex flex-wrap gap-2 items-end">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="transfer_basket">
+            <input type="hidden" name="basket" id="grid-manage-transfer-basket">
+            <input type="hidden" name="next" value="{% url 'crew_grid' %}">
+            <div class="flex flex-col gap-1 grow">
+                <label class="text-xs text-gray-500">Transfer to</label>
+                <select id="grid-manage-transfer-select" required class="border rounded px-2 py-1.5 text-sm w-full"></select>
+            </div>
+            <button type="submit" class="bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Transfer</button>
+        </form>
+
+        <form method="POST" id="grid-manage-coverage" class="hidden flex flex-col gap-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="start_coverage">
+            <input type="hidden" name="basket" id="grid-manage-coverage-basket">
+            <input type="hidden" name="next" value="{% url 'crew_grid' %}">
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Covering shifter</label>
+                <select id="grid-manage-coverage-select" required class="border rounded px-2 py-1.5 text-sm"></select>
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Notes (optional)</label>
+                <input type="text" name="notes" placeholder="e.g. covering while on vacation" class="border rounded px-2 py-1.5 text-sm">
+            </div>
+            <button type="submit" class="self-start bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Start Coverage</button>
+        </form>
+    </div>
+</div>
+
+<div id="grid-level-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-5">
+        <div class="flex items-center justify-between mb-1">
+            <p id="grid-level-title" class="text-sm font-semibold text-gray-700">Edit Level / Contract Code</p>
+            <button type="button" onclick="closeGridModal('grid-level-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p class="text-xs text-gray-400 mb-3">Changing this doesn't move or replace anyone — it's their own classification, independent of which basket they're in.</p>
+        <form method="POST" action="{% url 'crew_assignments' %}" id="grid-level-form" class="flex flex-col gap-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="edit_employee_level">
+            <input type="hidden" name="employee_id" id="grid-level-employee-id">
+            <input type="hidden" name="next" value="{% url 'crew_grid' %}">
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Level</label>
+                <select id="grid-level-select" name="minerlevel" class="border rounded px-2 py-1.5 text-sm">
+                    <option value="">-- Unclassified --</option>
+                    {% for value, label in minerlevel_choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Contract Code</label>
+                <select id="grid-level-contract-select" name="contractid" class="border rounded px-2 py-1.5 text-sm"></select>
+            </div>
+            <button type="submit" class="self-start bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Save</button>
+        </form>
+    </div>
+</div>
+
+<!-- Demote is a permanent, deliberate placement change — its own explicit
+     confirm()-gated action, never part of a drag/drop gesture. -->
+<form method="POST" action="{% url 'crew_assignments' %}" id="grid-demote-form" class="hidden">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="demote_to_miner_permanent">
+    <input type="hidden" name="employee_id" id="grid-demote-employee-id">
+    <input type="hidden" name="next" value="{% url 'crew_grid' %}">
+</form>
+
+<!-- Ending coverage hands the roster back to the home shifter and reverts
+     the covering Spare Shifter to Miner if they've nothing else active. -->
+<form method="POST" action="{% url 'crew_coverage' %}" id="grid-end-coverage-form" class="hidden">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="end">
+    <input type="hidden" name="coverage_id" id="grid-end-coverage-id">
+    <input type="hidden" name="next" value="{% url 'crew_grid' %}">
+</form>
+
+{{ positions_for_modal|json_script:"positions-for-modal-data" }}
+{{ available_employees_for_modal|json_script:"available-employees-data" }}
+{{ all_miners_for_modal|json_script:"all-miners-data" }}
+{{ all_shifters_for_modal|json_script:"all-shifters-data" }}
+{{ contracts_for_modal|json_script:"contracts-for-modal-data" }}
+
+<script>
+(function () {
+    const positionsForModal = JSON.parse(document.getElementById('positions-for-modal-data').textContent);
+    const availableEmployees = JSON.parse(document.getElementById('available-employees-data').textContent);
+    const allMiners = JSON.parse(document.getElementById('all-miners-data').textContent);
+    const allShifters = JSON.parse(document.getElementById('all-shifters-data').textContent);
+    const contractsForModal = JSON.parse(document.getElementById('contracts-for-modal-data').textContent);
+
+    window.closeGridModal = function (id) {
+        document.getElementById(id).classList.add('hidden');
+    };
+
+    function openModal(id) {
+        document.getElementById(id).classList.remove('hidden');
+    }
+
+    function fillSelect(select, items, valueKey, labelKey, placeholder) {
+        select.innerHTML = '';
+        const placeholderOpt = document.createElement('option');
+        placeholderOpt.value = '';
+        placeholderOpt.textContent = placeholder;
+        select.appendChild(placeholderOpt);
+        items.forEach(function (item) {
+            const opt = document.createElement('option');
+            opt.value = item[valueKey];
+            opt.textContent = item[labelKey];
+            select.appendChild(opt);
+        });
+    }
+
+    // ---- Room Allocation (unchanged: cosmetic, localStorage-only) ----
+    document.querySelectorAll('.room-allocation').forEach(function (input) {
+        const key = 'crew_grid_room_' + input.dataset.crew;
+        try {
+            const saved = localStorage.getItem(key);
+            if (saved) input.value = saved;
+        } catch (e) {}
+        input.addEventListener('input', function () {
+            try { localStorage.setItem(key, input.value); } catch (e) {}
+        });
+    });
+
+    // ---- Add Member modal ----
+    document.querySelectorAll('.grid-add-trigger').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.getElementById('grid-add-form').action = btn.dataset.postUrl;
+            document.getElementById('grid-add-basket').value = btn.dataset.basket;
+            document.getElementById('grid-add-basket-label').innerHTML = btn.dataset.basketLabel || '';
+            document.getElementById('grid-add-startdate').value = new Date().toISOString().slice(0, 10);
+
+            fillSelect(document.getElementById('grid-add-employee-select'), availableEmployees, 'employeeid', 'name', '-- Select Employee --');
+
+            const posSelect = document.getElementById('grid-add-position-select');
+            fillSelect(posSelect, positionsForModal[btn.dataset.shiftertype] || [], 'id', 'name', '-- Select Position --');
+            if (btn.dataset.positionId) {
+                posSelect.value = btn.dataset.positionId;
+            }
+
+            openModal('grid-add-modal');
+        });
+    });
+
+    document.getElementById('grid-add-form').addEventListener('submit', function () {
+        const empSelect = document.getElementById('grid-add-employee-select');
+        const posSelect = document.getElementById('grid-add-position-select');
+        document.getElementById('grid-add-employee-id').value = empSelect.value;
+        const posHidden = document.getElementById('grid-add-position-hidden');
+        posHidden.name = empSelect.value ? ('position_' + empSelect.value) : 'position_unset';
+        posHidden.value = posSelect.value;
+    });
+
+    // ---- Replace modal ----
+    document.querySelectorAll('.grid-name-chip').forEach(function (chip) {
+        chip.addEventListener('click', function () {
+            ['grid-replace-existing', 'grid-replace-new', 'grid-remove-form'].forEach(function (id) {
+                document.getElementById(id).action = chip.dataset.postUrl;
+            });
+            document.getElementById('grid-replace-assignment-id-1').value = chip.dataset.assignmentId;
+            document.getElementById('grid-replace-assignment-id-2').value = chip.dataset.assignmentId;
+            document.getElementById('grid-remove-assignment-id').value = chip.dataset.assignmentId;
+            document.getElementById('grid-replace-basket-1').value = chip.dataset.basket;
+            document.getElementById('grid-replace-basket-2').value = chip.dataset.basket;
+            document.getElementById('grid-remove-basket').value = chip.dataset.basket;
+            document.getElementById('grid-replace-title').textContent =
+                'Replace ' + chip.dataset.employeeName + (chip.dataset.positionName ? ' (' + chip.dataset.positionName + ')' : '');
+
+            const empSelect = document.getElementById('grid-replace-employee-select');
+            fillSelect(empSelect, allMiners, 'employeeid', 'name', '-- Select Employee --');
+            Array.from(empSelect.options).forEach(function (opt) {
+                if (!opt.value) return;
+                if (opt.value === chip.dataset.employeeId) {
+                    opt.remove();
+                    return;
+                }
+                const info = allMiners.find(function (m) { return m.employeeid === opt.value; });
+                if (info && info.current_label) {
+                    opt.textContent += ' — currently ' + info.current_label;
+                }
+            });
+
+            // Reset to "Existing Employee" mode each time the modal reopens.
+            document.querySelector('input[name="grid_replace_mode"]').checked = true;
+            document.getElementById('grid-replace-existing').classList.remove('hidden');
+            document.getElementById('grid-replace-new').classList.add('hidden');
+
+            openModal('grid-replace-modal');
+        });
+    });
+
+    // ---- Fill This Basket modal (vacant basket -> existing shifter, or a
+    // Miner promoted temporarily or permanently) ----
+    const crewCoverageUrl = '{% url "crew_coverage" %}';
+    const spareEligibleMiners = allMiners.filter(function (m) { return ['Lead', '1', '2'].indexOf(m.minerlevel) !== -1; });
+
+    document.querySelectorAll('.grid-assign-trigger').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            // Nobody at all to offer — a modal with every dropdown empty
+            // isn't useful, but jumping straight to Crew Coverage without
+            // warning is disorienting too. Explain why, and let the
+            // Superintendent choose whether to go there instead.
+            if (!allShifters.length && !allMiners.length) {
+                const basketLabel = (btn.dataset.basketLabel || 'this basket').replace(/&mdash;/g, '—');
+                const goToCoverage = confirm(
+                    'Nobody is available to assign to ' + basketLabel + '.\n\n' +
+                    'Go to Crew Coverage to promote a Miner to Spare Shifter instead?'
+                );
+                if (goToCoverage) {
+                    window.location.href = crewCoverageUrl;
+                }
+                return;
+            }
+
+            const parts = btn.dataset.basket.split(':');
+            ['1', '2', '3'].forEach(function (n) {
+                document.getElementById('grid-fill-crewid-' + n).value = parts[0];
+                document.getElementById('grid-fill-shiftertype-' + n).value = parts[1];
+            });
+            document.getElementById('grid-assign-title').innerHTML = 'Fill This Basket &mdash; ' + (btn.dataset.basketLabel || '');
+
+            fillSelect(document.getElementById('grid-fill-existing-select'), allShifters, 'employeeid', 'name', '-- Select Shifter --');
+            Array.from(document.getElementById('grid-fill-existing-select').options).forEach(function (opt) {
+                if (!opt.value) return;
+                const info = allShifters.find(function (s) { return s.employeeid === opt.value; });
+                if (info && info.current_label) opt.textContent += ' — currently ' + info.current_label;
+            });
+            fillSelect(document.getElementById('grid-fill-temporary-select'), spareEligibleMiners, 'employeeid', 'name', '-- Select Miner --');
+            fillSelect(document.getElementById('grid-fill-permanent-select'), allMiners, 'employeeid', 'name', '-- Select Miner --');
+
+            // Reset to "Assign an Existing Shifter" each time the modal reopens.
+            document.querySelector('input[name="grid_fill_mode"]').checked = true;
+            ['grid-fill-existing', 'grid-fill-temporary', 'grid-fill-permanent'].forEach(function (id) {
+                document.getElementById(id).classList.toggle('hidden', id !== 'grid-fill-existing');
+            });
+
+            openModal('grid-assign-modal');
+        });
+    });
+
+    // ---- Manage This Basket modal (occupied basket, via the shifter's own
+    // name -> Transfer or Start Coverage) ----
+    document.querySelectorAll('.grid-manage-trigger').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.getElementById('grid-manage-transfer').action = btn.dataset.postUrl;
+            document.getElementById('grid-manage-coverage').action = btn.dataset.postUrl;
+            document.getElementById('grid-manage-transfer-basket').value = btn.dataset.basket;
+            document.getElementById('grid-manage-coverage-basket').value = btn.dataset.basket;
+            document.getElementById('grid-manage-title').innerHTML = 'Manage ' + (btn.dataset.basketLabel || 'This Basket');
+            const name = btn.dataset.shifterName || 'them';
+            document.getElementById('grid-manage-transfer-desc').textContent =
+                'Permanently hand this basket to someone else. ' + name + ' stops running it — their own home crew/section clears if this was it. Use this when they\'re not coming back to this basket at all.';
+            document.getElementById('grid-manage-coverage-desc').textContent =
+                'Keep ' + name + ' as the basket\'s real owner, but temporarily hand the day-to-day running to someone else. ' + name + ' resumes automatically once you end the coverage.';
+
+            const otherShifters = allShifters.filter(function (s) { return s.employeeid !== btn.dataset.shifterEid; });
+            const transferSelect = document.getElementById('grid-manage-transfer-select');
+            fillGroupedSelect(transferSelect, [
+                { label: 'Existing Shifters', items: otherShifters, prefix: 'shifter' },
+                { label: 'Promote a Miner (Permanent)', items: allMiners, prefix: 'promote' },
+            ]);
+
+            const coverageSelect = document.getElementById('grid-manage-coverage-select');
+            fillGroupedSelect(coverageSelect, [
+                { label: 'Existing Shifters', items: otherShifters, prefix: 'shifter' },
+                { label: 'Promote a Miner (Temporary — Lead/1/2 only)', items: spareEligibleMiners, prefix: 'promote' },
+            ]);
+
+            // Reset to "Transfer" each time the modal reopens.
+            document.querySelector('input[name="grid_manage_mode"]').checked = true;
+            ['grid-manage-transfer', 'grid-manage-coverage'].forEach(function (id) {
+                document.getElementById(id).classList.toggle('hidden', id !== 'grid-manage-transfer');
+            });
+
+            openModal('grid-manage-modal');
+        });
+    });
+
+    function fillGroupedSelect(select, groups) {
+        select.innerHTML = '';
+        const placeholderOpt = document.createElement('option');
+        placeholderOpt.value = '';
+        placeholderOpt.textContent = '-- Select --';
+        select.appendChild(placeholderOpt);
+        groups.forEach(function (group) {
+            if (!group.items.length) return;
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = group.label;
+            group.items.forEach(function (item) {
+                const opt = document.createElement('option');
+                opt.value = group.prefix + ':' + item.employeeid;
+                opt.textContent = item.name + (item.current_label ? ' — currently ' + item.current_label : '');
+                optgroup.appendChild(opt);
+            });
+            select.appendChild(optgroup);
+        });
+    }
+
+    document.getElementById('grid-manage-transfer').addEventListener('submit', function (e) {
+        const [kind, employeeId] = document.getElementById('grid-manage-transfer-select').value.split(':');
+        if (!kind || !employeeId) { e.preventDefault(); return; }
+        if (!confirm('Permanently transfer this basket and all its members?')) { e.preventDefault(); return; }
+        this.querySelectorAll('input[name="new_shifter_id"], input[name="promote_employee_id"]').forEach(function (el) { el.remove(); });
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = kind === 'promote' ? 'promote_employee_id' : 'new_shifter_id';
+        input.value = employeeId;
+        this.appendChild(input);
+    });
+
+    document.getElementById('grid-manage-coverage').addEventListener('submit', function (e) {
+        const [kind, employeeId] = document.getElementById('grid-manage-coverage-select').value.split(':');
+        if (!kind || !employeeId) { e.preventDefault(); return; }
+        this.querySelectorAll('input[name="covering_shifter_id"], input[name="promote_employee_id"]').forEach(function (el) { el.remove(); });
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = kind === 'promote' ? 'promote_employee_id' : 'covering_shifter_id';
+        input.value = employeeId;
+        this.appendChild(input);
+        const startdate = document.createElement('input');
+        startdate.type = 'hidden';
+        startdate.name = 'startdate';
+        startdate.value = new Date().toISOString().slice(0, 10);
+        this.appendChild(startdate);
+    });
+
+    // ---- Demote to Miner (permanent) ----
+    document.querySelectorAll('.grid-demote-trigger').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            if (!confirm(
+                'Permanently demote ' + btn.dataset.employeeName + ' to Miner?\n\n' +
+                'Their basket will show as Unassigned, but the crew stays in place and can be reassigned a new shifter.'
+            )) return;
+            document.getElementById('grid-demote-employee-id').value = btn.dataset.employeeId;
+            document.getElementById('grid-demote-form').submit();
+        });
+    });
+
+    // ---- End Coverage ----
+    document.querySelectorAll('.grid-end-coverage-trigger').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            if (!confirm(
+                'End coverage? ' + btn.dataset.homeName + ' will resume running this basket, and ' +
+                btn.dataset.coveringName + ' will be demoted back to Miner if they have nothing else active.'
+            )) return;
+            document.getElementById('grid-end-coverage-id').value = btn.dataset.coverageId;
+            document.getElementById('grid-end-coverage-form').submit();
+        });
+    });
+
+    // ---- Edit Level / Contract Code modal ----
+    // Contract Code options are scoped to the selected Level (a contract can
+    // apply to several levels and a level to several contracts — real
+    // many-to-many, not a 1:1 lookup) — an unclassified contract always
+    // shows regardless of level, same "never hide an unclassified row"
+    // safety net Position's own discipline filter uses.
+    function allContractsUnion() {
+        const seen = {};
+        const combined = [];
+        Object.values(contractsForModal).forEach(function (list) {
+            list.forEach(function (c) {
+                if (!seen[c.id]) { seen[c.id] = true; combined.push(c); }
+            });
+        });
+        return combined;
+    }
+
+    function populateLevelModalContracts(levelCode, selectedContractId) {
+        const select = document.getElementById('grid-level-contract-select');
+        const items = levelCode ? (contractsForModal[levelCode] || []) : allContractsUnion();
+        fillSelect(select, items, 'id', 'label', '-- None --');
+        if (selectedContractId && items.some(function (c) { return String(c.id) === String(selectedContractId); })) {
+            select.value = selectedContractId;
+        }
+    }
+
+    document.querySelectorAll('.grid-level-trigger').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.getElementById('grid-level-employee-id').value = btn.dataset.employeeId;
+            document.getElementById('grid-level-title').textContent = 'Edit Level / Contract — ' + btn.dataset.employeeName;
+
+            const levelSelect = document.getElementById('grid-level-select');
+            levelSelect.value = btn.dataset.minerlevel || '';
+            populateLevelModalContracts(levelSelect.value, btn.dataset.contractid);
+
+            openModal('grid-level-modal');
+        });
+    });
+
+    const gridLevelSelect = document.getElementById('grid-level-select');
+    if (gridLevelSelect) {
+        gridLevelSelect.addEventListener('change', function () {
+            const currentContract = document.getElementById('grid-level-contract-select').value;
+            populateLevelModalContracts(this.value, currentContract);
+        });
+    }
+
+    // ---- Drag and drop: drag a name chip onto an empty "+Add" slot to move them ----
+    const csrfToken = document.querySelector('#grid-add-form input[name=csrfmiddlewaretoken]').value;
+    const gridUrl = '{% url "crew_grid" %}';
+
+    document.querySelectorAll('.grid-name-chip').forEach(function (chip) {
+        chip.addEventListener('dragstart', function (e) {
+            e.dataTransfer.setData('text/plain', chip.dataset.assignmentId);
+            e.dataTransfer.effectAllowed = 'move';
+        });
+    });
+
+    document.querySelectorAll('.grid-drop-target').forEach(function (target) {
+        target.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            target.classList.add('bg-indigo-100', 'rounded');
+        });
+        target.addEventListener('dragleave', function () {
+            target.classList.remove('bg-indigo-100', 'rounded');
+        });
+        target.addEventListener('drop', function (e) {
+            e.preventDefault();
+            target.classList.remove('bg-indigo-100', 'rounded');
+            const assignmentId = e.dataTransfer.getData('text/plain');
+            if (!assignmentId) return;
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = target.dataset.postUrl;
+            form.style.display = 'none';
+
+            const fields = {
+                csrfmiddlewaretoken: csrfToken,
+                action: 'move_position',
+                basket: target.dataset.basket,
+                source_assignment_id: assignmentId,
+                dest_position_id: target.dataset.positionId || '',
+                next: gridUrl,
+            };
+            Object.keys(fields).forEach(function (name) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = name;
+                input.value = fields[name];
+                form.appendChild(input);
+            });
+
+            document.body.appendChild(form);
+            form.submit();
+        });
+    });
+})();
+</script>
+
+{% endblock content %}

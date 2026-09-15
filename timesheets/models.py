@@ -289,12 +289,32 @@ class ContractSeries(models.Model):
         return self.seriesname
 
 
+class MinerLevel(models.Model):
+    """Real rows for the same Lead/1/2/3/4 scale as users.User.minerlevel —
+    needed as an actual table (not just a CharField) so Contract can carry a
+    genuine many-to-many to it: confirmed one contract can span several
+    levels and one level can have several valid contracts, so a single
+    nullable field on either side can't represent the real relationship."""
+    levelid = models.AutoField(db_column='LevelID', primary_key=True)
+    levelcode = models.CharField(db_column='LevelCode', max_length=4, unique=True)
+    sortorder = models.IntegerField(db_column='SortOrder', default=0)
+
+    class Meta:
+        managed = True
+        db_table = 'MinerLevel'
+        ordering = ['sortorder', 'levelcode']
+
+    def __str__(self):
+        return self.levelcode
+
+
 class Contract(models.Model):
     contractid= models.AutoField(db_column='ContractID', primary_key=True)
     contractcode = models.CharField(db_column='ContractCode', max_length=20)
     contracttitle = models.CharField(db_column='ContractTitle', max_length=255)
     contractdescription = models.TextField(db_column='ContractDescription', blank=True, null=True)
     series = models.ManyToManyField(ContractSeries, db_table='ContractSeriesMap', blank=True, related_name='contracts')
+    levels = models.ManyToManyField(MinerLevel, db_table='ContractLevelMap', blank=True, related_name='contracts')
     isactive = models.IntegerField(db_column='IsActive', default=1)
 
     class Meta:

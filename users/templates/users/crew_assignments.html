@@ -84,6 +84,12 @@
                     <span class="text-gray-400">Employment</span>
                     <span class="font-medium text-gray-800">{{ shifter.employmenttype }}</span>
                 </div>
+                <button type="button" class="demote-trigger mt-1 text-xs text-red-600 hover:underline self-end"
+                    data-employee-id="{{ shifter.employeeid }}"
+                    data-employee-name="{{ shifter.firstname }} {{ shifter.lastname }}"
+                    data-crew-count="{{ shifter.crew_count }}">
+                    <i class="fa-solid fa-arrow-down mr-1"></i>Demote to Miner
+                </button>
             </div>
 
             <div class="w-full hidden flex-col gap-1.5 mt-1 pt-2 border-t border-gray-100 crew-edit-mode">
@@ -143,6 +149,11 @@
                     <span class="text-gray-400">Employment</span>
                     <span class="font-medium text-gray-800">{{ miner.employmenttype }}</span>
                 </div>
+                <button type="button" class="promote-trigger mt-1 text-xs text-[#28348A] hover:underline self-end"
+                    data-employee-id="{{ miner.employeeid }}"
+                    data-employee-name="{{ miner.firstname }} {{ miner.lastname }}">
+                    <i class="fa-solid fa-arrow-up mr-1"></i>Promote to Shifter
+                </button>
             </div>
 
             <div class="w-full hidden flex-col gap-1.5 mt-1 pt-2 border-t border-gray-100 crew-edit-mode">
@@ -166,7 +177,38 @@
     <div id="member-no-results" class="hidden text-center text-gray-400 text-sm py-10">No members match your search.</div>
 </form>
 
+<!-- Promote/Demote are permanent, deliberate placement changes — kept as
+     their own explicit action outside the bulk crew-form save, never a
+     one-click/drag gesture, so they can't be triggered by accident. -->
+<form method="POST" id="promote-demote-form" class="hidden">
+    {% csrf_token %}
+    <input type="hidden" name="action" id="promote-demote-action">
+    <input type="hidden" name="employee_id" id="promote-demote-employee-id">
+</form>
+
 <script>
+document.querySelectorAll('.promote-trigger').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        if (!confirm('Permanently promote ' + btn.dataset.employeeName + ' to Shifter?')) return;
+        document.getElementById('promote-demote-action').value = 'promote_to_shifter_permanent';
+        document.getElementById('promote-demote-employee-id').value = btn.dataset.employeeId;
+        document.getElementById('promote-demote-form').submit();
+    });
+});
+
+document.querySelectorAll('.demote-trigger').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        const crewCount = parseInt(btn.dataset.crewCount || '0', 10);
+        const warning = crewCount > 0
+            ? ' They currently run a basket with ' + crewCount + ' crew member' + (crewCount !== 1 ? 's' : '') + ' — the basket will show as Unassigned, but the crew stays in place and can be reassigned a new shifter.'
+            : '';
+        if (!confirm('Permanently demote ' + btn.dataset.employeeName + ' to Miner?' + warning)) return;
+        document.getElementById('promote-demote-action').value = 'demote_to_miner_permanent';
+        document.getElementById('promote-demote-employee-id').value = btn.dataset.employeeId;
+        document.getElementById('promote-demote-form').submit();
+    });
+});
+
 function enterEditMode() {
     document.querySelectorAll('.crew-view-mode').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('.crew-edit-mode').forEach(el => { el.classList.remove('hidden'); el.classList.add('flex'); });

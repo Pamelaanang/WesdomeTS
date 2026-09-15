@@ -93,7 +93,9 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-management" class="hidden flex flex-col">
+                <a href="{% url 'crew_grid' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'crew_grid' %}font-semibold{% endif %}"><i class="fa-solid fa-table-cells"></i> Crew Grid</a>
                 <a href="{% url 'crew_assignments' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-people-group"></i> Shifter & Miner Management</a>
+                <a href="{% url 'position_catalog' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'position_catalog' %}font-semibold{% endif %}"><i class="fa-solid fa-list-check"></i> Position Catalog</a>
                 <a href="{% url 'crew_coverage' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'crew_coverage' %}font-semibold{% endif %}"><i class="fa-solid fa-arrows-rotate"></i> Crew Coverage</a>
                 <a href="{% url 'contract_account_management' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-link"></i> Contract-Cost Center</a>
             </div>

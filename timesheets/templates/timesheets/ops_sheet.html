@@ -21,13 +21,22 @@
     {% endif %}
     <form method="POST" action="{% url 'new_ops_sheet' %}" class="mt-4">
         {% csrf_token %}
-        {% if active_coverages %}
+        {% if active_coverages or own_baskets|length > 1 %}
         <div class="mb-4">
             <label class="block text-xs text-gray-500 mb-1 text-center">Submitting for</label>
             <div class="flex flex-wrap gap-2 justify-center">
+                {% if own_baskets|length > 1 %}
+                {% for b in own_baskets %}
                 <label class="flex items-center gap-2 border rounded-lg px-3 py-1.5 text-sm cursor-pointer has-[:checked]:border-[#28348A] has-[:checked]:bg-blue-50">
-                    <input type="radio" name="coverage_id" value="" checked class="accent-[#28348A]"> My own crew
+                    <input type="radio" name="coverage_id" value="" data-basket="{{ b.0.crewid }}:{{ b.1 }}" {% if forloop.first %}checked{% endif %} class="accent-[#28348A] own-basket-radio">
+                    My crew: Crew {{ b.0.crewname }} &mdash; {{ b.1 }}
                 </label>
+                {% endfor %}
+                {% else %}
+                <label class="flex items-center gap-2 border rounded-lg px-3 py-1.5 text-sm cursor-pointer has-[:checked]:border-[#28348A] has-[:checked]:bg-blue-50">
+                    <input type="radio" name="coverage_id" value="" data-basket="{{ default_own_basket }}" checked class="accent-[#28348A] own-basket-radio"> My own crew
+                </label>
+                {% endif %}
                 {% for cov in active_coverages %}
                 <label class="flex items-center gap-2 border rounded-lg px-3 py-1.5 text-sm cursor-pointer has-[:checked]:border-[#097d45] has-[:checked]:bg-green-50">
                     <input type="radio" name="coverage_id" value="{{ cov.coverageid }}" class="accent-[#097d45]">
@@ -39,6 +48,7 @@
         {% else %}
         <input type="hidden" name="coverage_id" value="">
         {% endif %}
+        <input type="hidden" name="own_basket" id="own-basket-input" value="{{ default_own_basket }}">
         <input type="hidden" name="section" id="section-input" value="{{ own_shiftertype }}">
         <div class="flex flex-wrap gap-4 justify-center items-end">
             <div class="flex flex-col gap-1">
@@ -73,15 +83,32 @@
     var ownCrew = "{{ own_crewname }}";
     var coverageSections = {{ coverage_sections|safe }};
     var coverageCrews = {{ coverage_crews|safe }};
+    var ownBasketSections = {{ own_basket_sections|safe }};
+    var ownBasketCrews = {{ own_basket_crews|safe }};
+
+    function syncFilingForDisplay() {
+        var checked = document.querySelector('input[name="coverage_id"]:checked');
+        if (!checked) return;
+        var section, crew;
+        if (checked.value) {
+            section = coverageSections[checked.value] || '';
+            crew = coverageCrews[checked.value] || '';
+            document.getElementById('own-basket-input').value = '';
+        } else {
+            var basketKey = checked.dataset.basket || '';
+            section = basketKey in ownBasketSections ? ownBasketSections[basketKey] : ownSection;
+            crew = basketKey in ownBasketCrews ? ownBasketCrews[basketKey] : ownCrew;
+            document.getElementById('own-basket-input').value = basketKey;
+        }
+        document.getElementById('section-input').value = section;
+        document.getElementById('section-display').textContent = section || '—';
+        document.getElementById('crew-display').textContent = crew || '—';
+    }
+
     document.querySelectorAll('input[name="coverage_id"]').forEach(function(radio) {
-        radio.addEventListener('change', function() {
-            var section = this.value ? (coverageSections[this.value] || '') : ownSection;
-            var crew = this.value ? (coverageCrews[this.value] || '') : ownCrew;
-            document.getElementById('section-input').value = section;
-            document.getElementById('section-display').textContent = section || '—';
-            document.getElementById('crew-display').textContent = crew || '—';
-        });
+        radio.addEventListener('change', syncFilingForDisplay);
     });
+    syncFilingForDisplay();
     </script>
 
     {% else %}
@@ -218,7 +245,8 @@
                                     data-entry="{{ entry.opsentryid }}"
                                     data-contract="{{ entry.contractid_id }}"
                                     data-account="{{ entry.accountid_id|default:0 }}"
-                                    onclick="openEditRow(this.dataset.entry, this.dataset.contract, this.dataset.account)"
+                                    data-employee="{{ entry.employeeid_id }}"
+                                    onclick="openEditRow(this.dataset.entry, this.dataset.contract, this.dataset.account, this.dataset.employee)"
                                     class="border border-[#28348A] rounded text-[#28348A] text-xs px-2 py-1 hover:bg-blue-50">Edit</button>
                                 <button type="button" onclick="deleteRow('{{ entry.opsentryid }}')"
                                     class="border border-red-500 rounded text-red-500 text-xs px-2 py-1">Delete</button>
@@ -231,7 +259,8 @@
                                 data-entry="{{ entry.opsentryid }}"
                                 data-contract="{{ entry.contractid_id }}"
                                 data-account="{{ entry.accountid_id|default:0 }}"
-                                onclick="openEditRow(this.dataset.entry, this.dataset.contract, this.dataset.account)"
+                                data-employee="{{ entry.employeeid_id }}"
+                                onclick="openEditRow(this.dataset.entry, this.dataset.contract, this.dataset.account, this.dataset.employee)"
                                 class="border border-[#28348A] rounded text-[#28348A] text-xs px-2 py-1 hover:bg-blue-50">Edit</button>
                             {% endif %}
                         </td>
@@ -251,6 +280,7 @@
                                 {% endfor %}
                             </select>
                             <p id="contract-info-edit-{{ entry.opsentryid }}" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
+                            <p id="contract-locked-note-edit-{{ entry.opsentryid }}" class="hidden text-[10px] text-gray-400 mt-0.5 italic">Assigned by Superintendent</p>
                         </td>
                         <td class="p-2">
                             <select id="account-edit-{{ entry.opsentryid }}" class="border rounded px-1 py-1 w-full text-xs">
@@ -326,6 +356,7 @@
                                 {% endfor %}
                             </select>
                             <p id="contract-info-edit-{{ entry.opsentryid }}" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
+                            <p id="contract-locked-note-edit-{{ entry.opsentryid }}" class="hidden text-[10px] text-gray-400 mt-0.5 italic">Assigned by Superintendent</p>
                         </td>
                         <td class="p-2">
                             <select id="account-edit-{{ entry.opsentryid }}" class="border rounded px-1 py-1 w-full text-xs">
@@ -436,6 +467,7 @@
                                 {% endfor %}
                             </select>
                             <p id="contract-info" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
+                            <p id="contract-locked-note" class="hidden text-[10px] text-gray-400 mt-0.5 italic">Assigned by Superintendent</p>
                         </td>
                         <td class="p-2">
                             <select name="accountid" id="account-select" class="border rounded px-1 py-1 w-full text-xs">
@@ -659,13 +691,43 @@
         showAccountInfo(this.value, addRowAccounts, 'account-info');
     });
 
-    function applyPrefill(employeeId) {
-        if (!employeeId || !prefill[employeeId]) { showLeaveInfo(); return; }
+    // Contract is only ever an open pick for an employee the Superintendent
+    // hasn't classified yet (no assigned_contractid) — otherwise it's fixed
+    // to their current assignment and the Shifter can't change it. Shared by
+    // the + Add Row picker and each saved row's inline editor, so both derive
+    // it the same way.
+    function resolveContractLock(employeeId) {
         const p = prefill[employeeId];
-        if (p.contractid) {
-            const cs = document.getElementById('contract-select');
-            if (cs) { cs.value = p.contractid; showContractInfo(p.contractid, 'contract-info'); }
-            loadAccounts(p.contractid, p.accountid);
+        if (!p) return { contractId: null, accountId: null, locked: false };
+        if (p.assigned_contractid) {
+            return { contractId: p.assigned_contractid, accountId: p.accountid, locked: true };
+        }
+        return { contractId: p.contractid || null, accountId: p.accountid, locked: false };
+    }
+
+    function applyPrefill(employeeId) {
+        const cs = document.getElementById('contract-select');
+        const lockNote = document.getElementById('contract-locked-note');
+        if (!employeeId || !prefill[employeeId]) {
+            if (cs) cs.disabled = false;
+            if (lockNote) lockNote.classList.add('hidden');
+            showLeaveInfo();
+            return;
+        }
+        const p = prefill[employeeId];
+        const lock = resolveContractLock(employeeId);
+        if (cs) {
+            cs.disabled = lock.locked;
+            if (lockNote) lockNote.classList.toggle('hidden', !lock.locked);
+            if (lock.contractId) {
+                cs.value = lock.contractId;
+                showContractInfo(lock.contractId, 'contract-info');
+                loadAccounts(lock.contractId, lock.accountId);
+            } else {
+                cs.value = '';
+                document.getElementById('contract-info').textContent = '';
+                loadAccounts('', null);
+            }
         }
         if (p.opscategoryid) {
             const catSel = document.getElementById('category-select');
@@ -761,11 +823,28 @@
         loadAccountsForEntry(entryId, null);
     }
 
-    function openEditRow(entryId, contractId, accountId) {
+    function openEditRow(entryId, contractId, accountId, employeeId) {
         document.getElementById('row-' + entryId).classList.add('hidden');
         document.getElementById('edit-row-' + entryId).classList.remove('hidden');
-        showContractInfo(contractId, 'contract-info-edit-' + entryId);
-        if (contractId) loadAccountsForEntry(entryId, accountId && accountId !== '0' ? accountId : null);
+
+        // Re-derive from the employee's *current* assignment, not just what
+        // was saved on this entry — if the Superintendent has reclassified
+        // them since this row was created, editing it (still a Draft) should
+        // pick that up rather than keep showing the stale saved value.
+        const lock = resolveContractLock(employeeId);
+        const effectiveContractId = lock.contractId || contractId;
+        const effectiveAccountId = lock.contractId ? lock.accountId : accountId;
+
+        const contractSel = document.getElementById('contract-edit-' + entryId);
+        const lockNote = document.getElementById('contract-locked-note-edit-' + entryId);
+        if (contractSel) {
+            contractSel.disabled = lock.locked;
+            if (effectiveContractId) contractSel.value = effectiveContractId;
+        }
+        if (lockNote) lockNote.classList.toggle('hidden', !lock.locked);
+
+        showContractInfo(effectiveContractId, 'contract-info-edit-' + entryId);
+        if (effectiveContractId) loadAccountsForEntry(entryId, effectiveAccountId && effectiveAccountId !== '0' ? effectiveAccountId : null);
         onEditCategoryChange(entryId);
     }
 
