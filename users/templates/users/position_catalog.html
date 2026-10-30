@@ -19,7 +19,7 @@
     <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
     <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
     <p class="text-center text-sm text-gray-500 mt-1">
-        <span class="font-semibold text-gray-700">POSITION CATALOG:</span> Add crew positions and classify which discipline each belongs to.
+        <span class="font-semibold text-gray-700">POSITION MANAGEMENT:</span> Add crew positions and group them by discipline.
     </p>
     {% if unclassified_count %}
     <p class="text-center text-xs text-amber-600 mt-2"><i class="fa-solid fa-triangle-exclamation"></i> {{ unclassified_count }} position{{ unclassified_count|pluralize }} still unclassified.</p>
@@ -55,40 +55,45 @@
     </form>
 </div>
 
-<!-- CLASSIFY EXISTING POSITIONS -->
-<div class="container mx-auto mb-8 bg-white rounded-2xl shadow p-5">
-    <button type="button" onclick="document.getElementById('classify-body').classList.toggle('hidden'); document.getElementById('classify-chevron').classList.toggle('rotate-90')"
-        class="w-full flex items-center justify-between text-left">
-        <h3 class="font-semibold text-sm text-gray-700">Classify Positions ({{ positions|length }})</h3>
-        <i id="classify-chevron" class="fa-solid fa-chevron-right text-xs text-gray-400 transition-transform duration-200 {% if unclassified_count %}rotate-90{% endif %}"></i>
-    </button>
-    <div id="classify-body" class="{% if not unclassified_count %}hidden{% endif %} mt-4">
-    <form method="POST">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="bulk_classify">
-        <div class="overflow-x-auto">
+<!-- POSITIONS BY DISCIPLINE: one toggle per discipline, one Save for all -->
+<form method="POST" class="container mx-auto mb-8">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="bulk_classify">
+
+    {% for group in groups %}
+    <div class="mb-3 bg-white rounded-2xl shadow overflow-hidden">
+        <button type="button" onclick="document.getElementById('group-body-{{ forloop.counter }}').classList.toggle('hidden'); document.getElementById('group-chevron-{{ forloop.counter }}').classList.toggle('rotate-90')"
+            class="w-full flex items-center justify-between text-left px-5 py-3 bg-gray-50 hover:bg-gray-100">
+            <span class="font-semibold text-sm text-gray-700">
+                {{ group.label }} <span class="text-gray-400 font-normal">({{ group.positions|length }})</span>
+                {% if group.label == 'Unclassified' and group.positions %}
+                <span class="ml-1 inline-block bg-amber-100 text-amber-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full align-middle">Needs a discipline</span>
+                {% endif %}
+            </span>
+            <i id="group-chevron-{{ forloop.counter }}" class="fa-solid fa-chevron-right text-xs text-gray-400 transition-transform duration-200 {% if group.label == 'Unclassified' and group.positions %}rotate-90{% endif %}"></i>
+        </button>
+        <div id="group-body-{{ forloop.counter }}" class="{% if not group.label == 'Unclassified' or not group.positions %}hidden{% endif %} px-5 pb-4 pt-2 overflow-x-auto">
             <table class="w-full max-w-xl text-sm border-separate" style="border-spacing: 0 2px;">
                 <thead>
                     <tr class="text-left text-xs text-gray-500">
                         <th class="py-2 pr-6">Position</th>
+                        <th class="py-2 pr-6">Order</th>
                         <th class="py-2 pr-6">Discipline</th>
                         <th class="py-2">Active</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for pos in positions %}
+                    {% for pos in group.positions %}
                     <tr class="border-b border-gray-100 {% if not pos.isactive %}opacity-50{% endif %}">
-                        <td class="py-1 pr-6 whitespace-nowrap">
-                            {{ pos.positionname }}
-                            {% if not pos.shiftertype %}
-                            <span class="ml-1 inline-block bg-amber-100 text-amber-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full align-middle">Unclassified</span>
-                            {% endif %}
+                        <td class="py-1 pr-6 whitespace-nowrap">{{ pos.positionname }}</td>
+                        <td class="py-1 pr-6">
+                            <input type="number" name="sortorder_{{ pos.positionid }}" value="{{ pos.sortorder }}" class="border rounded px-2 py-1 text-xs w-16" title="Row order within its discipline on the grid (lower first)">
                         </td>
                         <td class="py-1 pr-6">
                             <select name="shiftertype_{{ pos.positionid }}" class="border rounded px-2 py-1 text-xs">
                                 <option value="">— Unclassified —</option>
                                 {% for value, label in shifter_type_choices %}
-                                <option value="{{ value }}" {% if pos.shiftertype == value %}selected{% endif %}>{{ label }}</option>
+                                <option value="{{ value }}" {% if pos.discipline and pos.discipline.name == value %}selected{% endif %}>{{ label }}</option>
                                 {% endfor %}
                             </select>
                         </td>
@@ -98,22 +103,23 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="3" class="py-4 text-center text-gray-400 text-xs">No positions yet.</td>
+                        <td colspan="4" class="py-3 text-center text-gray-400 text-xs">No positions here yet.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-        {% if positions %}
-        <div class="flex justify-end mt-4">
-            <button type="submit"
-                class="bg-[#097d45] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">
-                <i class="fa-solid fa-floppy-disk mr-1"></i> Save Classifications
-            </button>
-        </div>
-        {% endif %}
-    </form>
     </div>
-</div>
+    {% endfor %}
+
+    {% if positions %}
+    <div class="flex justify-end mt-4">
+        <button type="submit"
+            class="bg-[#097d45] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">
+            <i class="fa-solid fa-floppy-disk mr-1"></i> Save Positions
+        </button>
+    </div>
+    {% endif %}
+</form>
 
 {% endblock content %}

@@ -5,8 +5,8 @@ from django.core.management.base import BaseCommand
 from timesheets.models import LeaveType, VacationRatePolicy
 
 INITIAL_RATES = {
-    'ops_development': 12,
-    'ops_other': 10,
+    'ops_staff': 12,
+    'ops_contract': 10,
     'non_operations': 12,
 }
 

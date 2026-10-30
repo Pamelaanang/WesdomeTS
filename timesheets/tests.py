@@ -43,8 +43,8 @@ class LeaveTestBase(TestCase):
         cls.lieu_type = LeaveType.objects.create(leavetypename='Lieu Day')
         cls.unpaid_type = LeaveType.objects.create(leavetypename='Unpaid Leave')
 
-        VacationRatePolicy.objects.create(bucket='ops_development', effective_year=cls.year, monthly_rate_hours=12)
-        VacationRatePolicy.objects.create(bucket='ops_other', effective_year=cls.year, monthly_rate_hours=10)
+        VacationRatePolicy.objects.create(bucket='ops_staff', effective_year=cls.year, monthly_rate_hours=12)
+        VacationRatePolicy.objects.create(bucket='ops_contract', effective_year=cls.year, monthly_rate_hours=10)
         VacationRatePolicy.objects.create(bucket='non_operations', effective_year=cls.year, monthly_rate_hours=12)
 
         cls.contract = Contract.objects.create(contractcode='TST', contracttitle='Test Contract')
@@ -67,13 +67,13 @@ class VacationAllocationTests(LeaveTestBase):
         self.assertEqual(allocation.allocatedhours, Decimal('120.00'))  # 10 months * 12
         self.assertEqual(allocation.isprorated, 1)
 
-    def test_hire_year_proration_ops_development(self):
-        emp = self.make_user('DEV1', 5, hiredate=datetime.date(self.year, 3, 1), shiftertype='Development')
+    def test_hire_year_proration_ops_staff(self):
+        emp = self.make_user('STAFF1', 5, hiredate=datetime.date(self.year, 3, 1), shiftertype='Development', employmenttype='Staff')
         allocation = leave_rules.get_or_create_vacation_allocation(emp, self.year)
         self.assertEqual(allocation.allocatedhours, Decimal('120.00'))  # 10 months * 12
 
-    def test_hire_year_proration_ops_other(self):
-        emp = self.make_user('PROD1', 5, hiredate=datetime.date(self.year, 3, 1), shiftertype='Production')
+    def test_hire_year_proration_ops_contract(self):
+        emp = self.make_user('CON1', 8, hiredate=datetime.date(self.year, 3, 1), employmenttype='Contract')
         allocation = leave_rules.get_or_create_vacation_allocation(emp, self.year)
         self.assertEqual(allocation.allocatedhours, Decimal('100.00'))  # 10 months * 10
 
@@ -94,9 +94,9 @@ class VacationAllocationTests(LeaveTestBase):
         self.assertNotEqual(this_year_alloc.allocationid, next_year_alloc.allocationid)
 
     def test_rate_policy_effective_dating_is_data_only(self):
-        VacationRatePolicy.objects.create(bucket='ops_other', effective_year=self.year + 1, monthly_rate_hours=12)
-        self.assertEqual(leave_rules.get_monthly_vacation_rate('ops_other', self.year), Decimal('10'))
-        self.assertEqual(leave_rules.get_monthly_vacation_rate('ops_other', self.year + 1), Decimal('12'))
+        VacationRatePolicy.objects.create(bucket='ops_contract', effective_year=self.year + 1, monthly_rate_hours=12)
+        self.assertEqual(leave_rules.get_monthly_vacation_rate('ops_contract', self.year), Decimal('10'))
+        self.assertEqual(leave_rules.get_monthly_vacation_rate('ops_contract', self.year + 1), Decimal('12'))
 
 
 class LieuEligibilityTests(LeaveTestBase):
@@ -296,7 +296,13 @@ class OperationsLeaveParityTests(LeaveTestBase):
         CrewAssignment.objects.create(shifter=shifter, employee=member, startdate=timezone.now().date())
 
         self.assertEqual(leave_rules.get_operations_employee_type(member), 'Development')
-        self.assertEqual(leave_rules.get_vacation_bucket(member), 'ops_development')
+
+    def test_operations_bucket_follows_employment_type_not_discipline(self):
+        dev_staff = self.make_user('DEVSTAFF', 5, shiftertype='Development', crewid=self.crew, employmenttype='Staff')
+        prod_contract = self.make_user('PRODCON', 8, employmenttype='Contract')
+        self.assertEqual(leave_rules.get_vacation_bucket(dev_staff), 'ops_staff')
+        self.assertEqual(leave_rules.get_vacation_bucket(prod_contract), 'ops_contract')
+        self.assertEqual(leave_rules.get_vacation_bucket(self.make_user('MAINT', 9)), 'non_operations')
 
     def test_lieu_day_never_offered_on_ops_sheet(self):
         shifter = self.make_user('SHIFT2', 5, shiftertype='Production', crewid=self.crew)

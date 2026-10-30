@@ -1,0 +1,388 @@
+<!-- ===================== Inline action modals ===================== -->
+
+<div id="grid-add-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-5">
+        <div class="flex items-center justify-between mb-1">
+            <p class="text-sm font-semibold text-gray-700">Add Crew Member</p>
+            <button type="button" onclick="closeGridModal('grid-add-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p id="grid-add-basket-label" class="text-xs text-gray-400 mb-3"></p>
+        <form method="POST" id="grid-add-form" class="flex flex-col gap-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" id="grid-add-action" value="bulk_add_members">
+            <input type="hidden" name="basket" id="grid-add-basket">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <input type="hidden" name="employee_ids" id="grid-add-employee-id">
+            <input type="hidden" id="grid-add-position-hidden">
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Employee</label>
+                <select id="grid-add-employee-select" required class="border rounded px-2 py-1.5 text-sm"></select>
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Position</label>
+                <select id="grid-add-position-select" class="border rounded px-2 py-1.5 text-sm"></select>
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Start Date</label>
+                <input type="date" name="startdate" id="grid-add-startdate" required class="border rounded px-2 py-1.5 text-sm">
+            </div>
+            <label id="grid-add-also-covers-wrap" class="hidden flex flex-col gap-1 text-xs text-gray-500">Also covers (optional)
+                <select id="grid-add-also-covers" class="border rounded px-2 py-1.5 text-sm"></select>
+            </label>
+            <button type="submit" class="self-start bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Add</button>
+        </form>
+    </div>
+</div>
+
+<div id="grid-replace-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5">
+        <div class="flex items-center justify-between mb-3">
+            <p id="grid-replace-title" class="text-sm font-semibold text-gray-700">Replace</p>
+            <button type="button" onclick="closeGridModal('grid-replace-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="flex gap-4 mb-3 text-xs">
+            <label class="flex items-center gap-1 cursor-pointer">
+                <input type="radio" name="grid_replace_mode" checked
+                    onchange="document.getElementById('grid-replace-existing').classList.remove('hidden'); document.getElementById('grid-replace-new').classList.add('hidden')">
+                Existing Employee
+            </label>
+            <label class="flex items-center gap-1 cursor-pointer">
+                <input type="radio" name="grid_replace_mode"
+                    onchange="document.getElementById('grid-replace-existing').classList.add('hidden'); document.getElementById('grid-replace-new').classList.remove('hidden')">
+                New Hire
+            </label>
+        </div>
+
+        <form method="POST" id="grid-replace-existing" class="flex flex-wrap gap-2 items-end">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="replace_position">
+            <input type="hidden" name="assignment_id" id="grid-replace-assignment-id-1">
+            <input type="hidden" name="basket" id="grid-replace-basket-1">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <div class="flex flex-col gap-1 grow">
+                <label class="text-xs text-gray-500">Employee</label>
+                <select name="existing_employeeid" id="grid-replace-employee-select" required class="border rounded px-2 py-1.5 text-sm w-full"></select>
+            </div>
+            <label class="flex flex-col gap-1 text-xs text-gray-500 w-full" id="grid-replace-also-wrap-1">Also covers (optional)
+                <select name="also_covers" id="grid-replace-also-covers-1" class="border rounded px-2 py-1.5 text-sm"></select>
+            </label>
+            <button type="submit" class="bg-amber-600 text-white text-sm px-3 py-2 rounded-lg hover:opacity-90">Replace</button>
+        </form>
+
+        <form method="POST" id="grid-replace-new" class="hidden flex flex-col gap-3 mt-2">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="replace_position">
+            <input type="hidden" name="assignment_id" id="grid-replace-assignment-id-2">
+            <input type="hidden" name="basket" id="grid-replace-basket-2">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <div class="grid grid-cols-2 gap-3">
+                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Employee ID</label><input type="text" name="new_employeeid" required class="border rounded px-2 py-1.5 text-sm"></div>
+                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">First Name</label><input type="text" name="new_firstname" required class="border rounded px-2 py-1.5 text-sm"></div>
+                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Last Name</label><input type="text" name="new_lastname" required class="border rounded px-2 py-1.5 text-sm"></div>
+                <div class="flex flex-col gap-1"><label class="text-xs text-gray-500">Phone</label><input type="text" name="new_phonenumber" required class="border rounded px-2 py-1.5 text-sm"></div>
+            </div>
+            <label class="flex flex-col gap-1 text-xs text-gray-500 w-full" id="grid-replace-also-wrap-2">Also covers (optional)
+                <select name="also_covers" id="grid-replace-also-covers-2" class="border rounded px-2 py-1.5 text-sm"></select>
+            </label>
+            <button type="submit" class="self-start bg-amber-600 text-white text-sm px-3 py-2 rounded-lg hover:opacity-90">Hire (pending IT access) &amp; Replace</button>
+        </form>
+
+        <form method="POST" action="{% url 'crew_assignments' %}" id="grid-quit-occupant-form" class="mt-3 pt-3 border-t border-gray-100">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="quit_employee">
+            <input type="hidden" name="employee_id" id="grid-quit-occupant-employee-id">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" onclick="return confirm('Record this person as quit today? Their seat will be freed and their account deactivated.');"
+                class="text-xs text-red-500 hover:underline"><i class="fa-solid fa-person-walking-arrow-right mr-1"></i> Record quit (leaves the company)</button>
+        </form>
+
+        <form method="POST" id="grid-remove-form" class="mt-3 pt-3 border-t border-gray-100">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="bulk_remove_members">
+            <input type="hidden" name="assignment_ids" id="grid-remove-assignment-id">
+            <input type="hidden" name="basket" id="grid-remove-basket">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" onclick="return confirm('Remove this crew member without replacing them?');"
+                class="text-xs text-red-500 hover:underline"><i class="fa-solid fa-trash mr-1"></i> Remove without replacing</button>
+        </form>
+    </div>
+</div>
+
+<div id="grid-assign-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5">
+        <div class="flex items-center justify-between mb-3">
+            <p id="grid-assign-title" class="text-sm font-semibold text-gray-700">Fill This Basket</p>
+            <button type="button" onclick="closeGridModal('grid-assign-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="flex flex-col gap-2.5 mb-4 text-xs">
+            <label class="flex items-start gap-2 cursor-pointer">
+                <input type="radio" name="grid_fill_mode" checked class="mt-0.5"
+                    onchange="['grid-fill-existing','grid-fill-temporary','grid-fill-permanent','grid-fill-hire'].forEach(function(id){document.getElementById(id).classList.toggle('hidden', id !== 'grid-fill-existing');})">
+                <span><span class="font-semibold text-gray-700">Assign an Existing Shifter</span><br>
+                <span class="text-gray-400">Give this basket to a shifter already in the system. If they already run another basket, they keep it and take this one on as a second.</span></span>
+            </label>
+            <label class="flex items-start gap-2 cursor-pointer">
+                <input type="radio" name="grid_fill_mode" class="mt-0.5"
+                    onchange="['grid-fill-existing','grid-fill-temporary','grid-fill-permanent','grid-fill-hire'].forEach(function(id){document.getElementById(id).classList.toggle('hidden', id !== 'grid-fill-temporary');})">
+                <span><span class="font-semibold text-gray-700">Temporary cover (Spare Shifter)</span><br>
+                <span class="text-gray-400">A Lead, 1, or 2 Miner covers this basket. Recorded as coverage, so hours can be logged. End it later to hand the basket back.</span></span>
+            </label>
+            <label class="flex items-start gap-2 cursor-pointer">
+                <input type="radio" name="grid_fill_mode" class="mt-0.5"
+                    onchange="['grid-fill-existing','grid-fill-temporary','grid-fill-permanent','grid-fill-hire'].forEach(function(id){document.getElementById(id).classList.toggle('hidden', id !== 'grid-fill-permanent');})">
+                <span><span class="font-semibold text-gray-700">Promote a Miner — Permanent</span><br>
+                <span class="text-gray-400">Permanently promote a Miner into the Shifter role and place them here. A lasting change, not a temporary fill.</span></span>
+            </label>
+            <label class="flex items-start gap-2 cursor-pointer">
+                <input type="radio" name="grid_fill_mode" class="mt-0.5"
+                    onchange="['grid-fill-existing','grid-fill-temporary','grid-fill-permanent','grid-fill-hire'].forEach(function(id){document.getElementById(id).classList.toggle('hidden', id !== 'grid-fill-hire');})">
+                <span><span class="font-semibold text-gray-700">Hire a New Shift Coordinator</span><br>
+                <span class="text-gray-400">Add someone new as this basket's shifter. They're held until IT activates their access, and the basket shows as pending until then.</span></span>
+            </label>
+        </div>
+
+        <form method="POST" action="{% url 'crew_assignments' %}" id="grid-fill-existing" class="flex flex-wrap gap-2 items-end">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="assign_basket">
+            <input type="hidden" name="crewid" id="grid-fill-crewid-1">
+            <input type="hidden" name="shiftertype" id="grid-fill-shiftertype-1">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <div class="flex flex-col gap-1 grow">
+                <label class="text-xs text-gray-500">Shifter</label>
+                <select name="shifter_id" id="grid-fill-existing-select" required class="border rounded px-2 py-1.5 text-sm w-full"></select>
+            </div>
+            <button type="submit" class="bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Assign</button>
+        </form>
+
+        <form method="POST" action="{% url 'crew_assignments' %}" id="grid-fill-temporary" class="hidden flex flex-wrap gap-2 items-end">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="promote_and_assign_basket_temporary">
+            <input type="hidden" name="crewid" id="grid-fill-crewid-2">
+            <input type="hidden" name="shiftertype" id="grid-fill-shiftertype-2">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <div class="flex flex-col gap-1 grow">
+                <label class="text-xs text-gray-500">Miner (Lead / 1 / 2 only)</label>
+                <select name="employee_id" id="grid-fill-temporary-select" required class="border rounded px-2 py-1.5 text-sm w-full"></select>
+            </div>
+            <button type="submit" class="bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Promote &amp; Assign</button>
+        </form>
+
+        <form method="POST" action="{% url 'crew_assignments' %}" id="grid-fill-permanent" class="hidden flex flex-wrap gap-2 items-end">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="promote_and_assign_basket">
+            <input type="hidden" name="crewid" id="grid-fill-crewid-3">
+            <input type="hidden" name="shiftertype" id="grid-fill-shiftertype-3">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <div class="flex flex-col gap-1 grow">
+                <label class="text-xs text-gray-500">Miner</label>
+                <select name="employee_id" id="grid-fill-permanent-select" required class="border rounded px-2 py-1.5 text-sm w-full"></select>
+            </div>
+            <button type="submit" class="bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Promote &amp; Assign</button>
+        </form>
+
+        <form method="POST" action="{% url 'crew_assignments' %}" id="grid-fill-hire" class="hidden flex flex-col gap-2 text-sm">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="hire_pending_shifter">
+            <input type="hidden" name="crewid" id="grid-fill-crewid-4">
+            <input type="hidden" name="shiftertype" id="grid-fill-shiftertype-4">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <div class="grid grid-cols-2 gap-2">
+                <input name="new_employeeid" placeholder="Employee ID" required class="border rounded px-2 py-1.5 text-sm">
+                <input name="new_phonenumber" placeholder="Phone" required class="border rounded px-2 py-1.5 text-sm">
+                <input name="new_firstname" placeholder="First name" required class="border rounded px-2 py-1.5 text-sm">
+                <input name="new_lastname" placeholder="Last name" required class="border rounded px-2 py-1.5 text-sm">
+            </div>
+            <button type="submit" class="self-end bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Hire &amp; Hold for IT</button>
+        </form>
+    </div>
+</div>
+
+<div id="grid-manage-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5">
+        <div class="flex items-center justify-between mb-3">
+            <p id="grid-manage-title" class="text-sm font-semibold text-gray-700">Manage This Basket</p>
+            <button type="button" onclick="closeGridModal('grid-manage-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="flex flex-col gap-2.5 mb-4 text-xs">
+            <label class="flex items-start gap-2 cursor-pointer">
+                <input type="radio" name="grid_manage_mode" checked class="mt-0.5"
+                    onchange="['grid-manage-transfer','grid-manage-coverage','grid-manage-swap'].forEach(function(id){document.getElementById(id).classList.toggle('hidden', id !== 'grid-manage-transfer');})">
+                <span><span class="font-semibold text-gray-700">Transfer</span><br>
+                <span id="grid-manage-transfer-desc" class="text-gray-400">Permanently hand this basket to someone else. They stop running it — their own home crew/section clears if this was it. Use this when they're not coming back to this basket at all.</span></span>
+            </label>
+            <label class="flex items-start gap-2 cursor-pointer">
+                <input type="radio" name="grid_manage_mode" class="mt-0.5"
+                    onchange="['grid-manage-transfer','grid-manage-coverage','grid-manage-swap'].forEach(function(id){document.getElementById(id).classList.toggle('hidden', id !== 'grid-manage-coverage');})">
+                <span><span class="font-semibold text-gray-700">Start Coverage</span><br>
+                <span id="grid-manage-coverage-desc" class="text-gray-400">Keep them as the basket's real owner, but temporarily hand the day-to-day running to someone else. They resume automatically once you end the coverage.</span></span>
+            </label>
+            <label class="flex items-start gap-2 cursor-pointer">
+                <input type="radio" name="grid_manage_mode" class="mt-0.5"
+                    onchange="['grid-manage-transfer','grid-manage-coverage','grid-manage-swap'].forEach(function(id){document.getElementById(id).classList.toggle('hidden', id !== 'grid-manage-swap');})">
+                <span><span class="font-semibold text-gray-700">Swap baskets</span><br>
+                <span class="text-gray-400">Two shifters, both running their own basket, trade baskets. Each keeps their members with the basket.</span></span>
+            </label>
+        </div>
+
+        <form method="POST" id="grid-manage-transfer" class="flex flex-wrap gap-2 items-end">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="transfer_basket">
+            <input type="hidden" name="basket" id="grid-manage-transfer-basket">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <div class="flex flex-col gap-1 grow">
+                <label class="text-xs text-gray-500">Transfer to</label>
+                <select id="grid-manage-transfer-select" required class="border rounded px-2 py-1.5 text-sm w-full"></select>
+            </div>
+            <button type="submit" class="bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Transfer</button>
+        </form>
+
+        <form method="POST" action="{% url 'crew_assignments' %}" id="grid-manage-swap" class="hidden flex flex-wrap gap-2 items-end">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="swap_baskets">
+            <input type="hidden" name="employee_id" id="grid-manage-swap-employee">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <div class="flex flex-col gap-1 grow">
+                <label class="text-xs text-gray-500">Swap with</label>
+                <select name="other_shifter_id" id="grid-manage-swap-select" required class="border rounded px-2 py-1.5 text-sm w-full"></select>
+            </div>
+            <button type="submit" class="bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Swap</button>
+        </form>
+
+        <form method="POST" id="grid-manage-coverage" class="hidden flex flex-col gap-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="start_coverage">
+            <input type="hidden" name="basket" id="grid-manage-coverage-basket">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Covering shifter</label>
+                <select id="grid-manage-coverage-select" required class="border rounded px-2 py-1.5 text-sm"></select>
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Notes (optional)</label>
+                <input type="text" name="notes" placeholder="e.g. covering while on vacation" class="border rounded px-2 py-1.5 text-sm">
+            </div>
+            <button type="submit" class="self-start bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Start Coverage</button>
+        </form>
+    </div>
+</div>
+
+<div id="grid-level-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-5">
+        <div class="flex items-center justify-between mb-1">
+            <p id="grid-level-title" class="text-sm font-semibold text-gray-700">Edit Classification</p>
+            <button type="button" onclick="closeGridModal('grid-level-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p class="text-xs text-gray-400 mb-3">Changing this doesn't move or replace anyone — it's their own classification, independent of which basket they're in.</p>
+        <form method="POST" action="{% url 'crew_assignments' %}" id="grid-level-form" class="flex flex-col gap-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="edit_employee_level">
+            <input type="hidden" name="employee_id" id="grid-level-employee-id">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Level</label>
+                <select id="grid-level-select" name="minerlevel" class="border rounded px-2 py-1.5 text-sm">
+                    <option value="">-- Unclassified --</option>
+                    {% for value, label in minerlevel_choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Contract Code</label>
+                <select id="grid-level-contract-select" name="contractid" class="border rounded px-2 py-1.5 text-sm"></select>
+            </div>
+            <button type="submit" class="self-start bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Save</button>
+        </form>
+    </div>
+</div>
+
+<!-- Demote is a permanent, deliberate placement change — its own explicit
+     confirm()-gated action, never part of a drag/drop gesture. -->
+<form method="POST" action="{% url 'crew_assignments' %}" id="grid-make-permanent-form" class="hidden">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="make_cover_permanent">
+    <input type="hidden" name="employee_id" id="grid-make-permanent-employee">
+    <input type="hidden" name="next" value="{{ request.path }}">
+</form>
+
+<form method="POST" action="{% url 'crew_assignments' %}" id="grid-exit-direct-form" class="hidden">
+    {% csrf_token %}
+    <input type="hidden" name="action" id="grid-exit-direct-action">
+    <input type="hidden" name="employee_id" id="grid-exit-direct-employee">
+    <input type="hidden" name="next" value="{{ request.path }}">
+</form>
+
+<div id="grid-exit-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5">
+        <div class="flex items-center justify-between mb-2">
+            <p id="grid-exit-title" class="text-sm font-semibold text-gray-700">Record quit</p>
+            <button type="button" onclick="closeGridModal('grid-exit-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p id="grid-exit-intro" class="text-xs text-gray-500 mb-3"></p>
+        <form method="POST" action="{% url 'crew_assignments' %}" id="grid-exit-form" class="flex flex-col gap-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" id="grid-exit-action">
+            <input type="hidden" name="employee_id" id="grid-exit-employee">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <div id="grid-exit-fill-wrap" class="flex flex-col gap-2 text-xs">
+                <label class="grid-exit-option flex items-start gap-2 cursor-pointer" data-kind="cover_temp">
+                    <input type="radio" name="fill_kind" value="cover_temp" class="mt-0.5">
+                    <span><span class="font-semibold text-gray-700">Temporary cover</span><br><span class="text-gray-400">A Lead, 1, or 2 Miner covers as Spare Shifter. Coverage is recorded, so hours can be logged.</span></span>
+                </label>
+                <label class="grid-exit-option flex items-start gap-2 cursor-pointer" data-kind="promote">
+                    <input type="radio" name="fill_kind" value="promote" class="mt-0.5">
+                    <span><span class="font-semibold text-gray-700">Promote a Miner (permanent)</span><br><span class="text-gray-400">Permanently promote a Miner into the Shifter role here.</span></span>
+                </label>
+                <label class="grid-exit-option flex items-start gap-2 cursor-pointer" data-kind="assign">
+                    <input type="radio" name="fill_kind" value="assign" class="mt-0.5">
+                    <span><span class="font-semibold text-gray-700">Assign an existing shifter (permanent)</span><br><span class="text-gray-400">Only shifters not already running a basket are listed.</span></span>
+                </label>
+                <label class="grid-exit-option flex items-start gap-2 cursor-pointer" data-kind="make_permanent">
+                    <input type="radio" name="fill_kind" value="make_permanent" class="mt-0.5">
+                    <span><span class="font-semibold text-gray-700">Make the covering shifter permanent</span><br><span class="text-gray-400" id="grid-exit-make-permanent-text"></span></span>
+                </label>
+                <label class="grid-exit-option flex items-start gap-2 cursor-pointer" data-kind="hire">
+                    <input type="radio" name="fill_kind" value="hire" class="mt-0.5">
+                    <span><span class="font-semibold text-gray-700">Hire a new shifter (pending IT access)</span><br><span class="text-gray-400">They're held until IT activates them. A covered basket keeps its cover until then.</span></span>
+                </label>
+            </div>
+            <div id="grid-exit-demote-wrap" class="hidden flex flex-col gap-3">
+                <div class="flex flex-col gap-1">
+                    <label class="text-xs text-gray-500">Miner Level <span class="text-gray-400">(required)</span></label>
+                    <select name="minerlevel" id="grid-exit-demote-level" class="border rounded px-2 py-1.5 text-sm">
+                        <option value="">-- Choose a level --</option>
+                        {% for value, label in minerlevel_choices %}{% if label != 'Staff' %}<option value="{{ value }}">{{ label }}</option>{% endif %}{% endfor %}
+                    </select>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label class="text-xs text-gray-500">Contract Code <span class="text-gray-400">(optional)</span></label>
+                    <select name="contractid" id="grid-exit-demote-contract" disabled class="border rounded px-2 py-1.5 text-sm"></select>
+                </div>
+            </div>
+            <div id="grid-exit-select-wrap" class="hidden flex flex-col gap-1">
+                <label class="text-xs text-gray-500">Person</label>
+                <select name="fill_employee_id" id="grid-exit-select" class="border rounded px-2 py-1.5 text-sm"></select>
+            </div>
+            <div id="grid-exit-hire-wrap" class="hidden grid grid-cols-2 gap-2">
+                <input name="new_employeeid" placeholder="Employee ID" class="border rounded px-2 py-1.5 text-sm">
+                <input name="new_phonenumber" placeholder="Phone" class="border rounded px-2 py-1.5 text-sm">
+                <input name="new_firstname" placeholder="First name" class="border rounded px-2 py-1.5 text-sm">
+                <input name="new_lastname" placeholder="Last name" class="border rounded px-2 py-1.5 text-sm">
+            </div>
+            <button type="submit" id="grid-exit-submit" class="self-end bg-red-600 text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Record</button>
+        </form>
+    </div>
+</div>
+
+
+<!-- Ending coverage hands the roster back to the home shifter and reverts
+     the covering Spare Shifter to Miner if they've nothing else active. -->
+<form method="POST" action="{% url 'crew_coverage' %}" id="grid-end-coverage-form" class="hidden">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="end">
+    <input type="hidden" name="coverage_id" id="grid-end-coverage-id">
+    <input type="hidden" name="next" value="{{ request.path }}">
+</form>

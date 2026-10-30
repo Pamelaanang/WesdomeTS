@@ -43,10 +43,10 @@ def is_lieu_eligible(employee):
 
 
 def get_operations_employee_type(employee, as_of=None):
-    """A Shifter uses their own shiftertype; a crew member uses the
-    shiftertype of the Shifter they're currently assigned under."""
-    if employee.shiftertype:
-        return employee.shiftertype
+    """A Shifter uses their own discipline; a crew member uses the
+    discipline of the Shifter they're currently assigned under."""
+    if employee.discipline_id:
+        return employee.discipline.name
 
     as_of = as_of or timezone.now().date()
     assignment = (
@@ -57,13 +57,14 @@ def get_operations_employee_type(employee, as_of=None):
         .order_by('-startdate')
         .first()
     )
-    return assignment.shifter.shiftertype if assignment and assignment.shifter else None
+    return assignment.shifter.discipline.name if assignment and assignment.shifter and assignment.shifter.discipline_id else None
 
 
 def get_vacation_bucket(employee):
+    # Operations rate follows employment type, not discipline: Staff and
+    # Contract accrue at different rates whatever crew or discipline they're in.
     if employee.access_level in (5, 8):
-        optype = get_operations_employee_type(employee)
-        return 'ops_development' if optype == 'Development' else 'ops_other'
+        return 'ops_staff' if employee.employmenttype == 'Staff' else 'ops_contract'
     return 'non_operations'
 
 

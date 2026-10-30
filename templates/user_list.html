@@ -84,10 +84,17 @@
                             Edit
                         </button>
                         {% endif %}
+                        {% if user.isactive %}
                         <form method="post" action="{% url 'reset_password' user.employeeid %}">
                             {% csrf_token %}
                             <button class="bg-[#28348A] text-white text-xs px-3 py-1 rounded hover:bg-blue-800">Reset Password</button>
                         </form>
+                        {% else %}
+                        <form method="post" action="{% url 'reactivate_employee' user.employeeid %}">
+                            {% csrf_token %}
+                            <button class="bg-green-600 text-white text-xs px-3 py-1 rounded hover:bg-green-700" onclick="return confirm('Reactivate {{ user.firstname|escapejs }} {{ user.lastname|escapejs }}? A new temporary password will be sent.');">Reactivate</button>
+                        </form>
+                        {% endif %}
                         {% if user.isactive %}
                         <a href="{% url 'replace_employee' user.employeeid %}"
                             class="bg-red-100 text-red-700 text-xs px-3 py-1 rounded hover:bg-red-200">
@@ -192,7 +199,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Miner Level <span class="text-gray-400 font-normal">(Miners only — Lead/1/2 are Spare Shifter eligible)</span></label>
-                    <select name="minerlevel"
+                    <select name="minerlevel" id="addMinerlevel" onchange="fillUserContracts('addMinerlevel', 'addContractid', '')"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
                         <option value="">— N/A —</option>
                         {% for value, label in minerlevel_choices %}
@@ -217,12 +224,9 @@
 
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Charged to Contract <span class="text-gray-400 font-normal">(Contract labor only)</span></label>
-                    <select name="contractid"
+                    <select name="contractid" id="addContractid" disabled
                         class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
-                        <option value="">— N/A —</option>
-                        {% for c in contracts %}
-                        <option value="{{ c.contractid }}">{{ c.contractcode }} — {{ c.contracttitle }}</option>
-                        {% endfor %}
+                        <option value="">— Choose a level first —</option>
                     </select>
                 </div>
                 <div>
@@ -347,7 +351,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Miner Level <span class="text-gray-400 font-normal">(Miners only — Lead/1/2 are Spare Shifter eligible)</span></label>
-                    <select name="minerlevel" id="editMinerlevel"
+                    <select name="minerlevel" id="editMinerlevel" onchange="fillUserContracts('editMinerlevel', 'editContractid', '')"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
                         <option value="">— N/A —</option>
                         {% for value, label in minerlevel_choices %}
@@ -377,12 +381,9 @@
 
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Charged to Contract <span class="text-gray-400 font-normal">(Contract labor only)</span></label>
-                    <select name="contractid" id="editContractid"
+                    <select name="contractid" id="editContractid" disabled
                         class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
-                        <option value="">— N/A —</option>
-                        {% for c in contracts %}
-                        <option value="{{ c.contractid }}">{{ c.contractcode }} — {{ c.contracttitle }}</option>
-                        {% endfor %}
+                        <option value="">— Choose a level first —</option>
                     </select>
                 </div>
                 <div>
@@ -420,6 +421,7 @@
 
 
 <!-- Roles data for JS filtering -->
+{{ contracts_for_modal|json_script:"user-contracts-by-level" }}
 <script>
 const allRoles = [
     {% for role in roles %}
@@ -441,9 +443,9 @@ const employeeData = {
         email: "{{ user.email|default:''|escapejs }}",
         roleid: "{{ user.roleid_id|default:'' }}",
         supervisorid: "{{ user.supervisorid_id|default:'' }}",
-        shiftertype: "{{ user.shiftertype|default:'' }}",
-        crewid: "{{ user.crewid_id|default:'' }}",
-        minerlevel: "{{ user.minerlevel|default:'' }}",
+        shiftertype: "{{ user.home_basket.discipline.name|default:'' }}",
+        crewid: "{{ user.home_basket.crew_row.crewid|default:'' }}",
+        minerlevel: "{{ user.minerlevel_id|default_if_none:'' }}",
         hasaccess: {{ user.hasaccess|yesno:"true,false" }},
         employmenttype: "{{ user.employmenttype|default:'Staff' }}",
         contractid: "{{ user.contractid_id|default:'' }}",
@@ -454,6 +456,29 @@ const employeeData = {
     {% endfor %}
 };
 const editUrlTemplate = "{% url 'edit_employee' 'PLACEHOLDER' %}";
+
+// Contract choices follow the Level: pick a Level, then only its contracts show.
+// With no Level the Contract box is disabled, so nothing posts (the server then stores none).
+const contractsByLevel = JSON.parse(document.getElementById('user-contracts-by-level').textContent);
+
+function fillUserContracts(levelSelectId, contractSelectId, selectedId) {
+    const levelId = document.getElementById(levelSelectId).value;
+    const select = document.getElementById(contractSelectId);
+    const items = levelId ? (contractsByLevel[levelId] || []) : [];
+    select.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = levelId ? '— N/A —' : '— Choose a level first —';
+    select.appendChild(placeholder);
+    items.forEach(function (c) {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.label;
+        select.appendChild(opt);
+    });
+    select.disabled = !levelId;
+    select.value = (selectedId && items.some(function (c) { return String(c.id) === String(selectedId); })) ? String(selectedId) : '';
+}
 
 function openEditModal(employeeid) {
     const emp = employeeData[employeeid];
@@ -473,7 +498,7 @@ function openEditModal(employeeid) {
     document.getElementById('editMinerlevel').value = emp.minerlevel;
     document.getElementById('editHasaccess').checked = emp.hasaccess;
     document.getElementById('editEmploymenttype').value = emp.employmenttype;
-    document.getElementById('editContractid').value = emp.contractid;
+    fillUserContracts('editMinerlevel', 'editContractid', emp.contractid);
     document.getElementById('editAccountid').value = emp.accountid;
     document.getElementById('editHiredate').value = emp.hiredate;
     document.getElementById('editTerminationdate').value = emp.terminationdate;

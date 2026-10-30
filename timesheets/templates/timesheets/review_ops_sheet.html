@@ -20,7 +20,7 @@
     {% if header.coverageid %}
     <div class="mt-3 mx-4 bg-green-50 border border-green-300 text-green-800 text-xs rounded px-3 py-2">
         <i class="fa-solid fa-arrows-rotate mr-1"></i>
-        Coverage sheet &mdash; submitted on behalf of <strong>{{ header.coverageid.home_shifter.firstname }} {{ header.coverageid.home_shifter.lastname }}</strong>'s crew
+        Coverage sheet &mdash; submitted on behalf of <strong>{{ header.coverageid.home_label }}</strong>'s crew
     </div>
     {% endif %}
 
@@ -30,7 +30,7 @@
                 {% if header.shifterid.profilepic %}
                 <img src="/media/{{ header.shifterid.profilepic }}" class="w-full h-full object-cover" alt="">
                 {% else %}
-                <i class="fa-solid fa-user text-white text-xs"></i>
+                <span class="text-white font-bold text-xs">{{ header.shifterid.firstname|slice:":1" }}{{ header.shifterid.lastname|slice:":1" }}</span>
                 {% endif %}
             </div>
             Shifter: <span class="font-medium">{{ header.shifterid.firstname }} {{ header.shifterid.lastname }}</span>

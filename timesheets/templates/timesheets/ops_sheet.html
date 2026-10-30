@@ -40,7 +40,7 @@
                 {% for cov in active_coverages %}
                 <label class="flex items-center gap-2 border rounded-lg px-3 py-1.5 text-sm cursor-pointer has-[:checked]:border-[#097d45] has-[:checked]:bg-green-50">
                     <input type="radio" name="coverage_id" value="{{ cov.coverageid }}" class="accent-[#097d45]">
-                    Covering: {{ cov.home_shifter.firstname }} {{ cov.home_shifter.lastname }}'s crew
+                    Covering: {{ cov.home_label }}'s crew
                 </label>
                 {% endfor %}
             </div>
@@ -115,7 +115,7 @@
     {% if coverage %}
     <div class="mt-3 mx-4 bg-green-50 border border-green-300 text-green-800 text-xs rounded px-3 py-2">
         <i class="fa-solid fa-arrows-rotate mr-1"></i>
-        Coverage sheet &mdash; submitted on behalf of <strong>{{ coverage.home_shifter.firstname }} {{ coverage.home_shifter.lastname }}</strong>'s crew
+        Coverage sheet &mdash; submitted on behalf of <strong>{{ coverage.home_label }}</strong>'s crew
     </div>
     {% endif %}
     <div class="flex flex-wrap justify-between items-center mt-4 text-sm gap-y-2 px-4">
@@ -123,7 +123,7 @@
         <span>Date: <span class="font-medium">{{ header.shiftdate|date:"M j, Y" }}</span>{% if is_stat %} <span class="ml-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_label }}">Stat</span>{% endif %}</span>
         <span>Shift: <span class="font-medium">{{ header.shifttype }}</span></span>
         <span>Crew: <span class="font-medium">{{ header.crewid.crewname }}</span></span>
-        {% if header.section %}<span>Section: <span class="font-medium">{{ header.section }}</span></span>{% endif %}
+        {% if header.discipline %}<span>Section: <span class="font-medium">{{ header.discipline.name }}</span></span>{% endif %}
         <span>Status:
             <span class="font-medium
                 {% if header.overallstatus == 'Draft' %}text-yellow-600
@@ -275,8 +275,8 @@
                             <select id="contract-edit-{{ entry.opsentryid }}"
                                 onchange="onEditContractChange('{{ entry.opsentryid }}')"
                                 class="border rounded px-1 py-1 w-full text-xs">
-                                {% for c in contracts %}
-                                <option value="{{ c.contractid }}" {% if c.contractid == entry.contractid_id %}selected{% endif %}>{{ c.contractcode }} — {{ c.contracttitle }}</option>
+                                {% for c in entry.contract_choices %}
+                                <option value="{{ c.id }}" {% if c.id == entry.contractid_id %}selected{% endif %}>{{ c.label }}</option>
                                 {% endfor %}
                             </select>
                             <p id="contract-info-edit-{{ entry.opsentryid }}" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
@@ -351,8 +351,8 @@
                             <select id="contract-edit-{{ entry.opsentryid }}"
                                 onchange="onEditContractChange('{{ entry.opsentryid }}')"
                                 class="border rounded px-1 py-1 w-full text-xs">
-                                {% for c in contracts %}
-                                <option value="{{ c.contractid }}" {% if c.contractid == entry.contractid_id %}selected{% endif %}>{{ c.contractcode }} — {{ c.contracttitle }}</option>
+                                {% for c in entry.contract_choices %}
+                                <option value="{{ c.id }}" {% if c.id == entry.contractid_id %}selected{% endif %}>{{ c.label }}</option>
                                 {% endfor %}
                             </select>
                             <p id="contract-info-edit-{{ entry.opsentryid }}" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
@@ -439,7 +439,7 @@
                                 class="border rounded px-1 py-1 w-full text-xs">
                                 <option value="">-- Select --</option>
                                 {% if active_assignments %}
-                                <optgroup label="{% if coverage %}{{ coverage.home_shifter.firstname }} {{ coverage.home_shifter.lastname }}'s Crew{% else %}Your Crew{% endif %}">
+                                <optgroup label="{% if coverage %}{{ coverage.home_label }}'s Crew{% else %}Your Crew{% endif %}">
                                     {% for a in active_assignments %}
                                     <option value="{{ a.employee.eid }}">{{ a.employee.firstname }} {{ a.employee.lastname }}</option>
                                     {% endfor %}
@@ -458,6 +458,7 @@
                                 </optgroup>
                                 {% endif %}
                             </select>
+                            <p id="level-info" class="text-[10px] text-gray-500 mt-0.5 leading-tight"></p>
                         </td>
                         <td class="p-2">
                             <select name="contractid" id="contract-select" class="border rounded px-1 py-1 w-full text-xs">
@@ -579,10 +580,12 @@
 </div>
 
 {{ prefill|json_script:"prefill-data" }}
+{{ contracts_by_level|json_script:"contracts-by-level-data" }}
 {{ vacation_balances|json_script:"vacation-balances-data" }}
 
 <script>
     const prefill = JSON.parse(document.getElementById('prefill-data').textContent);
+    const contractsByLevel = JSON.parse(document.getElementById('contracts-by-level-data').textContent);
     const vacationBalances = JSON.parse(document.getElementById('vacation-balances-data').textContent);
     const VACATION_LT = "{{ vacation_leavetype_id|default:'' }}";
     const FLOATER_LT = "{{ floater_leavetype_id|default:'' }}";
@@ -705,29 +708,67 @@
         return { contractId: p.contractid || null, accountId: p.accountid, locked: false };
     }
 
-    function applyPrefill(employeeId) {
+    // The contract picker lists the contracts offered at the person's Level.
+    // A contract the Superintendent assigned locks the picker to it. With no
+    // Level (Staff, or not yet classified) the full list stays available.
+    function setContractOptions(items, selectedId, placeholder, disabled) {
         const cs = document.getElementById('contract-select');
+        cs.innerHTML = '';
+        const first = document.createElement('option');
+        first.value = '';
+        first.textContent = placeholder;
+        cs.appendChild(first);
+        items.forEach(function (c) {
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.label;
+            cs.appendChild(opt);
+        });
+        cs.value = (selectedId && items.some(function (c) { return String(c.id) === String(selectedId); })) ? String(selectedId) : '';
+        cs.disabled = disabled;
+    }
+
+    function allContractItems() {
+        return Object.keys(contractsData).map(function (id) {
+            return { id: id, label: contractsData[id].code + ' — ' + contractsData[id].title };
+        });
+    }
+
+    function applyPrefill(employeeId) {
         const lockNote = document.getElementById('contract-locked-note');
+        const levelInfo = document.getElementById('level-info');
         if (!employeeId || !prefill[employeeId]) {
-            if (cs) cs.disabled = false;
+            setContractOptions([], '', '-- Select a crew member --', true);
             if (lockNote) lockNote.classList.add('hidden');
+            if (levelInfo) levelInfo.textContent = '';
             showLeaveInfo();
             return;
         }
         const p = prefill[employeeId];
         const lock = resolveContractLock(employeeId);
-        if (cs) {
-            cs.disabled = lock.locked;
-            if (lockNote) lockNote.classList.toggle('hidden', !lock.locked);
-            if (lock.contractId) {
-                cs.value = lock.contractId;
-                showContractInfo(lock.contractId, 'contract-info');
-                loadAccounts(lock.contractId, lock.accountId);
-            } else {
-                cs.value = '';
-                document.getElementById('contract-info').textContent = '';
-                loadAccounts('', null);
-            }
+        if (lock.locked) {
+            setContractOptions([{ id: p.assigned_contractid, label: p.assigned_contract_label }], p.assigned_contractid, '', true);
+        } else if (p.level_id && p.level_code !== 'Staff') {
+            const items = contractsByLevel[String(p.level_id)] || [];
+            setContractOptions(items, '', items.length ? '-- Select --' : 'No contract offered at this level', false);
+        } else {
+            setContractOptions([], '', 'No contract (Staff or not classified)', true);
+        }
+        if (lockNote) lockNote.classList.toggle('hidden', !lock.locked);
+
+        const lvl = p.level_code ? (p.level_code === 'Staff' ? 'Staff' : 'Level ' + p.level_code) : 'No Level';
+        if (levelInfo) {
+            levelInfo.textContent = lock.locked
+                ? lvl + ' · Contract ' + p.assigned_contract_label + ' (assigned by Superintendent)'
+                : lvl + (p.level_id && p.level_code !== 'Staff' ? ' · pick a contract from this level' : ' · no contract');
+        }
+
+        if (lock.contractId) {
+            showContractInfo(lock.contractId, 'contract-info');
+            loadAccounts(lock.contractId, lock.accountId);
+        } else {
+            document.getElementById('contract-info').textContent = '';
+            loadAccounts('', null);
         }
         if (p.opscategoryid) {
             const catSel = document.getElementById('category-select');

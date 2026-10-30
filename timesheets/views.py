@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from users.models import User, Department, CrewAssignment, CrewCoverage
-from .models import MainHeader, MainEntry, Crews, Workcategory, Opscategory, LeaveType, OperationsHeader, OperationsEntry, Contract, Account, ContractAccount, ContractSeries, MinerLevel, OperationsBonus, BONUS_RATE_CODES, StatHoliday, BusinessHeader, BusinessEntry, Businesscategory, MONTH_CHOICES, EmployeeBonus, BONUS_TYPE_CHOICES, Auditlog, submission_deadline
+from .models import basket_for, contracts_by_miner_level, MainHeader, MainEntry, Crews, Workcategory, Opscategory, LeaveType, OperationsHeader, OperationsEntry, Contract, Account, ContractAccount, ContractSeries, MinerLevel, OperationsBonus, BONUS_RATE_CODES, StatHoliday, BusinessHeader, BusinessEntry, Businesscategory, MONTH_CHOICES, EmployeeBonus, BONUS_TYPE_CHOICES, Auditlog, submission_deadline
 from django.utils import timezone
 from django.db.models import Sum, Count, Min, Max, Q, Case, When, IntegerField, Prefetch
 from django.db.models.functions import TruncMonth
@@ -892,7 +892,7 @@ def payroll_ops_daily_shift(request, year, month, day, shifttype):
                 'employeeid', 'contractid', 'accountid', 'opscategoryid', 'leavetypeid'
             ).order_by('employeeid__lastname', 'employeeid__firstname'),
         )
-    ).order_by('crewid__crewname', 'section', 'shifterid__lastname', 'shifterid__firstname')
+    ).order_by('crewid__crewname', 'discipline__name', 'shifterid__lastname', 'shifterid__firstname')
 
     return render(request, 'timesheets/payroll_ops_daily_shift.html', {
         'headers': headers,
@@ -1219,7 +1219,7 @@ def superintendent_ops_daily_shift(request, year, month, day, shifttype):
                 'employeeid', 'contractid', 'accountid', 'opscategoryid', 'leavetypeid'
             ).order_by('employeeid__lastname', 'employeeid__firstname'),
         )
-    ).order_by('crewid__crewname', 'section', 'shifterid__lastname', 'shifterid__firstname')
+    ).order_by('crewid__crewname', 'discipline__name', 'shifterid__lastname', 'shifterid__firstname')
 
     return render(request, 'timesheets/superintendent_ops_daily_shift.html', {
         'headers': headers,
@@ -1597,6 +1597,18 @@ def my_timesheets_paid_month(request, year, month):
     })
 
 
+def _contract_block(employee, posted_contractid):
+    # Why an entry for this employee can't be saved without a contract, or None.
+    # Staff and unclassified people carry no contract, so the picker is off for them.
+    if employee.contractid_id:
+        return None
+    if not employee.minerlevel_id or employee.minerlevel.levelcode == 'Staff':
+        return f'{employee.firstname} {employee.lastname} has no contract on record. The Superintendent needs to classify them first.'
+    if not posted_contractid:
+        return 'Pick a contract for this entry.'
+    return None
+
+
 @login_required(login_url='login')
 def new_ops_sheet(request):
     if request.user.access_level != 5:
@@ -1619,11 +1631,11 @@ def new_ops_sheet(request):
     # Build maps for JS: swap the displayed section/crew when the shifter
     # toggles between their own basket(s) and coverage options.
     coverage_sections = {
-        str(cov.coverageid): cov.home_shifter.shiftertype or ''
+        str(cov.coverageid): cov.basket_shiftertype or ''
         for cov in active_coverages
     }
     coverage_crews = {
-        str(cov.coverageid): (cov.home_shifter.crewid.crewname if cov.home_shifter.crewid else '')
+        str(cov.coverageid): (cov.basket_crew.crewname if cov.basket_crew else '')
         for cov in active_coverages
     }
     own_basket_sections = {f'{b[0].crewid}:{b[1]}': b[1] for b in own_baskets}
@@ -1634,7 +1646,7 @@ def new_ops_sheet(request):
     base_context = {
         'header': None,
         'active_coverages': active_coverages,
-        'own_shiftertype': request.user.shiftertype or '',
+        'own_shiftertype': request.user.discipline.name if request.user.discipline_id else '',
         'own_crewname': own_crewname,
         'own_baskets': own_baskets,
         'default_own_basket': default_own_basket,
@@ -1674,8 +1686,8 @@ def new_ops_sheet(request):
         if coverage_id:
             cov = active_coverages.filter(coverageid=coverage_id).first()
             if cov:
-                section = cov.home_shifter.shiftertype
-                crew = cov.home_shifter.crewid
+                section = cov.basket_shiftertype
+                crew = cov.basket_crew
         elif own_basket and ':' in own_basket:
             chosen_crewid, chosen_shiftertype = own_basket.split(':', 1)
             match = next(
@@ -1733,10 +1745,17 @@ def new_ops_sheet(request):
         # A crew member with neither a current assignment nor any prior entry
         # has no contract to satisfy the NOT NULL column, so they're skipped
         # here and stay available in the + Add Row picker instead.
-        prefill_shifter = cov.home_shifter if coverage_id and cov else request.user
-        active_assignments = CrewAssignment.objects.filter(
-            shifter=prefill_shifter, crewid=crew, shiftertype=section, enddate__isnull=True
-        ).select_related('employee')
+        basket = basket_for(crew, section)
+        if basket is None:
+            active_assignments = CrewAssignment.objects.none()
+        elif coverage_id and cov:
+            active_assignments = CrewAssignment.objects.filter(
+                basket=basket, enddate__isnull=True
+            ).exclude(employee=request.user).select_related('employee')
+        else:
+            active_assignments = CrewAssignment.objects.filter(
+                shifter=request.user, basket=basket, enddate__isnull=True
+            ).select_related('employee')
         for assignment in active_assignments:
             employee = assignment.employee
             last = OperationsEntry.objects.filter(
@@ -1792,6 +1811,8 @@ def ops_sheet(request, pk):
             if row_employee:
                 leave_error = _validate_leave_entry(row_employee, leavetypeid, str(header.shiftdate), hoursworked_str)
 
+            if not leave_error and row_employee:
+                leave_error = _contract_block(row_employee, request.POST.get('contractid'))
             if leave_error:
                 messages.error(request, leave_error)
             else:
@@ -1860,6 +1881,8 @@ def ops_sheet(request, pk):
             leave_error = _validate_leave_entry(
                 entry.employeeid, leavetypeid, str(header.shiftdate), hoursworked_str, exclude_entry=entry,
             )
+            if not leave_error:
+                leave_error = _contract_block(entry.employeeid, request.POST.get('contractid'))
 
             if leave_error:
                 messages.error(request, leave_error)
@@ -1907,11 +1930,17 @@ def ops_sheet(request, pk):
     )
 
     coverage = header.coverageid
-    effective_shifter = coverage.home_shifter if coverage else request.user
-
-    active_assignments = CrewAssignment.objects.filter(
-        shifter=effective_shifter, enddate__isnull=True
-    ).select_related('employee')
+    if coverage:
+        basket = basket_for(coverage.basket_crew, coverage.basket_shiftertype)
+        active_assignments = (
+            CrewAssignment.objects.none() if basket is None else
+            CrewAssignment.objects.filter(basket=basket, enddate__isnull=True)
+            .exclude(employee=header.shifterid).select_related('employee')
+        )
+    else:
+        active_assignments = CrewAssignment.objects.filter(
+            shifter=request.user, enddate__isnull=True
+        ).select_related('employee')
 
     guest_employees = User.objects.filter(roleid__accessid__accessid=8, isactive=True)
 
@@ -1938,7 +1967,11 @@ def ops_sheet(request, pk):
         prefill[member.eid] = {
             'assigned_contractid': member.contractid_id,
             'assigned_contract_label': f'{member.contractid.contractcode} — {member.contractid.contracttitle}' if member.contractid_id else None,
-            'contractid': last.contractid_id if last else None,
+            # No fallback to the last entry's contract any more: the picker lists
+            # the contracts offered at this person's Level instead.
+            'contractid': None,
+            'level_id': member.minerlevel_id,
+            'level_code': member.minerlevel.levelcode if member.minerlevel_id else None,
             'accountid': last.accountid_id if last else None,
             'opscategoryid': last.opscategoryid_id if last else None,
         }
@@ -1953,6 +1986,15 @@ def ops_sheet(request, pk):
     # reselecting. Per-person prefill (above) still overrides this when that specific
     # person has their own distinct last-used contract/account/category.
     last_on_sheet = entries.order_by('-opsentryid').first()
+    # Each edit row offers only its employee's Level contracts, plus the entry's own
+    # contract so an existing entry never loses it silently.
+    level_contracts = contracts_by_miner_level()
+    entry_rows = list(entries)
+    for row in entry_rows:
+        choices = list(level_contracts.get(str(row.employeeid.minerlevel_id), [])) if row.employeeid.minerlevel_id else []
+        if row.contractid_id and row.contractid_id not in {c['id'] for c in choices}:
+            choices.append({'id': row.contractid_id, 'label': f'{row.contractid.contractcode} — {row.contractid.contracttitle}'})
+        row.contract_choices = choices
     sheet_default = {
         'contractid': last_on_sheet.contractid_id if last_on_sheet else None,
         'accountid': last_on_sheet.accountid_id if last_on_sheet else None,
@@ -1962,7 +2004,7 @@ def ops_sheet(request, pk):
     stat_dates, stat_labels = _stat_info()
     return render(request, 'timesheets/ops_sheet.html', {
         'header': header,
-        'entries': entries,
+        'entries': entry_rows,
         'active_assignments': active_assignments,
         'guest_employees': guest_employees,
         'contracts': contracts,
@@ -1971,6 +2013,7 @@ def ops_sheet(request, pk):
         'vacation_leavetype_id': vacation_type.leavetypeid if vacation_type else None,
         'floater_leavetype_id': floater_type.leavetypeid if floater_type else None,
         'prefill': prefill,
+        'contracts_by_level': contracts_by_miner_level(),
         'vacation_balances': vacation_balances,
         'sheet_default': sheet_default,
         'hours_remaining': round(hours_remaining, 1),
@@ -2089,7 +2132,7 @@ def my_ops_completed_shift(request, year, month, day, shifttype):
                 'employeeid', 'contractid', 'accountid', 'opscategoryid', 'leavetypeid'
             ).order_by('employeeid__firstname', 'employeeid__lastname'),
         )
-    ).order_by('crewid__crewname', 'section', 'shifterid__lastname', 'shifterid__firstname')
+    ).order_by('crewid__crewname', 'discipline__name', 'shifterid__lastname', 'shifterid__firstname')
     return render(request, 'timesheets/my_ops_completed_shift.html', {
         'headers': headers,
         'shift_date': shift_date,
@@ -2238,7 +2281,7 @@ def ops_approval_inbox_shift(request, year, month, day, shifttype):
         Q(ohapprovedby_capt__isnull=True) | Q(ohapprovedby_capt=request.user)
     ).select_related(
         'shifterid', 'crewid', 'coverageid__home_shifter'
-    ).order_by('crewid__crewname', 'section', 'shifterid__lastname', 'shifterid__firstname')
+    ).order_by('crewid__crewname', 'discipline__name', 'shifterid__lastname', 'shifterid__firstname')
 
     stat_dates, stat_labels = _stat_info()
     panels = []

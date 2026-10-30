@@ -61,11 +61,11 @@
             {% include 'timesheets/_avatar.html' with person=sheet.shifterid extra_class='mb-2 mt-2' %}
             <p class="text-xs font-normal text-center mb-1">{{ sheet.shifterid.firstname }} {{ sheet.shifterid.lastname }}</p>
             <p class="text-xs font-normal text-center mb-1">{{ sheet.crewid.crewname }} Crew &mdash; {{ sheet.shifttype }} Shift</p>
-            <p class="text-xs font-normal text-center mb-1">{{ sheet.section|default:"—" }}</p>
+            <p class="text-xs font-normal text-center mb-1">{{ sheet.discipline.name|default:"—" }}</p>
             <p class="text-xs font-normal text-center mb-1">{{ sheet.shiftdate|date:"M j, Y" }}</p>
             <p class="text-xs text-center text-orange-600 mb-1">{{ sheet.rejected_count }} entr{{ sheet.rejected_count|pluralize:"y,ies" }} rejected</p>
             {% if sheet.coverageid %}
-            <p class="text-xs font-medium text-center text-[#097d45] mb-1">Covering {{ sheet.coverageid.home_shifter.firstname }} {{ sheet.coverageid.home_shifter.lastname }}'s crew</p>
+            <p class="text-xs font-medium text-center text-[#097d45] mb-1">Covering {{ sheet.coverageid.home_label }}'s crew</p>
             {% endif %}
             <span class="mt-1 bg-orange-100 text-orange-700 text-xs font-semibold px-2 py-0.5 rounded-full">Pending Correction</span>
         </div>

@@ -1,0 +1,153 @@
+{{ move_targets|json_script:"move-targets-data" }}
+{{ move_positions_by_discipline|json_script:"move-positions-data" }}
+
+<!-- Person panel: opened from a name. A person with a seat gets the move controls; a person without one gets their status, recent history and an edit button. -->
+<div id="grid-person-modal" data-can-move="{% if panel_can_move == False %}0{% else %}1{% endif %}" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-1">
+            <p id="person-name" class="text-sm font-semibold text-gray-700"></p>
+            <button type="button" onclick="closeGridModal('grid-person-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p id="person-status" class="text-sm text-gray-500 mb-4"></p>
+        <div id="person-body" class="flex flex-col gap-4 text-sm"></div>
+    </div>
+</div>
+
+<form id="person-move-form" method="POST" action="{% url 'person_move' %}" class="hidden">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.path }}">
+</form>
+
+<script>
+(function () {
+    const personPanels = JSON.parse(document.getElementById('person-panels-data').textContent);
+    const moveTargets = JSON.parse(document.getElementById('move-targets-data').textContent);
+    const positionsByDiscipline = JSON.parse(document.getElementById('move-positions-data').textContent);
+
+    function el(tag, cls, text) {
+        const node = document.createElement(tag);
+        if (cls) node.className = cls;
+        if (text !== undefined) node.textContent = text;
+        return node;
+    }
+
+    function select(options, valueKey, labelKey, placeholder) {
+        const s = el('select', 'border rounded px-2 py-1.5 text-sm w-full');
+        if (placeholder) s.appendChild(new Option(placeholder, ''));
+        options.forEach(function (o) { s.appendChild(new Option(o[labelKey], o[valueKey])); });
+        return s;
+    }
+
+    function submitMove(fields) {
+        const form = document.getElementById('person-move-form');
+        form.querySelectorAll('.dyn').forEach(function (n) { n.remove(); });
+        Object.keys(fields).forEach(function (name) {
+            const input = el('input', 'dyn');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = fields[name];
+            form.appendChild(input);
+        });
+        form.submit();
+    }
+
+    function sectionTitle(text) {
+        return el('p', 'font-semibold text-gray-700 mb-1', text);
+    }
+
+    function renderSeat(d, seat) {
+        const body = document.getElementById('person-body');
+        const block = el('div', 'border rounded-xl p-3 flex flex-col gap-2');
+        block.appendChild(el('p', 'text-gray-900', seat.label));
+
+        // Moves within this basket, by position.
+        if (document.getElementById('grid-person-modal').dataset.canMove === '0') {
+            body.appendChild(block);
+            return;
+        }
+        const seatDiscipline = seat.basket.split(':')[1];
+        const samePositions = positionsByDiscipline[seatDiscipline] || [];
+        const inBasket = el('div', 'flex gap-2 items-end');
+        const posSel = select(samePositions, 'id', 'name', '-- Position --');
+        posSel.value = seat.position_id;
+        const inBtn = el('button', 'px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-xs', 'Move to position');
+        inBtn.type = 'button';
+        inBtn.addEventListener('click', function () {
+            if (!posSel.value || posSel.value === String(seat.position_id)) return;
+            submitMove({ source_assignment_id: seat.id, basket: seat.basket, dest_position_id: posSel.value });
+        });
+        inBasket.appendChild(posSel);
+        inBasket.appendChild(inBtn);
+        block.appendChild(sectionTitle('Move within this basket'));
+        block.appendChild(inBasket);
+
+        // Move to another basket, with a position in it.
+        const others = moveTargets.filter(function (t) { return t.value !== seat.basket; });
+        const basketSel = select(others, 'value', 'label', '-- Basket --');
+        const toPosSel = select([], 'id', 'name', '-- Position --');
+        basketSel.addEventListener('change', function () {
+            const target = moveTargets.find(function (t) { return t.value === basketSel.value; });
+            const list = target ? (positionsByDiscipline[target.discipline] || []) : [];
+            toPosSel.innerHTML = '';
+            toPosSel.appendChild(new Option('-- Position --', ''));
+            list.forEach(function (p) { toPosSel.appendChild(new Option(p.name, p.id)); });
+        });
+        const toBtn = el('button', 'px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-xs', 'Move to basket');
+        toBtn.type = 'button';
+        toBtn.addEventListener('click', function () {
+            if (!basketSel.value || !toPosSel.value) return;
+            submitMove({ source_assignment_id: seat.id, basket: basketSel.value, dest_position_id: toPosSel.value });
+        });
+        const toRow = el('div', 'flex flex-col gap-2');
+        toRow.appendChild(basketSel);
+        const toPosRow = el('div', 'flex gap-2 items-end');
+        toPosRow.appendChild(toPosSel);
+        toPosRow.appendChild(toBtn);
+        toRow.appendChild(toPosRow);
+        block.appendChild(sectionTitle('Move to another basket'));
+        block.appendChild(toRow);
+        body.appendChild(block);
+    }
+
+    function renderHistory(d) {
+        const body = document.getElementById('person-body');
+        body.appendChild(sectionTitle('Recent seats'));
+        if (!d.history.length) body.appendChild(el('p', 'text-gray-400', 'None'));
+        d.history.forEach(function (h) {
+            body.appendChild(el('p', 'text-gray-600', h.seat + ' · ' + h.start + ' → ' + h.end));
+        });
+        if (d.cover_history.length) {
+            body.appendChild(sectionTitle('Recent coverage'));
+            d.cover_history.forEach(function (c) {
+                body.appendChild(el('p', 'text-gray-600', c.role + ' · ' + c.basket + ' · with ' + c.with + ' · ' + c.start + ' → ' + c.end));
+            });
+        }
+    }
+
+    function renderEdit(d) {
+        const body = document.getElementById('person-body');
+        const btn = el('button', 'self-start px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-xs', 'Edit level and contract');
+        btn.type = 'button';
+        btn.addEventListener('click', function () {
+            openLevel({ dataset: { employeeId: d.employeeid, employeeName: d.name, minerlevel: d.minerlevel_id, contractid: d.contractid } });
+        });
+        body.appendChild(btn);
+    }
+
+    window.openPersonPanel = function (employeeId) {
+        const d = personPanels[employeeId];
+        if (!d) return;
+        document.getElementById('person-name').textContent = d.name;
+        document.getElementById('person-status').textContent = d.status;
+        const body = document.getElementById('person-body');
+        body.innerHTML = '';
+        if (d.seat_rows && d.seat_rows.length) {
+            d.seat_rows.forEach(function (seat) { renderSeat(d, seat); });
+        } else {
+            renderEdit(d);
+        }
+        renderHistory(d);
+        document.getElementById('grid-person-modal').classList.remove('hidden');
+    };
+})();
+</script>

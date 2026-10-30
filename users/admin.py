@@ -33,8 +33,8 @@ class PositionAdmin(admin.ModelAdmin):
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ('employeeid', 'firstname', 'lastname', 'roleid', 'shiftertype', 'crewid', 'employmenttype', 'isactive', 'hasaccess')
-    list_filter = ('isactive', 'hasaccess', 'shiftertype', 'crewid', 'employmenttype')
+    list_display = ('employeeid', 'firstname', 'lastname', 'roleid', 'discipline', 'crewid', 'employmenttype', 'isactive', 'hasaccess')
+    list_filter = ('isactive', 'hasaccess', 'discipline', 'crewid', 'employmenttype')
     search_fields = ('employeeid', 'firstname', 'lastname', 'email')
     ordering = ('lastname', 'firstname')
     fields = (

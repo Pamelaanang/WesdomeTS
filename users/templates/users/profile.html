@@ -19,7 +19,7 @@
                     <img src="/media/{{ request.user.profilepic }}" class="w-full h-full object-cover"
                         alt="Profile Photo">
                     {% else %}
-                    <i class="fa-solid fa-user text-[3rem] text-white"></i>
+                    <span class="text-white font-bold text-[3rem]">{{ request.user.firstname|slice:":1" }}{{ request.user.lastname|slice:":1" }}</span>
                     {% endif %}
                 </div>
                 <div
@@ -39,7 +39,7 @@
             <span><i class="fa-solid fa-book-open-reader text-black mr-1"></i>Supervisor: {{ request.user.supervisorid.firstname }} {{ request.user.supervisorid.lastname }}</span>
             {% endif %}
             {% if al == 5 %}
-            <span><i class="fa-solid fa-hard-hat text-black mr-1"></i>Section: {{ request.user.shiftertype|default:"Not set" }}</span>
+            <span><i class="fa-solid fa-hard-hat text-black mr-1"></i>Section: {{ request.user.home_basket.discipline.name|default:"Not set" }}</span>
             {% endif %}
         </div>
     </div>
@@ -90,6 +90,17 @@
             <div class="flex items-center justify-between text-base">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-building text-gray-400"></i> {{ dept.roleid__departmentid__departmentname }}</span>
                 <span class="text-xl font-bold">{{dept.user_count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="flex-1 min-w-[240px] bg-white rounded-2xl shadow p-6">
+        <p class="font-semibold mb-4">Workforce by Role</p>
+        <div class="space-y-3">
+            {% for role in role_breakdown %}
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-id-badge text-gray-400"></i> {{ role.roleid__accessid__accessrole }}</span>
+                <span class="text-xl font-bold">{{ role.user_count }}</span>
             </div>
             {% endfor %}
         </div>
@@ -389,10 +400,6 @@
                 class="flex items-center gap-3 px-4 py-3 bg-[#B45309] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-clipboard-list"></i> Crew Daily Sheets Inbox
             </a>
-            <a href="{% url 'crew_assignments' %}"
-                class="flex items-center gap-3 px-4 py-3 bg-[#15803D] text-white rounded-xl text-sm font-medium hover:opacity-90">
-                <i class="fa-solid fa-people-group"></i> Shifter & Miner Management
-            </a>
             <a href="{% url 'contract_account_management' %}"
                 class="flex items-center gap-3 px-4 py-3 bg-[#7C3AED] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-link"></i> Contract-Cost Centre
@@ -427,11 +434,6 @@
             <a href="{% url 'my_bonuses' %}"
                 class="flex items-center gap-3 px-4 py-3 bg-[#BE185D] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-gift"></i> My Bonuses
-            </a>
-            <p class="text-xs font-medium text-gray-400 uppercase -mb-1 pt-1">Crew Coverage</p>
-            <a href="{% url 'crew_coverage' %}"
-                class="flex items-center gap-3 px-4 py-3 bg-[#0F766E] text-white rounded-xl text-sm font-medium hover:opacity-90">
-                <i class="fa-solid fa-arrows-rotate"></i> Crew Coverage
             </a>
             {% elif al == 5 %}
             <p class="text-xs font-medium text-gray-400 uppercase -mb-1">Crew Sheets</p>

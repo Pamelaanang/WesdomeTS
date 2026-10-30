@@ -10,7 +10,7 @@
             {% if employee.profilepic %}
             <img src="/media/{{ employee.profilepic }}" class="w-full h-full object-cover" alt="">
             {% else %}
-            <i class="fa-solid fa-user text-white text-xl"></i>
+            <span class="text-white font-bold text-xl">{{ employee.firstname|slice:":1" }}{{ employee.lastname|slice:":1" }}</span>
             {% endif %}
         </div>
         <div>

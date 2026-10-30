@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mx-10 space-y-8">
+
+    <div class="bg-white rounded-2xl shadow p-4 text-center">
+        <h2 class="text-xl font-bold">WESDOME GOLD MINES LIMITED</h2>
+        <h3 class="font-semibold">EAGLE RIVER MINE</h3>
+    </div>
+
+    <!-- Login requests: promoted or covering shifters with no login yet -->
+    <div class="bg-white rounded-2xl shadow p-6">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Promoted shifters needing a login ({{ access_requests|length }})</p>
+        <p class="text-xs text-gray-500 mb-4">Existing employees promoted to Shift Coordinator, or covering as Spare Shifters. They're already on the grid and only need login access.</p>
+        {% if access_requests %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs text-gray-500 border-b">
+                        <th class="py-2 pr-4">Name</th>
+                        <th class="py-2 pr-4">ID</th>
+                        <th class="py-2 pr-4">Role</th>
+                        <th class="py-2 pr-4">Phone</th>
+                        <th class="py-2"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in access_requests %}
+                    <tr class="border-b align-top">
+                        <td class="py-3 pr-4 font-semibold text-gray-900">{{ r.firstname }} {{ r.lastname }}</td>
+                        <td class="py-3 pr-4 text-gray-700">{{ r.employeeid }}</td>
+                        <td class="py-3 pr-4 text-gray-700">{{ r.roleid.rolename }}</td>
+                        <td class="py-3 pr-4 text-gray-700">{{ r.phonenumber|default:"—" }}</td>
+                        <td class="py-3">
+                            <form method="post" class="inline" onsubmit="return confirm('Grant login to {{ r.firstname|escapejs }} {{ r.lastname|escapejs }}? A temporary password will be sent to their phone.');">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="grant_access">
+                                <input type="hidden" name="employeeid" value="{{ r.employeeid }}">
+                                <button type="submit" class="px-3 py-1.5 rounded-lg bg-[#28348A] text-white text-xs font-semibold hover:opacity-90">Grant access</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-500">No one is waiting for login.</p>
+        {% endif %}
+    </div>
+
+    <!-- Miners added by the Superintendent (no login; information only) -->
+    <details class="bg-white rounded-2xl shadow p-6">
+        <summary class="cursor-pointer text-sm font-semibold text-gray-700">Miners added by the Superintendent ({{ no_login_miners|length }})</summary>
+        <div class="mt-4">
+            {% if no_login_miners %}
+            <ul class="divide-y text-sm">
+                {% for m in no_login_miners %}
+                <li class="py-2 flex justify-between">
+                    <span class="text-gray-900">{{ m.firstname }} {{ m.lastname }} <span class="text-gray-400">{{ m.employeeid }}</span></span>
+                    <span class="text-gray-500">Added by {{ m.onboarding_requested_by.firstname }} {{ m.onboarding_requested_by.lastname }}{% if m.onboarding_requested_on %} · {{ m.onboarding_requested_on|date:"M j, Y" }}{% endif %}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-sm text-gray-500">None.</p>
+            {% endif %}
+        </div>
+    </details>
+
+    <!-- Awaiting activation -->
+    <div class="bg-white rounded-2xl shadow p-6">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">New hires waiting for activation ({{ pending|length }})</p>
+        <p class="text-xs text-gray-500 mb-4">People the Superintendent added to the grid. They can't log in until you activate them.</p>
+
+        {% if pending %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs text-gray-500 border-b">
+                        <th class="py-2 pr-4">Name</th>
+                        <th class="py-2 pr-4">ID</th>
+                        <th class="py-2 pr-4">Role</th>
+                        <th class="py-2 pr-4">Phone</th>
+                        <th class="py-2 pr-4">Placement</th>
+                        <th class="py-2 pr-4">Added by</th>
+                        <th class="py-2 pr-4">Added on</th>
+                        <th class="py-2"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in pending %}
+                    <tr class="border-b align-top">
+                        <td class="py-3 pr-4 font-semibold text-gray-900">{{ p.firstname }} {{ p.lastname }}</td>
+                        <td class="py-3 pr-4 text-gray-700">{{ p.employeeid }}</td>
+                        <td class="py-3 pr-4 text-gray-700">{{ p.roleid.rolename }}</td>
+                        <td class="py-3 pr-4 text-gray-700">{{ p.phonenumber }}</td>
+                        <td class="py-3 pr-4 text-gray-700">
+                            {% for label in p.placements %}<div>{{ label }}</div>{% empty %}<span class="text-gray-400">Unplaced</span>{% endfor %}
+                        </td>
+                        <td class="py-3 pr-4 text-gray-700">{% if p.onboarding_requested_by %}{{ p.onboarding_requested_by.firstname }} {{ p.onboarding_requested_by.lastname }}{% else %}&mdash;{% endif %}</td>
+                        <td class="py-3 pr-4 text-gray-700">{{ p.onboarding_requested_on|date:"M j, Y" }}</td>
+                        <td class="py-3 whitespace-nowrap">
+                            <form method="post" class="inline" onsubmit="return confirm('Activate {{ p.firstname|escapejs }} {{ p.lastname|escapejs }}? A temporary password will be sent to their phone.');">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="activate">
+                                <input type="hidden" name="employeeid" value="{{ p.employeeid }}">
+                                <button type="submit" class="px-3 py-1.5 rounded-lg bg-[#28348A] text-white text-xs font-semibold hover:opacity-90">Activate</button>
+                            </form>
+                            <form method="post" class="inline ml-2" onsubmit="return confirm('Reject {{ p.firstname|escapejs }} {{ p.lastname|escapejs }}? Their seat on the grid will be freed.');">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="reject">
+                                <input type="hidden" name="employeeid" value="{{ p.employeeid }}">
+                                <button type="submit" class="px-3 py-1.5 rounded-lg border border-red-300 text-red-600 text-xs font-semibold hover:bg-red-50">Reject</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-500">No hires waiting for access.</p>
+        {% endif %}
+    </div>
+
+    <!-- Archive, by month resolved -->
+    <div class="bg-white rounded-2xl shadow p-6">
+        <div class="flex items-center justify-between mb-4">
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Resolved Requests</p>
+            {% if month_values %}
+            <form method="get" class="flex items-center gap-2">
+                <label for="month" class="text-xs text-gray-500">Month</label>
+                <select id="month" name="month" onchange="this.form.submit()" class="border rounded px-2 py-1 text-sm">
+                    {% for m in month_values %}
+                    <option value="{{ m }}" {% if m == selected_month %}selected{% endif %}>{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+            {% endif %}
+        </div>
+
+        {% if archive %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs text-gray-500 border-b">
+                        <th class="py-2 pr-4">Name</th>
+                        <th class="py-2 pr-4">ID</th>
+                        <th class="py-2 pr-4">Role</th>
+                        <th class="py-2 pr-4">Outcome</th>
+                        <th class="py-2 pr-4">Resolved by</th>
+                        <th class="py-2">Resolved on</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in archive %}
+                    <tr class="border-b">
+                        <td class="py-2 pr-4 text-gray-900">{{ r.firstname }} {{ r.lastname }}</td>
+                        <td class="py-2 pr-4 text-gray-700">{{ r.employeeid }}</td>
+                        <td class="py-2 pr-4 text-gray-700">{{ r.roleid.rolename }}</td>
+                        <td class="py-2 pr-4">
+                            {% if r.onboarding_status == 'activated' %}
+                            <span class="text-green-700 font-semibold">Activated</span>
+                            {% else %}
+                            <span class="text-red-600 font-semibold">Rejected</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2 pr-4 text-gray-700">{% if r.onboarding_resolved_by %}{{ r.onboarding_resolved_by.firstname }} {{ r.onboarding_resolved_by.lastname }}{% else %}&mdash;{% endif %}</td>
+                        <td class="py-2 text-gray-700">{{ r.onboarding_resolved_on|date:"M j, Y" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-500">No resolved requests yet.</p>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

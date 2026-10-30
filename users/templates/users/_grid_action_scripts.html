@@ -1,0 +1,485 @@
+{{ positions_for_modal|json_script:"positions-for-modal-data" }}
+{{ available_employees_for_modal|json_script:"available-employees-data" }}
+{{ all_miners_for_modal|json_script:"all-miners-data" }}
+{{ all_shifters_for_modal|json_script:"all-shifters-data" }}
+{{ contracts_for_modal|json_script:"contracts-for-modal-data" }}
+{{ person_panels|json_script:"person-panels-data" }}
+{{ crew_pair_map|json_script:"crew-pair-map-data" }}
+{{ also_covers_options|json_script:"also-covers-options-data" }}
+
+<script>
+(function () {
+    const positionsForModal = JSON.parse(document.getElementById('positions-for-modal-data').textContent);
+    const availableEmployees = JSON.parse(document.getElementById('available-employees-data').textContent);
+    const allMiners = JSON.parse(document.getElementById('all-miners-data').textContent);
+    const allShifters = JSON.parse(document.getElementById('all-shifters-data').textContent);
+    const contractsForModal = JSON.parse(document.getElementById('contracts-for-modal-data').textContent);
+    const crewPairMap = JSON.parse(document.getElementById('crew-pair-map-data').textContent);
+    const alsoCoversOptions = JSON.parse(document.getElementById('also-covers-options-data').textContent);
+    function fillAlsoCovers(selectId, basket) {
+        fillSelect(document.getElementById(selectId), alsoCoversOptions[basket] || [], 'value', 'label', '-- None --');
+    }
+
+    window.closeGridModal = function (id) {
+        document.getElementById(id).classList.add('hidden');
+    };
+
+    function openModal(id) {
+        document.getElementById(id).classList.remove('hidden');
+    }
+
+    function fillSelect(select, items, valueKey, labelKey, placeholder) {
+        select.innerHTML = '';
+        const placeholderOpt = document.createElement('option');
+        placeholderOpt.value = '';
+        placeholderOpt.textContent = placeholder;
+        select.appendChild(placeholderOpt);
+        items.forEach(function (item) {
+            const opt = document.createElement('option');
+            opt.value = item[valueKey];
+            opt.textContent = item[labelKey];
+            select.appendChild(opt);
+        });
+    }
+
+    // ---- Room Allocation (unchanged: cosmetic, localStorage-only) ----
+    document.querySelectorAll('.room-allocation').forEach(function (input) {
+        const key = 'crew_grid_room_' + input.dataset.crew;
+        try {
+            const saved = localStorage.getItem(key);
+            if (saved) input.value = saved;
+        } catch (e) {}
+        input.addEventListener('input', function () {
+            try { localStorage.setItem(key, input.value); } catch (e) {}
+        });
+    });
+
+    // ---- Add Member modal ----
+    // Takes the trigger (or any object with the same dataset), so the basket page can open it too.
+    function openAddMember(btn) {
+            document.getElementById('grid-add-form').action = btn.dataset.postUrl;
+            document.getElementById('grid-add-action').value = btn.dataset.action || 'bulk_add_members';
+            document.getElementById('grid-add-basket').value = btn.dataset.basket;
+            document.getElementById('grid-add-basket-label').textContent = btn.dataset.basketLabel || '';
+            document.getElementById('grid-add-startdate').value = new Date().toISOString().slice(0, 10);
+
+            fillSelect(document.getElementById('grid-add-employee-select'), availableEmployees, 'employeeid', 'name', availableEmployees.length ? '-- Select Employee --' : '-- Nobody unassigned is available --');
+
+            const posSelect = document.getElementById('grid-add-position-select');
+            fillSelect(posSelect, positionsForModal[btn.dataset.shiftertype] || [], 'id', 'name', '-- Select Position --');
+            if (btn.dataset.positionId) {
+                posSelect.value = btn.dataset.positionId;
+            }
+
+            const alsoSelect = document.getElementById('grid-add-also-covers');
+            const alsoOptions = alsoCoversOptions[btn.dataset.basket] || [];
+            fillSelect(alsoSelect, alsoOptions, 'value', 'label', '-- None --');
+            document.getElementById('grid-add-also-covers-wrap').classList.toggle('hidden', alsoOptions.length === 0);
+
+            openModal('grid-add-modal');
+    }
+    window.openAddMember = openAddMember;
+    document.querySelectorAll('.grid-add-trigger').forEach(function (btn) {
+        btn.addEventListener('click', function () { openAddMember(btn); });
+    });
+
+    document.getElementById('grid-add-form').addEventListener('submit', function () {
+        const empSelect = document.getElementById('grid-add-employee-select');
+        const posSelect = document.getElementById('grid-add-position-select');
+        document.getElementById('grid-add-employee-id').value = empSelect.value;
+        const posHidden = document.getElementById('grid-add-position-hidden');
+        posHidden.name = empSelect.value ? ('position_' + empSelect.value) : 'position_unset';
+        posHidden.value = posSelect.value;
+
+        const alsoSelect = document.getElementById('grid-add-also-covers');
+        const alsoHidden = document.getElementById('grid-add-also-hidden') || document.createElement('input');
+        alsoHidden.type = 'hidden';
+        alsoHidden.id = 'grid-add-also-hidden';
+        alsoHidden.name = empSelect.value ? ('also_covers_' + empSelect.value) : 'also_covers_unset';
+        alsoHidden.value = alsoSelect.value;
+        document.getElementById('grid-add-form').appendChild(alsoHidden);
+    });
+
+
+    // ---- Replace modal ----
+    function openSeatActions(chip) {
+        ['grid-replace-existing', 'grid-replace-new', 'grid-remove-form'].forEach(function (id) {
+            document.getElementById(id).action = chip.dataset.postUrl;
+        });
+        document.getElementById('grid-replace-assignment-id-1').value = chip.dataset.assignmentId;
+        document.getElementById('grid-replace-assignment-id-2').value = chip.dataset.assignmentId;
+        document.getElementById('grid-remove-assignment-id').value = chip.dataset.assignmentId;
+        document.getElementById('grid-quit-occupant-employee-id').value = chip.dataset.employeeId;
+        document.getElementById('grid-replace-basket-1').value = chip.dataset.basket;
+        document.getElementById('grid-replace-basket-2').value = chip.dataset.basket;
+        document.getElementById('grid-remove-basket').value = chip.dataset.basket;
+        document.getElementById('grid-replace-title').textContent =
+            'Replace ' + chip.dataset.employeeName + (chip.dataset.positionName ? ' (' + chip.dataset.positionName + ')' : '');
+
+        fillAlsoCovers('grid-replace-also-covers-1', chip.dataset.basket);
+        fillAlsoCovers('grid-replace-also-covers-2', chip.dataset.basket);
+
+        const empSelect = document.getElementById('grid-replace-employee-select');
+        fillSelect(empSelect, allMiners, 'employeeid', 'name', '-- Select Employee --');
+        Array.from(empSelect.options).forEach(function (opt) {
+            if (!opt.value) return;
+            if (opt.value === chip.dataset.employeeId) {
+                opt.remove();
+                return;
+            }
+            const info = allMiners.find(function (m) { return m.employeeid === opt.value; });
+            if (info && info.current_label) {
+                opt.textContent += ' — currently ' + info.current_label;
+            }
+        });
+
+        // Reset to "Existing Employee" mode each time the modal reopens.
+        document.querySelector('input[name="grid_replace_mode"]').checked = true;
+        document.getElementById('grid-replace-existing').classList.remove('hidden');
+        document.getElementById('grid-replace-new').classList.add('hidden');
+
+        openModal('grid-replace-modal');
+    }
+    window.openSeatActions = openSeatActions;
+
+    document.querySelectorAll('.grid-name-chip').forEach(function (chip) {
+        chip.addEventListener('click', function () { window.openPersonPanel(chip.dataset.employeeId); });
+    });
+
+    // ---- Fill This Basket modal (vacant basket -> existing shifter, or a
+    // Miner promoted temporarily or permanently) ----
+    const crewCoverageUrl = '{% url "crew_coverage" %}';
+    const spareEligibleMiners = allMiners.filter(function (m) { return ['Lead', '1', '2'].indexOf(m.minerlevel) !== -1; });
+
+    // Takes the trigger (or any object with the same dataset), so the basket page can open it too.
+    function openAssign(btn) {
+            // Nobody at all to offer — a modal with every dropdown empty
+            // isn't useful, but jumping straight to Crew Coverage without
+            // warning is disorienting too. Explain why, and let the
+            // Superintendent choose whether to go there instead.
+            if (!allShifters.length && !allMiners.length) {
+                const basketLabel = (btn.dataset.basketLabel || 'this basket').replace(/&mdash;/g, '—');
+                const goToCoverage = confirm(
+                    'Nobody is available to assign to ' + basketLabel + '.\n\n' +
+                    'Go to Crew Coverage to promote a Miner to Spare Shifter instead?'
+                );
+                if (goToCoverage) {
+                    window.location.href = crewCoverageUrl;
+                }
+                return;
+            }
+
+            const parts = btn.dataset.basket.split(':');
+            ['1', '2', '3', '4'].forEach(function (n) {
+                document.getElementById('grid-fill-crewid-' + n).value = parts[0];
+                document.getElementById('grid-fill-shiftertype-' + n).value = parts[1];
+            });
+            document.getElementById('grid-assign-title').textContent = 'Fill This Basket — ' + (btn.dataset.basketLabel || '');
+
+            fillSelect(document.getElementById('grid-fill-existing-select'), allShifters, 'employeeid', 'name', '-- Select Shifter --');
+            Array.from(document.getElementById('grid-fill-existing-select').options).forEach(function (opt) {
+                if (!opt.value) return;
+                const info = allShifters.find(function (s) { return s.employeeid === opt.value; });
+                if (info && info.current_label) opt.textContent += ' — currently ' + info.current_label;
+            });
+            fillSelect(document.getElementById('grid-fill-temporary-select'), spareEligibleMiners, 'employeeid', 'name', '-- Select Miner --');
+            fillSelect(document.getElementById('grid-fill-permanent-select'), allMiners, 'employeeid', 'name', '-- Select Miner --');
+
+            // Reset to "Assign an Existing Shifter" each time the modal reopens.
+            document.querySelector('input[name="grid_fill_mode"]').checked = true;
+            ['grid-fill-existing', 'grid-fill-temporary', 'grid-fill-permanent', 'grid-fill-hire'].forEach(function (id) {
+                document.getElementById(id).classList.toggle('hidden', id !== 'grid-fill-existing');
+            });
+
+            openModal('grid-assign-modal');
+    }
+    window.openAssign = openAssign;
+    document.querySelectorAll('.grid-assign-trigger').forEach(function (btn) {
+        btn.addEventListener('click', function () { openAssign(btn); });
+    });
+
+    // ---- Manage This Basket modal (occupied basket, via the shifter's own
+    // name -> Transfer or Start Coverage) ----
+    // Takes the trigger (or any object with the same dataset), so the basket page can open it too.
+    function openManage(btn) {
+            document.getElementById('grid-manage-transfer').action = btn.dataset.postUrl;
+            document.getElementById('grid-manage-coverage').action = btn.dataset.postUrl;
+            document.getElementById('grid-manage-transfer-basket').value = btn.dataset.basket;
+            document.getElementById('grid-manage-coverage-basket').value = btn.dataset.basket;
+            document.getElementById('grid-manage-title').textContent = 'Manage ' + (btn.dataset.basketLabel || 'This Basket');
+            const name = btn.dataset.shifterName || 'them';
+            document.getElementById('grid-manage-transfer-desc').textContent =
+                'Permanently hand this basket to someone else. ' + name + ' stops running it — their own home crew/section clears if this was it. Use this when they\'re not coming back to this basket at all.';
+            document.getElementById('grid-manage-coverage-desc').textContent =
+                'Keep ' + name + ' as the basket\'s real owner, but temporarily hand the day-to-day running to someone else. ' + name + ' resumes automatically once you end the coverage.';
+
+            const otherShifters = allShifters.filter(function (s) { return s.employeeid !== btn.dataset.shifterEid; });
+            const freeToCover = otherShifters.filter(function (s) { return !s.busy_cover; });
+            const transferSelect = document.getElementById('grid-manage-transfer-select');
+            fillGroupedSelect(transferSelect, [
+                { label: 'Existing Shifters', items: otherShifters, prefix: 'shifter' },
+                { label: 'Promote a Miner (Permanent)', items: allMiners, prefix: 'promote' },
+            ]);
+
+            document.getElementById('grid-manage-swap-employee').value = btn.dataset.shifterEid;
+            fillSelect(
+                document.getElementById('grid-manage-swap-select'),
+                allShifters.filter(function (sh) { return sh.employeeid !== btn.dataset.shifterEid && sh.current_label; }),
+                'employeeid', 'name', '-- Select Shifter --'
+            );
+
+            const coverageSelect = document.getElementById('grid-manage-coverage-select');
+            fillGroupedSelect(coverageSelect, [
+                { label: 'Existing Shifters', items: freeToCover, prefix: 'shifter' },
+                { label: 'Promote a Miner (Temporary — Lead/1/2 only)', items: spareEligibleMiners, prefix: 'promote' },
+            ]);
+
+            // Reset to "Transfer" each time the modal reopens.
+            document.querySelector('input[name="grid_manage_mode"]').checked = true;
+            ['grid-manage-transfer', 'grid-manage-coverage'].forEach(function (id) {
+                document.getElementById(id).classList.toggle('hidden', id !== 'grid-manage-transfer');
+            });
+
+            openModal('grid-manage-modal');
+    }
+    window.openManage = openManage;
+    document.querySelectorAll('.grid-manage-trigger').forEach(function (btn) {
+        btn.addEventListener('click', function () { openManage(btn); });
+    });
+
+    function fillGroupedSelect(select, groups) {
+        select.innerHTML = '';
+        const placeholderOpt = document.createElement('option');
+        placeholderOpt.value = '';
+        placeholderOpt.textContent = '-- Select --';
+        select.appendChild(placeholderOpt);
+        groups.forEach(function (group) {
+            if (!group.items.length) return;
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = group.label;
+            group.items.forEach(function (item) {
+                const opt = document.createElement('option');
+                opt.value = group.prefix + ':' + item.employeeid;
+                opt.textContent = item.name + (item.current_label ? ' — currently ' + item.current_label : '');
+                optgroup.appendChild(opt);
+            });
+            select.appendChild(optgroup);
+        });
+    }
+
+    document.getElementById('grid-manage-transfer').addEventListener('submit', function (e) {
+        const [kind, employeeId] = document.getElementById('grid-manage-transfer-select').value.split(':');
+        if (!kind || !employeeId) { e.preventDefault(); return; }
+        if (!confirm('Permanently transfer this basket and all its members?')) { e.preventDefault(); return; }
+        this.querySelectorAll('input[name="new_shifter_id"], input[name="promote_employee_id"]').forEach(function (el) { el.remove(); });
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = kind === 'promote' ? 'promote_employee_id' : 'new_shifter_id';
+        input.value = employeeId;
+        this.appendChild(input);
+    });
+
+    document.getElementById('grid-manage-coverage').addEventListener('submit', function (e) {
+        const [kind, employeeId] = document.getElementById('grid-manage-coverage-select').value.split(':');
+        if (!kind || !employeeId) { e.preventDefault(); return; }
+        this.querySelectorAll('input[name="covering_shifter_id"], input[name="promote_employee_id"]').forEach(function (el) { el.remove(); });
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = kind === 'promote' ? 'promote_employee_id' : 'covering_shifter_id';
+        input.value = employeeId;
+        this.appendChild(input);
+        const startdate = document.createElement('input');
+        startdate.type = 'hidden';
+        startdate.name = 'startdate';
+        startdate.value = new Date().toISOString().slice(0, 10);
+        this.appendChild(startdate);
+    });
+
+    // ---- Demote to Miner (permanent) ----
+    // ---- Quit / demote a shifter ----
+    function syncExitModal() {
+        const kind = document.querySelector('input[name="fill_kind"]:checked');
+        const k = kind ? kind.value : '';
+        const needsPerson = ['cover_temp', 'promote', 'assign'].indexOf(k) !== -1;
+        document.getElementById('grid-exit-select-wrap').classList.toggle('hidden', !needsPerson);
+        document.getElementById('grid-exit-hire-wrap').classList.toggle('hidden', k !== 'hire');
+        if (needsPerson) {
+            const source = k === 'cover_temp' ? spareEligibleMiners
+                : k === 'promote' ? allMiners
+                : allShifters.filter(function (sh) { return !sh.current_label; });
+            fillSelect(document.getElementById('grid-exit-select'), source, 'employeeid', 'name', '-- Select --');
+        }
+    }
+    document.querySelectorAll('input[name="fill_kind"]').forEach(function (el) {
+        el.addEventListener('change', syncExitModal);
+    });
+
+    // Demote Level picker: Miner levels only, and the Contract list follows the Level.
+    const demoteLevelSelect = document.getElementById('grid-exit-demote-level');
+    function fillDemoteContracts() {
+        const levelId = demoteLevelSelect.value;
+        fillSelect(document.getElementById('grid-exit-demote-contract'), levelId ? (contractsForModal[levelId] || []) : [], 'id', 'label', levelId ? '-- None --' : '-- Choose a level first --');
+        document.getElementById('grid-exit-demote-contract').disabled = !levelId;
+    }
+    demoteLevelSelect.addEventListener('change', fillDemoteContracts);
+
+    // Takes the trigger (or any object with the same dataset), so the basket page can open it too.
+    function openExit(btn) {
+            const isQuit = btn.dataset.action === 'quit_employee';
+            const name = btn.dataset.employeeName;
+            if (btn.dataset.fillRequired !== '1' && isQuit) {
+                if (!confirm('Record ' + name + ' as quit today?\n\nTheir account will be deactivated and their seat freed.')) return;
+                document.getElementById('grid-exit-direct-action').value = btn.dataset.action;
+                document.getElementById('grid-exit-direct-employee').value = btn.dataset.employeeId;
+                document.getElementById('grid-exit-direct-form').submit();
+                return;
+            }
+
+            const covered = btn.dataset.covered === '1';
+            document.getElementById('grid-exit-title').textContent = (isQuit ? 'Record quit: ' : 'Demote: ') + name;
+            const fillRequired = btn.dataset.fillRequired === '1';
+            document.getElementById('grid-exit-intro').textContent = fillRequired
+                ? name + ' leads a basket with members. Choose who runs it next so their hours can be logged.'
+                : 'Choose the Miner Level they return to. Their contract, if any, is set here.';
+            document.getElementById('grid-exit-fill-wrap').classList.toggle('hidden', !fillRequired);
+            document.getElementById('grid-exit-demote-wrap').classList.toggle('hidden', isQuit);
+            demoteLevelSelect.disabled = isQuit;
+            demoteLevelSelect.required = !isQuit;
+            demoteLevelSelect.value = '';
+            fillDemoteContracts();
+            document.getElementById('grid-exit-action').value = btn.dataset.action;
+            document.getElementById('grid-exit-employee').value = btn.dataset.employeeId;
+            document.getElementById('grid-exit-make-permanent-text').textContent =
+                (btn.dataset.coveringName || 'The covering shifter') + ' takes over the basket for good.';
+            document.getElementById('grid-exit-submit').textContent = isQuit ? 'Record quit' : 'Demote';
+
+            document.querySelectorAll('.grid-exit-option').forEach(function (label) {
+                const kind = label.dataset.kind;
+                const show = covered ? (kind === 'make_permanent' || kind === 'hire') : (kind !== 'make_permanent');
+                label.classList.toggle('hidden', !show);
+                label.querySelector('input').checked = false;
+            });
+            document.getElementById('grid-exit-modal').classList.remove('hidden');
+            syncExitModal();
+    }
+    window.openExit = openExit;
+    document.querySelectorAll('.grid-exit-trigger').forEach(function (btn) {
+        btn.addEventListener('click', function () { openExit(btn); });
+    });
+
+    // Takes the trigger (or any object with the same dataset), so the basket page can open it too.
+    function openMakePermanent(btn) {
+            if (!confirm(
+                'Make ' + btn.dataset.employeeName + ' the permanent shifter for this basket?\n\n' +
+                'Their temporary coverage ends and they take over the basket for good.'
+            )) return;
+            document.getElementById('grid-make-permanent-employee').value = btn.dataset.employeeId;
+            document.getElementById('grid-make-permanent-form').submit();
+    }
+    window.openMakePermanent = openMakePermanent;
+    document.querySelectorAll('.grid-make-permanent-trigger').forEach(function (btn) {
+        btn.addEventListener('click', function () { openMakePermanent(btn); });
+    });
+
+    // ---- End Coverage ----
+    // Takes the trigger (or any object with the same dataset), so the basket page can open it too.
+    function openEndCoverage(btn) {
+            if (!confirm(
+                btn.dataset.homeVacant === '1'
+                    ? 'End coverage? The basket will be left without a leader, and ' + btn.dataset.coveringName + ' will be demoted back to Miner if they have nothing else active.'
+                    : 'End coverage? ' + btn.dataset.homeName + ' will resume running this basket, and ' +
+                      btn.dataset.coveringName + ' will be demoted back to Miner if they have nothing else active.'
+            )) return;
+            document.getElementById('grid-end-coverage-id').value = btn.dataset.coverageId;
+            document.getElementById('grid-end-coverage-form').submit();
+    }
+    window.openEndCoverage = openEndCoverage;
+    document.querySelectorAll('.grid-end-coverage-trigger').forEach(function (btn) {
+        btn.addEventListener('click', function () { openEndCoverage(btn); });
+    });
+
+    // ---- Edit Level / Contract Code modal ----
+    // Contract Code options are scoped to the selected Level (a contract can
+    // apply to several levels and a level to several contracts — real
+    // many-to-many, not a 1:1 lookup) — an unclassified contract always
+    // shows regardless of level, same "never hide an unclassified row"
+    // safety net Position's own discipline filter uses.
+    // Pick a Level first: the Contract list is that Level's contracts only.
+    // With no Level the Contract box is disabled, so nothing posts and the
+    // server stores no contract (see edit_employee_level).
+    function populateLevelModalContracts(levelId, selectedContractId) {
+        const select = document.getElementById('grid-level-contract-select');
+        const items = levelId ? (contractsForModal[levelId] || []) : [];
+        fillSelect(select, items, 'id', 'label', levelId ? '-- None --' : '-- Choose a level first --');
+        select.disabled = !levelId;
+        if (selectedContractId && items.some(function (c) { return String(c.id) === String(selectedContractId); })) {
+            select.value = selectedContractId;
+        }
+    }
+
+    // Takes the trigger (or any object with the same dataset), so the basket page can open it too.
+    function openLevel(btn) {
+            document.getElementById('grid-level-employee-id').value = btn.dataset.employeeId;
+            document.getElementById('grid-level-title').textContent = 'Edit Classification — ' + btn.dataset.employeeName;
+
+            const levelSelect = document.getElementById('grid-level-select');
+            levelSelect.value = btn.dataset.minerlevel || '';
+            populateLevelModalContracts(levelSelect.value, btn.dataset.contractid);
+
+            openModal('grid-level-modal');
+    }
+    window.openLevel = openLevel;
+    document.querySelectorAll('.grid-level-trigger').forEach(function (btn) {
+        btn.addEventListener('click', function () { openLevel(btn); });
+    });
+
+    const gridLevelSelect = document.getElementById('grid-level-select');
+    if (gridLevelSelect) {
+        gridLevelSelect.addEventListener('change', function () {
+            const currentContract = document.getElementById('grid-level-contract-select').value;
+            populateLevelModalContracts(this.value, currentContract);
+        });
+    }
+
+
+    // ---- Drag and drop: drag a name onto any cell to move it there. Goes through the same
+    // move as the person panel, so the same rules apply on both screens. ----
+    document.querySelectorAll('[data-assignment-id][draggable="true"]').forEach(function (chip) {
+        chip.addEventListener('dragstart', function (e) {
+            e.dataTransfer.setData('text/plain', chip.dataset.assignmentId);
+            e.dataTransfer.effectAllowed = 'move';
+        });
+    });
+    document.querySelectorAll('.grid-drop-target').forEach(function (target) {
+        target.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            target.classList.add('bg-indigo-50');
+        });
+        target.addEventListener('dragleave', function () {
+            target.classList.remove('bg-indigo-50');
+        });
+        target.addEventListener('drop', function (e) {
+            e.preventDefault();
+            target.classList.remove('bg-indigo-50');
+            const assignmentId = e.dataTransfer.getData('text/plain');
+            if (!assignmentId) return;
+            const form = document.getElementById('person-move-form');
+            form.querySelectorAll('.dyn').forEach(function (n) { n.remove(); });
+            const fields = {
+                source_assignment_id: assignmentId,
+                basket: target.dataset.basket,
+                dest_position_id: target.dataset.positionId,
+            };
+            Object.keys(fields).forEach(function (name) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = name;
+                input.value = fields[name];
+                input.className = 'dyn';
+                form.appendChild(input);
+            });
+            form.submit();
+        });
+    });
+})();
+</script>

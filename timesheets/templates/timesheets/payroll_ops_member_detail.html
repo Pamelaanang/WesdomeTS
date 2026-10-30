@@ -10,7 +10,7 @@
             {% if member.profilepic %}
             <img src="/media/{{ member.profilepic }}" class="w-full h-full object-cover" alt="">
             {% else %}
-            <i class="fa-solid fa-user text-white text-2xl"></i>
+            <span class="text-white font-bold text-2xl">{{ member.firstname|slice:":1" }}{{ member.lastname|slice:":1" }}</span>
             {% endif %}
         </div>
         <div>

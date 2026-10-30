@@ -1,0 +1,360 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mx-10 space-y-8">
+
+    <div class="container w-full p-4 bg-white rounded-2xl shadow">
+        <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+        <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+        <p class="text-center text-sm text-gray-500 mt-1"><span class="font-semibold text-gray-700">MANAGEMENT:</span> Pick a crew to see its baskets, members, and leaders. Day-to-day moves and cover are on the <a href="{% url 'crew_grid' %}" class="text-[#28348A] hover:underline">Crew Grid</a>.</p>
+        <p class="text-center text-sm font-semibold text-gray-800 mt-3">Six crews, {{ unassigned|length }} unassigned Miner{{ unassigned|length|pluralize }}, {{ pending|length }} pending access</p>
+    </div>
+
+    <!-- Search -->
+    <form method="GET" class="bg-white rounded-2xl shadow p-4 flex flex-wrap items-center gap-3">
+        <input type="search" name="q" value="{{ q }}" placeholder="Search name or ID" class="border rounded-xl px-3 py-2 text-sm w-72">
+        <select name="level" class="border rounded-xl px-3 py-2 text-sm">
+            <option value="">All levels</option>
+            {% for lvl in level_choices %}
+            <option value="{{ lvl.levelcode }}" {% if level == lvl.levelcode %}selected{% endif %}>{% if lvl.levelcode == 'Staff' %}Staff{% else %}Level {{ lvl.levelcode }}{% endif %}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="px-4 py-2 rounded-xl bg-[#28348A] text-white text-sm hover:opacity-90">Search</button>
+        {% if q or level %}<a href="{% url 'crew_management' %}" class="text-sm text-[#28348A] hover:underline">Clear</a>{% endif %}
+        <button type="button" onclick="openAddMiner()" class="ml-auto px-4 py-2 rounded-xl border border-[#28348A] text-[#28348A] text-sm font-semibold hover:bg-indigo-50">+ Add Miner</button>
+    </form>
+
+    {% if results is not None %}
+    <div class="bg-white rounded-2xl shadow p-6">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Results ({{ results|length }})</p>
+        {% if results %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs text-gray-500 border-b">
+                        <th class="py-2 pr-4">Name</th>
+                        <th class="py-2 pr-4">ID</th>
+                        <th class="py-2 pr-4">Level</th>
+                        <th class="py-2">Where</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in results %}
+                    <tr class="border-b">
+                        <td class="py-2 pr-4 text-gray-900">{% if r.url %}<a href="{{ r.url }}" class="text-[#28348A] hover:underline">{{ r.person.firstname }} {{ r.person.lastname }}</a>{% else %}{{ r.person.firstname }} {{ r.person.lastname }}{% endif %}</td>
+                        <td class="py-2 pr-4 text-gray-700">{{ r.person.employeeid }}</td>
+                        <td class="py-2 pr-4 text-gray-700">{{ r.person.minerlevel|default:"—" }}</td>
+                        <td class="py-2 text-gray-700">{{ r.where }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-500">No one matches that search.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Mine Captains -->
+    <section class="mb-4">
+        <p class="text-sm font-semibold text-gray-600 mb-2">Mine Captains</p>
+        <div class="flex flex-wrap gap-2">
+            {% for captain in active_captains %}
+            <button type="button" onclick="openPersonPanel('{{ captain.employeeid }}')" class="bg-[#28348A] text-white text-sm font-semibold px-3 py-1 rounded-full hover:opacity-90">{{ captain.firstname }} {{ captain.lastname }}</button>
+            {% empty %}<span class="text-sm text-gray-400">None</span>{% endfor %}
+        </div>
+    </section>
+
+    <!-- Needs attention -->
+    {% if needs_attention %}
+    <section class="mb-4 bg-amber-50 border border-amber-300 rounded-2xl p-4">
+        <p class="text-sm font-semibold text-amber-700 mb-2"><i class="fa-solid fa-triangle-exclamation"></i> Needs Attention ({{ needs_attention|length }})</p>
+        <ul class="text-sm divide-y divide-amber-200">
+            {% for assignment, reason in needs_attention %}
+            <li class="py-1.5 flex justify-between gap-3">
+                <span class="text-gray-900">{{ assignment.employee.firstname }} {{ assignment.employee.lastname }} <span class="text-xs text-gray-500">{{ assignment.employee.employeeid }}</span></span>
+                <span class="text-xs text-amber-800 text-right">{{ reason }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+    <!-- Crew cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {% for card in crew_cards %}
+        {% if card.exists %}<a href="{% url 'crew_management_crew' card.name %}" class="block bg-white rounded-2xl shadow p-6 hover:shadow-lg transition">{% else %}<div class="bg-white rounded-2xl shadow p-6 opacity-60">{% endif %}
+            <div class="flex items-start justify-between mb-4">
+                <div>
+                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Crew</p>
+                    <p class="text-3xl font-bold text-[#28348A]">{{ card.name }}</p>
+                </div>
+                <div class="text-right text-xs text-gray-500">
+                    <p><span class="font-semibold text-gray-800">{{ card.total_members }}</span> member{{ card.total_members|pluralize }}</p>
+                    {% if card.pending_leaders %}<p class="text-amber-700 font-semibold">{{ card.pending_leaders }} leader{{ card.pending_leaders|pluralize }} pending IT access</p>{% endif %}
+                    {% if card.leaderless %}<p class="text-amber-700 font-semibold">{{ card.leaderless }} basket{{ card.leaderless|pluralize }} without a leader</p>{% endif %}
+                </div>
+            </div>
+
+            {% if not card.exists %}
+            <p class="text-sm text-gray-400">This crew is not set up yet.</p>
+            {% else %}
+            <div class="space-y-3">
+                {% for basket in card.baskets %}
+                <div class="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-800">{{ basket.section }}</p>
+                        {% if basket.leader %}
+                        <p class="text-xs text-gray-500">{{ basket.leader.firstname }} {{ basket.leader.lastname }}{% if basket.leader.minerlevel %} · Lvl {{ basket.leader.minerlevel }}{% endif %}</p>
+                        {% else %}
+                        {% if basket.pending_leader %}
+                        <p class="text-xs text-amber-700 font-semibold">Leader awaiting IT access</p>
+                        {% else %}
+                        <p class="text-xs text-amber-700 font-semibold">No leader</p>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                    <p class="text-sm text-gray-600">{{ basket.members }} member{{ basket.members|pluralize }}</p>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% if card.exists %}</a>{% else %}</div>{% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- Unassigned Miners -->
+    <details class="bg-white rounded-2xl shadow p-6">
+        <summary class="cursor-pointer text-sm font-semibold text-gray-700">Unassigned ({{ unassigned|length }})</summary>
+        <div class="mt-4">
+            {% if unassigned %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-xs text-gray-500 border-b">
+                            <th class="py-2 pr-4">Name</th>
+                            <th class="py-2 pr-4">ID</th>
+                            <th class="py-2 pr-4">Role</th>
+                            <th class="py-2 pr-4">Level</th>
+                            <th class="py-2 pr-4">Contract</th>
+                            <th class="py-2"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in unassigned %}
+                        <tr class="border-b">
+                            <td class="py-2 pr-4 text-gray-900">{{ m.firstname }} {{ m.lastname }}</td>
+                            <td class="py-2 pr-4 text-gray-700">{{ m.employeeid }}</td>
+                            <td class="py-2 pr-4 text-gray-700">{{ m.roleid.rolename }}</td>
+                            <td class="py-2 pr-4 text-gray-700">{{ m.minerlevel|default:"—" }}</td>
+                            <td class="py-2 pr-4 text-gray-700">{{ m.contractid.contractcode|default:"—" }}</td>
+                            <td class="py-2"><button type="button" data-grid-open="openLevel" data-employee-id="{{ m.employeeid }}" data-employee-name="{{ m.firstname }} {{ m.lastname }}" data-minerlevel="{{ m.minerlevel_id|default_if_none:'' }}" data-contractid="{{ m.contractid_id|default:'' }}" class="px-2 py-1 rounded-lg border border-gray-300 hover:bg-gray-50 text-xs">Edit level</button>
+                                <button type="button" onclick="openAssignPerson('{{ m.employeeid|escapejs }}', '{{ m.firstname|escapejs }} {{ m.lastname|escapejs }}', {% if m.roleid.accessid.accessid == 5 %}true{% else %}false{% endif %})" class="px-2 py-1 rounded-lg bg-[#28348A] text-white hover:opacity-90 text-xs">Assign</button></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-500">Everyone is placed in a basket.</p>
+            {% endif %}
+        </div>
+    </details>
+
+    <!-- Pending IT access -->
+    <details class="bg-white rounded-2xl shadow p-6">
+        <summary class="cursor-pointer text-sm font-semibold text-gray-700">Pending System Access ({{ pending|length }})</summary>
+        <div class="mt-4">
+            {% if pending %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-xs text-gray-500 border-b">
+                            <th class="py-2 pr-4">Name</th>
+                            <th class="py-2 pr-4">ID</th>
+                            <th class="py-2 pr-4">Role</th>
+                            <th class="py-2 pr-4">Crew</th>
+                            <th class="py-2 pr-4">Discipline</th>
+                            <th class="py-2">Added by</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in pending %}
+                        <tr class="border-b">
+                            <td class="py-2 pr-4 text-gray-900">{{ p.firstname }} {{ p.lastname }}</td>
+                            <td class="py-2 pr-4 text-gray-700">{{ p.employeeid }}</td>
+                            <td class="py-2 pr-4 text-gray-700">{{ p.roleid.rolename }}</td>
+                            <td class="py-2 pr-4 text-gray-700">{% if p.home_basket %}{{ p.home_basket.unit_name }}{% else %}<span class="text-gray-400">—</span>{% endif %}</td>
+                            <td class="py-2 pr-4 text-gray-700">{{ p.home_basket.discipline.name|default:'<span class="text-gray-400">—</span>'|safe }}</td>
+                            <td class="py-2 text-gray-700">{% if p.onboarding_requested_by %}{{ p.onboarding_requested_by.firstname }} {{ p.onboarding_requested_by.lastname }}{% else %}—{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-500">Nobody is waiting for system access.</p>
+            {% endif %}
+        </div>
+    </details>
+
+</div>
+
+<!-- Assign an unplaced person to a basket -->
+<div id="assign-person-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-5">
+        <div class="flex items-center justify-between mb-3">
+            <p id="assign-person-title" class="text-sm font-semibold text-gray-700">Assign</p>
+            <button type="button" onclick="closeGridModal('assign-person-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="POST" action="{% url 'crew_management' %}" class="flex flex-col gap-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="assign_unassigned">
+            <input type="hidden" name="employee_id" id="assign-person-employee">
+            <label class="flex flex-col gap-1 text-xs text-gray-500">Crew and discipline
+                <select name="basket" id="assign-person-basket" required class="border rounded px-2 py-1.5 text-sm">
+                    <option value="">-- Choose --</option>
+                    {% for b in basket_choices %}
+                    <option value="{{ b.value }}" data-section="{{ b.section }}">{{ b.label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label id="assign-person-position-wrap" class="flex flex-col gap-1 text-xs text-gray-500">Position
+                <select name="position" id="assign-person-position" class="border rounded px-2 py-1.5 text-sm">
+                    <option value="">-- Choose a crew and discipline first --</option>
+                </select>
+            </label>
+            <label class="flex flex-col gap-1 text-xs text-gray-500">Start date
+                <input type="date" name="startdate" id="assign-person-startdate" class="border rounded px-2 py-1.5 text-sm">
+            </label>
+            <p id="assign-person-note" class="text-xs text-gray-500"></p>
+            <button type="submit" class="self-end bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Assign</button>
+        </form>
+    </div>
+</div>
+
+
+
+<!-- Add a hired Miner (no system access; IT is not involved at hire) -->
+<div id="add-miner-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-5">
+        <div class="flex items-center justify-between mb-3">
+            <p class="text-sm font-semibold text-gray-700">Add a Miner</p>
+            <button type="button" onclick="closeGridModal('add-miner-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="POST" action="{% url 'crew_management' %}" class="flex flex-col gap-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_miner">
+            <div class="grid grid-cols-2 gap-3">
+                <label class="flex flex-col gap-1 text-xs text-gray-500"><span>Employee ID (from HR)</span>
+                    <input name="employee_id" required autocomplete="off" class="border rounded px-2 py-1.5 text-sm">
+                </label>
+                <label class="flex flex-col gap-1 text-xs text-gray-500"><span>Phone <span class="text-gray-400">(optional)</span></span>
+                    <input name="phonenumber" autocomplete="off" class="border rounded px-2 py-1.5 text-sm">
+                </label>
+                <label class="flex flex-col gap-1 text-xs text-gray-500">First name
+                    <input name="firstname" required class="border rounded px-2 py-1.5 text-sm">
+                </label>
+                <label class="flex flex-col gap-1 text-xs text-gray-500">Last name
+                    <input name="lastname" required class="border rounded px-2 py-1.5 text-sm">
+                </label>
+            </div>
+            <label class="flex flex-col gap-1 text-xs text-gray-500">Miner level
+                <select name="minerlevel" id="add-miner-level" required class="border rounded px-2 py-1.5 text-sm">
+                    <option value="">-- Choose a level --</option>
+                    {% for value, label in minerlevel_choices %}{% if label != 'Staff' %}<option value="{{ value }}">Level {{ label }}</option>{% endif %}{% endfor %}
+                </select>
+            </label>
+            <label class="flex flex-col gap-1 text-xs text-gray-500">Contract
+                <select name="contractid" id="add-miner-contract" required disabled class="border rounded px-2 py-1.5 text-sm">
+                    <option value="">-- Choose a level first --</option>
+                </select>
+            </label>
+            <p class="text-xs text-gray-500">Employment is set to Contract. They have no login until they're promoted or covering.</p>
+            <button type="submit" class="self-end bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Add Miner</button>
+        </form>
+    </div>
+</div>
+
+{% include 'users/_grid_action_modals.html' %}
+{% include 'users/_grid_action_scripts.html' %}
+{% include 'users/_person_panel.html' %}
+
+<script>
+    const addMinerContracts = JSON.parse(document.getElementById('contracts-for-modal-data').textContent);
+    const addMinerLevel = document.getElementById('add-miner-level');
+    const addMinerContract = document.getElementById('add-miner-contract');
+
+    function fillAddMinerContracts() {
+        const items = addMinerLevel.value ? (addMinerContracts[addMinerLevel.value] || []) : [];
+        addMinerContract.innerHTML = '';
+        const first = document.createElement('option');
+        first.value = '';
+        first.textContent = addMinerLevel.value ? (items.length ? '-- Choose a contract --' : 'No contract offered at this level') : '-- Choose a level first --';
+        addMinerContract.appendChild(first);
+        items.forEach(function (c) {
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.label;
+            addMinerContract.appendChild(opt);
+        });
+        addMinerContract.disabled = !addMinerLevel.value;
+    }
+    addMinerLevel.addEventListener('change', fillAddMinerContracts);
+
+    function openAddMiner() {
+        addMinerLevel.value = '';
+        fillAddMinerContracts();
+        document.getElementById('add-miner-modal').classList.remove('hidden');
+    }
+    window.openAddMiner = openAddMiner;
+</script>
+
+<script>
+    const assignPositions = JSON.parse(document.getElementById('positions-for-modal-data').textContent);
+    const assignBasket = document.getElementById('assign-person-basket');
+
+    function fillAssignPositions() {
+        const select = document.getElementById('assign-person-position');
+        const section = assignBasket.selectedOptions[0] ? assignBasket.selectedOptions[0].dataset.section : '';
+        select.innerHTML = '';
+        const first = document.createElement('option');
+        first.value = '';
+        first.textContent = section ? '-- Choose a position --' : '-- Choose a crew and discipline first --';
+        select.appendChild(first);
+        (section ? (assignPositions[section] || []) : []).forEach(function (p) {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name;
+            select.appendChild(opt);
+        });
+    }
+    assignBasket.addEventListener('change', fillAssignPositions);
+
+    function openAssignPerson(employeeId, name, isShifter) {
+        document.getElementById('assign-person-employee').value = employeeId;
+        document.getElementById('assign-person-title').textContent = 'Assign ' + name;
+        document.getElementById('assign-person-startdate').value = new Date().toISOString().slice(0, 10);
+        assignBasket.value = '';
+        const posWrap = document.getElementById('assign-person-position-wrap');
+        const posSelect = document.getElementById('assign-person-position');
+        posWrap.classList.toggle('hidden', isShifter);
+        posSelect.required = !isShifter;
+        document.getElementById('assign-person-note').textContent = isShifter
+            ? 'A Shift Coordinator becomes the leader of the basket chosen. The basket must have no leader yet.'
+            : 'The Miner joins the basket with the position chosen. If the basket has a leader, they take the Miner onto their roster.';
+        fillAssignPositions();
+        document.getElementById('assign-person-modal').classList.remove('hidden');
+    }
+    window.openAssignPerson = openAssignPerson;
+</script>
+
+
+<script>
+    // Unassigned rows name the Crew Grid opener they use (data-grid-open).
+    document.querySelectorAll('[data-grid-open]').forEach(function (btn) {
+        btn.addEventListener('click', function () { window[btn.dataset.gridOpen](btn); });
+    });
+</script>
+{% endblock %}

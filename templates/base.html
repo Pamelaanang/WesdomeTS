@@ -31,18 +31,14 @@
 
             <!-- System Admin (1) only -->
             {% if al == 1 %}
-            <a href="{% url 'user_list' %}"
-                class="flex items-center gap-3 {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}"><i
-                    class="fa-solid fa-users-gear"></i> User Management</a>
-            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-file-lines"></i> All Timesheets</a>
-            {# Reports: future work #}
-            {# <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-chart-bar"></i> Reports</a> #}
-            <a href="{% url 'audit_log' %}"
-                class="flex items-center gap-3 {% if request.resolver_match.url_name == 'audit_log' %}active{% endif %}"><i
-                    class="fa-solid fa-clipboard-list"></i> Audit Log</a>
-            <a href="{% url 'settings_page' %}"
-                class="flex items-center gap-3 {% if request.resolver_match.url_name == 'settings_page' %}active{% endif %}"><i
-                    class="fa-solid fa-gear"></i> Settings</a>
+            <button onclick="toggleAccordion('menu-users')" class="accordion-btn">
+                <span class="flex items-center gap-3"><i class="fa-solid fa-users-gear"></i> Users</span>
+                <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
+            </button>
+            <div id="menu-users" class="hidden flex flex-col">
+                <a href="{% url 'user_list' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'user_list' %}font-semibold{% endif %}"><i class="fa-solid fa-users"></i> User Management</a>
+                <a href="{% url 'pending_onboarding' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'pending_onboarding' %}font-semibold{% endif %}"><i class="fa-solid fa-user-clock"></i> IT Onboarding</a>
+            </div>
             {% endif %}
 
             <!-- My Employees accordion: Superintendent (2) and Supervisor (3) -->
@@ -88,17 +84,39 @@
                 <a href="{% url 'superintendent_ops_members' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'superintendent_ops_members,superintendent_ops_member_detail,superintendent_ops_member_month' %}font-semibold{% endif %}">
                     <i class="fa-solid fa-star"></i> Crew History & Bonuses</a>
             </div>
+            {% endif %}
+
+            <!-- Management: Superintendent (2) and System Admin (1) get full access to the crew pages -->
+            {% if al == 1 or al == 2 %}
             <button onclick="toggleAccordion('menu-management')" class="accordion-btn">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-screwdriver-wrench"></i> Management</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-management" class="hidden flex flex-col">
+                <a href="{% url 'crew_management' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'crew_management' or request.resolver_match.url_name == 'crew_management_crew' or request.resolver_match.url_name == 'crew_management_basket' %}font-semibold{% endif %}"><i class="fa-solid fa-sitemap"></i> Crew Management</a>
                 <a href="{% url 'crew_grid' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'crew_grid' %}font-semibold{% endif %}"><i class="fa-solid fa-table-cells"></i> Crew Grid</a>
-                <a href="{% url 'crew_assignments' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-people-group"></i> Shifter & Miner Management</a>
-                <a href="{% url 'position_catalog' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'position_catalog' %}font-semibold{% endif %}"><i class="fa-solid fa-list-check"></i> Position Catalog</a>
-                <a href="{% url 'crew_coverage' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'crew_coverage' %}font-semibold{% endif %}"><i class="fa-solid fa-arrows-rotate"></i> Crew Coverage</a>
+                <a href="{% url 'position_catalog' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'position_catalog' %}font-semibold{% endif %}"><i class="fa-solid fa-list-check"></i> Position Management</a>
+                {% if al == 2 %}
                 <a href="{% url 'contract_account_management' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-link"></i> Contract-Cost Center</a>
+                {% endif %}
             </div>
+            {% endif %}
+
+            <!-- System Trail: System Admin (1) only -->
+            {% if al == 1 %}
+            <button onclick="toggleAccordion('menu-trail')" class="accordion-btn">
+                <span class="flex items-center gap-3"><i class="fa-solid fa-shoe-prints"></i> System Trail</span>
+                <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
+            </button>
+            <div id="menu-trail" class="hidden flex flex-col">
+                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-file-lines"></i> All Timesheets</a>
+                {# Reports: future work #}
+                {# <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-chart-bar"></i> Reports</a> #}
+                <a href="{% url 'audit_log' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'audit_log' %}font-semibold{% endif %}"><i class="fa-solid fa-clipboard-list"></i> Audit Log</a>
+            </div>
+            <a href="{% url 'settings_page' %}"
+                class="flex items-center gap-3 {% if request.resolver_match.url_name == 'settings_page' %}active{% endif %}"><i
+                    class="fa-solid fa-gear"></i> Settings</a>
             {% endif %}
 
             <!-- Mine Captain (4): My Shifters and Daily Timesheets for daily approval -->
@@ -124,7 +142,6 @@
                 <a href="{% url 'my_ops_completed' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_ops_completed,my_ops_completed_month,my_ops_completed_day,my_ops_completed_shift' %}font-semibold{% endif %}">
                     <i class="fa-solid fa-circle-check"></i> Completed Sheets</a>
             </div>
-            <a href="{% url 'crew_coverage' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'crew_coverage' %}font-semibold{% endif %}"><i class="fa-solid fa-arrows-rotate"></i> Crew Coverage</a>
             {% endif %}
 
             <!-- Shifter (5): daily sheets and personal timesheets -->
@@ -225,7 +242,7 @@
                     <img src="/media/{{ request.user.profilepic }}" class="w-full h-full object-cover"
                         alt="Profile Photo">
                     {% else %}
-                    <i class="fa-solid fa-user text-[3rem] text-white"></i>
+                    <span class="text-white font-bold text-[3rem]">{{ request.user.firstname|slice:":1" }}{{ request.user.lastname|slice:":1" }}</span>
                     {% endif %}
                 </div></a> 
             </div>

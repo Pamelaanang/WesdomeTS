@@ -83,6 +83,18 @@ class User(AbstractBaseUser, PermissionsMixin):
     isactive = models.BooleanField(db_column='IsActive')
     hasaccess = models.BooleanField(db_column='HasAccess', default=True)
 
+    #Superintendent-added hires awaiting IT system access. Null for everyone else.
+    ONBOARDING_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('activated', 'Activated'),
+        ('rejected', 'Rejected'),
+    ]
+    onboarding_status = models.CharField(max_length=10, choices=ONBOARDING_STATUS_CHOICES, blank=True, null=True)
+    onboarding_requested_by = models.ForeignKey('self', models.SET_NULL, blank=True, null=True, related_name='onboarding_requests')
+    onboarding_requested_on = models.DateField(blank=True, null=True)
+    onboarding_resolved_by = models.ForeignKey('self', models.SET_NULL, blank=True, null=True, related_name='onboarding_resolutions')
+    onboarding_resolved_on = models.DateField(blank=True, null=True)
+
     #Foreign key to roles table
     roleid = models.ForeignKey('Roles', models.DO_NOTHING, db_column='RoleID')  # Field name made lowercase.
 
@@ -106,6 +118,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         ('Logistics', 'Logistics'),
     ]
     shiftertype = models.CharField(db_column='ShifterType', max_length=20, choices=SHIFTER_TYPE_CHOICES, blank=True, null=True)
+    discipline = models.ForeignKey('timesheets.Discipline', models.PROTECT, db_column='DisciplineID', blank=True, null=True)
 
     #Home crew (A/B/C/D) for Shifters — fixed while active, independent of CrewAssignment roster membership
     crewid = models.ForeignKey('timesheets.Crews', models.SET_NULL, db_column='CrewID', blank=True, null=True, related_name='shifters')
@@ -113,15 +126,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     #Full Miner (al=8) seniority scale, independent of Spare Shifter eligibility —
     #only Lead/1/2 are ever offered as Spare Shifter candidates (see crew_coverage
     #view); Levels 3/4 are recorded here but never promoted. Null means unclassified.
-    MINER_LEVEL_CHOICES = [
-        ('Staff', 'Staff'),
-        ('Lead', 'Lead'),
-        ('1', '1'),
-        ('2', '2'),
-        ('3', '3'),
-        ('4', '4'),
-    ]
-    minerlevel = models.CharField(db_column='MinerLevel', max_length=6, choices=MINER_LEVEL_CHOICES, blank=True, null=True)
+    #Foreign key to the MinerLevel table (rows: Staff, Lead, 1, 2, 3, 4). Use
+    #minerlevel.levelcode when the text is needed.
+    minerlevel = models.ForeignKey('timesheets.MinerLevel', db_column='MinerLevelID', on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
 
     #HR/payroll classification — Staff vs Contract labor. Contract cost is charged to
     #a designated contract/account for reporting, separate from per-entry billing.
@@ -156,19 +163,26 @@ class User(AbstractBaseUser, PermissionsMixin):
         return None
 
     def get_active_baskets(self):
-        """Every distinct (crewid, shiftertype) basket this Shifter currently
-        operates — their home basket (crewid/shiftertype on their own record)
-        plus any other basket picked up via active CrewAssignment rows (e.g.
-        temporarily covering a second basket). Almost always just the one
-        home basket. Shared by crew_assignment_detail and new_ops_sheet so
-        both agree on what "my baskets" means."""
+        """Every (crew, discipline) basket this Shifter currently runs, read from the
+        basket table: their home basket and any second-basket lead, plus any basket
+        they hold active seats in (e.g. temporarily covering a second basket).
+        Shared by crew_assignment_detail and new_ops_sheet so both agree on what
+        "my baskets" means."""
+        from timesheets.models import BasketShifter
         baskets = {}
-        if self.crewid_id and self.shiftertype:
-            baskets[(self.crewid_id, self.shiftertype)] = (self.crewid, self.shiftertype)
-        for a in self.crew_led.filter(enddate__isnull=True).select_related('crewid'):
-            if a.crewid_id and a.shiftertype:
-                baskets[(a.crewid_id, a.shiftertype)] = (a.crewid, a.shiftertype)
-        return sorted(baskets.values(), key=lambda b: (b[0].crewname, b[1]))
+        for row in BasketShifter.objects.filter(shifter=self, enddate__isnull=True).select_related('basket__crew', 'basket__group', 'basket__discipline'):
+            baskets[row.basket_id] = row.basket
+        for a in self.crew_led.filter(enddate__isnull=True, basket__isnull=False).select_related('basket__crew', 'basket__group', 'basket__discipline'):
+            baskets[a.basket_id] = a.basket
+        pairs = [(b.crew_row, b.discipline.name) for b in baskets.values() if b.crew_row is not None]
+        return sorted(pairs, key=lambda b: (b[0].crewname, b[1]))
+
+    @property
+    def home_basket(self):
+        # The basket this shifter is home in (active, or pending IT access), or None.
+        from timesheets.models import BasketShifter
+        row = BasketShifter.objects.filter(shifter=self, is_home=True, enddate__isnull=True).select_related('basket__crew', 'basket__group', 'basket__discipline').first()
+        return row.basket if row else None
 
     @property
     def has_maintenance_reports(self):
@@ -209,6 +223,9 @@ class Position(models.Model):
     #and get sorted into a discipline gradually by the Superintendent via the
     #Position Catalog page, rather than all at once in a migration.
     shiftertype = models.CharField(db_column='ShifterType', max_length=20, choices=User.SHIFTER_TYPE_CHOICES, blank=True, null=True)
+    discipline = models.ForeignKey('timesheets.Discipline', models.PROTECT, db_column='DisciplineID', blank=True, null=True)
+    # Row order within the position's discipline on the grid (lower first), shared by every crew.
+    sortorder = models.IntegerField(db_column='SortOrder', default=0)
 
     class Meta:
         managed = True
@@ -222,7 +239,7 @@ class Position(models.Model):
 class CrewCoverage(models.Model):
     coverageid = models.AutoField(db_column='CoverageID', primary_key=True)
     covering_shifter = models.ForeignKey('User', models.DO_NOTHING, db_column='CoveringShifterID', related_name='coverages_covering')
-    home_shifter = models.ForeignKey('User', models.DO_NOTHING, db_column='HomeShifterID', related_name='coverages_home')
+    home_shifter = models.ForeignKey('User', models.DO_NOTHING, db_column='HomeShifterID', related_name='coverages_home', blank=True, null=True)
 
     #Which basket this covers — recorded explicitly rather than derived from
     #home_shifter's own crewid/shiftertype at end time, since a shifter can
@@ -231,6 +248,8 @@ class CrewCoverage(models.Model):
     #in for. Nullable only because historical rows predate this field.
     crewid = models.ForeignKey('timesheets.Crews', models.SET_NULL, db_column='CrewID', blank=True, null=True)
     shiftertype = models.CharField(db_column='ShifterType', max_length=20, choices=User.SHIFTER_TYPE_CHOICES, blank=True, null=True)
+    discipline = models.ForeignKey('timesheets.Discipline', models.PROTECT, db_column='DisciplineID', blank=True, null=True)
+    basket = models.ForeignKey('timesheets.UnitDiscipline', models.PROTECT, db_column='BasketID', blank=True, null=True, related_name='coverages')
 
     startdate = models.DateField(db_column='StartDate')
     enddate = models.DateField(db_column='EndDate', blank=True, null=True)
@@ -245,6 +264,28 @@ class CrewCoverage(models.Model):
 
     def __str__(self):
         return f"{self.covering_shifter} covering {self.home_shifter}"
+
+    @property
+    def home_label(self):
+        if self.home_shifter:
+            return f'{self.home_shifter.firstname} {self.home_shifter.lastname}'
+        return 'vacant basket'
+
+    @property
+    def home_is_live(self):
+        return bool(self.home_shifter and self.home_shifter.isactive and self.home_shifter.access_level == 5)
+
+    @property
+    def basket_crew(self):
+        if self.crewid_id:
+            return self.crewid
+        return self.home_shifter.crewid if self.home_shifter else None
+
+    @property
+    def basket_shiftertype(self):
+        if self.shiftertype:
+            return self.shiftertype
+        return self.home_shifter.shiftertype if self.home_shifter else None
 
     @property
     def is_active(self):
@@ -274,7 +315,51 @@ class CrewAssignment(models.Model):
     #picks directly. Nullable only so existing rows can be backfilled.
     crewid = models.ForeignKey('timesheets.Crews', models.SET_NULL, db_column='CrewID', blank=True, null=True)
     shiftertype = models.CharField(db_column='ShifterType', max_length=20, choices=User.SHIFTER_TYPE_CHOICES, blank=True, null=True)
+    discipline = models.ForeignKey('timesheets.Discipline', models.PROTECT, db_column='DisciplineID', blank=True, null=True)
+
+    #Grid-display-only — lets this one row's cell visually merge into a
+    #joint crew's column (e.g. a Production position covering both Crew A
+    #and Crew B) without changing which basket it actually belongs to for
+    #every other purpose. crewid/shiftertype above stay canonical and keep
+    #driving Ops Sheet derivation, Coverage, Transfer, Demote, etc.,
+    #completely unchanged — nothing outside crew_grid ever reads this field.
+    #Expected values are the real "AB"/"CD" Crews rows only, never a new pairing.
+
+    #The basket (unit + discipline) this seat sits in. Position's discipline must match it.
+    basket = models.ForeignKey('timesheets.UnitDiscipline', models.PROTECT, db_column='BasketID', blank=True, null=True, related_name='assignments')
+
+    #Database guard: one active assignment per person. Set to the employee while
+    #the assignment is open, empty once it ends, so a second open seat is refused.
+    active_employee_key = models.CharField(db_column='ActiveEmployeeKey', max_length=20, unique=True, null=True, blank=True, editable=False)
+
+
+    # The other crew this seat also covers, as a basket for the same discipline. Empty when
+    # the seat covers only its primary basket. The crew rules come from the unit links.
+    also_covers_basket = models.ForeignKey('timesheets.UnitDiscipline', models.PROTECT, db_column='AlsoCoversBasketID', blank=True, null=True, related_name='also_covering_seats')
+
+    def save(self, *args, **kwargs):
+        self.active_employee_key = None if self.enddate else str(self.employee_id)
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None and 'active_employee_key' not in update_fields:
+            kwargs['update_fields'] = list(update_fields) + ['active_employee_key']
+        super().save(*args, **kwargs)
 
     class Meta:
         managed = True
         db_table = 'CrewAssignment'
+
+class BasketLead(models.Model):
+    """A shifter leading a basket they don't call home — recorded even when the
+    basket has no members yet, so an empty second basket still has a leader."""
+    basketleadid = models.AutoField(primary_key=True)
+    shifter = models.ForeignKey('User', models.DO_NOTHING, related_name='basket_leads')
+    crewid = models.ForeignKey('timesheets.Crews', models.DO_NOTHING)
+    shiftertype = models.CharField(max_length=20, choices=User.SHIFTER_TYPE_CHOICES)
+    discipline = models.ForeignKey('timesheets.Discipline', models.PROTECT, db_column='DisciplineID', blank=True, null=True)
+    basket = models.ForeignKey('timesheets.UnitDiscipline', models.PROTECT, db_column='BasketID', blank=True, null=True, related_name='lead_records')
+    startdate = models.DateField()
+    enddate = models.DateField(blank=True, null=True)
+
+    class Meta:
+        managed = True
+        db_table = 'BasketLead'

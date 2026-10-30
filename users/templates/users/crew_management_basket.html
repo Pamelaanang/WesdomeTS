@@ -1,0 +1,315 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mx-10 space-y-6">
+
+    <div class="container w-full p-4 bg-white rounded-2xl shadow">
+        <a href="{% url 'crew_management_crew' crew.crewname %}" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline mb-2">
+            <i class="fa-solid fa-arrow-left"></i> Crew {{ crew.crewname }}
+        </a>
+        <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+        <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+        <p class="text-center text-sm text-gray-500 mt-1"><span class="font-semibold text-gray-700">MANAGEMENT:</span> Manage this basket's shifter and members. Add or remove members here. Transfers, cover, demotions, replacements and promotions are on the Crew Grid.</p>
+        <p class="text-center text-sm font-semibold text-gray-800 mt-3">
+            Crew {{ crew.crewname }} {{ section }} · {{ members|length }} member{{ members|length|pluralize }}
+            {% if leader %} · Led by {{ leader.firstname }} {{ leader.lastname }}{% endif %}
+        </p>
+    </div>
+
+    <!-- Shifter row -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-white rounded-2xl shadow overflow-hidden {% if not covering_here %}lg:col-span-2{% endif %}">
+            {% if leader %}
+            <div class="h-2 bg-gradient-to-r from-[#28348A] to-indigo-400"></div>
+            <div class="p-6">
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 rounded-full overflow-hidden shrink-0 ring-4 ring-indigo-100 bg-[#28348A] text-white flex items-center justify-center text-lg font-bold">
+                        {% if leader.profilepic %}<img src="/media/{{ leader.profilepic }}" class="w-full h-full object-cover" alt="">{% else %}{{ leader.firstname|slice:":1" }}{{ leader.lastname|slice:":1" }}{% endif %}
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-xs font-semibold text-[#28348A] uppercase tracking-wide">Shifter</p>
+                        <p class="text-lg font-bold text-gray-900 truncate">{{ leader.firstname }} {{ leader.lastname }}</p>
+                        <p class="text-xs text-gray-500">{{ leader.employeeid }}</p>
+                    </div>
+                </div>
+                <div class="mt-5 grid grid-cols-2 xl:grid-cols-4 gap-3">
+                    <div class="rounded-xl bg-indigo-50 px-3 py-2">
+                        <p class="text-[10px] uppercase tracking-wide text-gray-400">Crew</p>
+                        <p class="text-sm font-semibold text-gray-800">{{ crew.crewname }}</p>
+                    </div>
+                    <div class="rounded-xl bg-indigo-50 px-3 py-2">
+                        <p class="text-[10px] uppercase tracking-wide text-gray-400">Section</p>
+                        <p class="text-sm font-semibold text-gray-800 break-words">{{ section }}</p>
+                    </div>
+                    <div class="rounded-xl bg-indigo-50 px-3 py-2">
+                        <p class="text-[10px] uppercase tracking-wide text-gray-400">Level</p>
+                        <p class="text-sm font-semibold text-gray-800 break-words">{{ leader.minerlevel|default:"—" }}</p>
+                    </div>
+                    <div class="rounded-xl bg-indigo-50 px-3 py-2">
+                        <p class="text-[10px] uppercase tracking-wide text-gray-400">Members</p>
+                        <p class="text-sm font-semibold text-gray-800">{{ members|length }}</p>
+                    </div>
+                </div>
+            </div>
+            {% elif pending_leader %}
+            <div class="h-2 bg-gradient-to-r from-gray-300 to-gray-200"></div>
+            <div class="p-6 opacity-60">
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 rounded-full overflow-hidden shrink-0 ring-4 ring-gray-100 bg-gray-300 text-gray-600 flex items-center justify-center text-lg font-bold">
+                        {{ pending_leader.firstname|slice:":1" }}{{ pending_leader.lastname|slice:":1" }}
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Shifter</p>
+                        <p class="text-lg font-bold text-gray-700 truncate">{{ pending_leader.firstname }} {{ pending_leader.lastname }}</p>
+                        <p class="text-xs text-gray-500">{{ pending_leader.employeeid }}</p>
+                    </div>
+                </div>
+                <div class="mt-5 grid grid-cols-2 xl:grid-cols-4 gap-3">
+                    <div class="rounded-xl bg-gray-100 px-3 py-2">
+                        <p class="text-[10px] uppercase tracking-wide text-gray-400">Crew</p>
+                        <p class="text-sm font-semibold text-gray-700">{{ crew.crewname }}</p>
+                    </div>
+                    <div class="rounded-xl bg-gray-100 px-3 py-2">
+                        <p class="text-[10px] uppercase tracking-wide text-gray-400">Section</p>
+                        <p class="text-sm font-semibold text-gray-700 break-words">{{ section }}</p>
+                    </div>
+                    <div class="rounded-xl bg-gray-100 px-3 py-2">
+                        <p class="text-[10px] uppercase tracking-wide text-gray-400">Level</p>
+                        <p class="text-sm font-semibold text-gray-700">{{ pending_leader.minerlevel|default:"—" }}</p>
+                    </div>
+                    <div class="rounded-xl bg-gray-100 px-3 py-2">
+                        <p class="text-[10px] uppercase tracking-wide text-gray-400">Members</p>
+                        <p class="text-sm font-semibold text-gray-700">{{ members|length }}</p>
+                    </div>
+                </div>
+                <p class="mt-4 text-xs font-semibold text-amber-700">Awaiting IT access. IT activates them from IT Onboarding, then they take this basket.</p>
+            </div>
+            {% else %}
+            <div class="h-2 bg-gradient-to-r from-amber-500 to-amber-300"></div>
+            <div class="p-6">
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 rounded-full shrink-0 ring-4 ring-amber-100 bg-gray-200 text-gray-500 flex items-center justify-center text-2xl font-bold">?</div>
+                    <div class="min-w-0">
+                        <p class="text-xs font-semibold text-amber-700 uppercase tracking-wide">Shifter</p>
+                        <p class="text-lg font-bold text-amber-700">No leader</p>
+                        <p class="text-xs text-gray-500">Assign one from the basket actions</p>
+                    </div>
+                </div>
+                <div class="mt-5 grid grid-cols-2 xl:grid-cols-4 gap-3">
+                    <div class="rounded-xl bg-amber-50 px-3 py-2">
+                        <p class="text-[10px] uppercase tracking-wide text-gray-400">Crew</p>
+                        <p class="text-sm font-semibold text-gray-800">{{ crew.crewname }}</p>
+                    </div>
+                    <div class="rounded-xl bg-amber-50 px-3 py-2">
+                        <p class="text-[10px] uppercase tracking-wide text-gray-400">Section</p>
+                        <p class="text-sm font-semibold text-gray-800 break-words">{{ section }}</p>
+                    </div>
+                    <div class="rounded-xl bg-amber-50 px-3 py-2">
+                        <p class="text-[10px] uppercase tracking-wide text-gray-400">Level</p>
+                        <p class="text-sm font-semibold text-gray-800">—</p>
+                    </div>
+                    <div class="rounded-xl bg-amber-50 px-3 py-2">
+                        <p class="text-[10px] uppercase tracking-wide text-gray-400">Members</p>
+                        <p class="text-sm font-semibold text-gray-800">{{ members|length }}</p>
+                    </div>
+                </div>
+                <p class="mt-4 text-xs text-gray-500">Members can be added now. Removing, replacing, and moving them needs a leader.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if covering_here %}
+        {% with cover=covering_here.covering_shifter %}
+        <div class="bg-white rounded-2xl shadow p-6 border-2 border-amber-300">
+            <div class="flex items-start gap-4">
+                <div class="w-16 h-16 rounded-full overflow-hidden shrink-0 bg-amber-500 text-white flex items-center justify-center text-lg font-bold">
+                    {% if cover.profilepic %}<img src="/media/{{ cover.profilepic }}" class="w-full h-full object-cover" alt="">{% else %}{{ cover.firstname|slice:":1" }}{{ cover.lastname|slice:":1" }}{% endif %}
+                </div>
+                <div class="flex-1">
+                    <p class="text-xs font-semibold text-amber-700 uppercase tracking-wide">Covering</p>
+                    <p class="text-lg font-bold text-gray-900">{{ cover.firstname }} {{ cover.lastname }}</p>
+                    <p class="text-xs text-gray-500">{{ cover.employeeid }} · since {{ covering_here.startdate|date:"M j, Y" }}</p>
+                    <p class="text-xs text-gray-500 mt-1">Covering for {% if leader %}{{ leader.firstname }} {{ leader.lastname }}{% else %}the vacant basket{% endif %}</p>
+                </div>
+            </div>
+            <button type="button" class="mt-4 w-full text-center text-sm px-3 py-2 rounded-xl border border-amber-400 text-amber-800 hover:bg-amber-50" data-grid-open="openEndCoverage" data-coverage-id="{{ covering_here.coverageid }}" data-covering-name="{{ cover.firstname }} {{ cover.lastname }}" data-home-name="{% if leader %}{{ leader.firstname }} {{ leader.lastname }}{% endif %}" data-home-vacant="{% if not leader %}1{% endif %}">End coverage</button>
+        </div>
+        {% endwith %}
+        {% endif %}
+
+        <div class="bg-white rounded-2xl shadow p-6 space-y-2">
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Basket actions</p>
+            {% if leader %}
+            <button type="button" class="block w-full text-center text-sm px-3 py-2 rounded-xl border border-gray-300 hover:bg-gray-50" data-grid-open="openManage" data-basket="{{ basket_key }}" data-basket-label="Crew {{ crew.crewname }} &mdash; {{ section }}" data-post-url="{% url 'crew_assignment_detail' leader.employeeid %}" data-shifter-eid="{{ leader.employeeid }}" data-shifter-name="{{ leader.firstname }} {{ leader.lastname }}">Transfer, cover or swap</button>
+            <button type="button" class="block w-full text-center text-sm px-3 py-2 rounded-xl border border-red-300 text-red-600 hover:bg-red-50" data-grid-open="openExit" data-action="demote_to_miner_permanent" data-employee-id="{{ leader.employeeid }}" data-employee-name="{{ leader.firstname }} {{ leader.lastname }}" data-fill-required="{% if members %}1{% endif %}" data-covered="{% if covering_here %}1{% endif %}" data-covering-name="{% if covering_here %}{{ covering_here.covering_shifter.firstname }} {{ covering_here.covering_shifter.lastname }}{% endif %}">Demote to Miner</button>
+            <button type="button" class="block w-full text-center text-sm px-3 py-2 rounded-xl border border-gray-300 hover:bg-gray-50" data-grid-open="openLevel" data-employee-id="{{ leader.employeeid }}" data-employee-name="{{ leader.firstname }} {{ leader.lastname }}" data-minerlevel="{{ leader.minerlevel_id|default_if_none:'' }}" data-contractid="{{ leader.contractid_id|default:'' }}">Edit level and contract</button>
+            {% elif pending_leader %}
+            <div class="rounded-xl bg-amber-50 px-3 py-2 text-center">
+                <p class="text-sm font-semibold text-amber-700">Leader awaiting IT access</p>
+                <p class="text-xs text-amber-700 mt-1">{{ pending_leader_count }} leader{{ pending_leader_count|pluralize }} pending IT access</p>
+            </div>
+            {% else %}
+            <button type="button" class="block w-full text-center text-sm px-3 py-2 rounded-xl border border-gray-300 hover:bg-gray-50" data-grid-open="openAssign" data-action="bulk_add_vacant_members" data-post-url="{% url 'crew_assignments' %}" data-basket="{{ basket_key }}" data-basket-label="Crew {{ crew.crewname }} &mdash; {{ section }}" data-shiftertype="{{ section }}">Assign a leader</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Member actions -->
+    <div class="bg-white rounded-2xl shadow p-4 flex flex-wrap items-center gap-3">
+        {% if leader %}
+        <button type="button" data-grid-open="openAddMember" data-action="bulk_add_members" data-post-url="{% url 'crew_assignment_detail' leader.employeeid %}" data-basket="{{ basket_key }}" data-basket-label="Crew {{ crew.crewname }} &mdash; {{ section }}" data-shiftertype="{{ section }}" class="px-4 py-2 rounded-xl bg-[#28348A] text-white text-sm hover:opacity-90">+ Add members</button>
+        <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" id="select-all" class="w-4 h-4 accent-black"> Select all
+        </label>
+        <button type="submit" form="remove-form" class="px-4 py-2 rounded-xl border border-red-300 text-red-600 text-sm hover:bg-red-50">Remove selected</button>
+        {% else %}
+        <button type="button" data-grid-open="openAddMember" data-action="bulk_add_vacant_members" data-post-url="{% url 'crew_assignments' %}" data-basket="{{ basket_key }}" data-basket-label="Crew {{ crew.crewname }} &mdash; {{ section }}" data-shiftertype="{{ section }}" class="px-4 py-2 rounded-xl bg-[#28348A] text-white text-sm hover:opacity-90">+ Add members</button>
+        {% endif %}
+    </div>
+
+    <!-- Member cards -->
+    {% if leader %}
+    <form method="POST" action="{% url 'crew_assignment_detail' leader.employeeid %}" id="remove-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="bulk_remove_members">
+        <input type="hidden" name="next" value="{{ request.path }}">
+    </form>
+    {% endif %}
+
+    {% if members %}
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {% for m in members %}
+        <div class="bg-white rounded-2xl shadow p-4 flex gap-3 {% if m.covering %}opacity-50{% endif %}">
+            {% if leader %}
+            <input type="checkbox" name="assignment_ids" value="{{ m.assignment.assignmentid }}" form="remove-form" class="member-cb mt-1 w-4 h-4 accent-black">
+            {% endif %}
+            <div class="w-12 h-12 rounded-full overflow-hidden bg-gray-200 text-gray-700 flex items-center justify-center text-sm font-bold shrink-0">
+                {% if m.employee.profilepic %}<img src="/media/{{ m.employee.profilepic }}" class="w-full h-full object-cover" alt="">{% else %}{{ m.employee.firstname|slice:":1" }}{{ m.employee.lastname|slice:":1" }}{% endif %}
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="font-semibold text-gray-900 truncate"><button type="button" onclick="openPersonPanel('{{ m.employee.employeeid }}')" class="hover:underline text-left">{{ m.employee.firstname }} {{ m.employee.lastname }}</button>
+                    {% if m.covering %}<span class="text-xs font-normal text-amber-700">(covering)</span>{% endif %}</p>
+                <p class="text-xs text-gray-500">{{ m.employee.employeeid }} · {{ m.employee.roleid.rolename }}</p>
+                {% if m.also %}<p class="text-xs text-amber-700">Home: {{ home_label }} · also covers {{ m.also }}</p>{% endif %}
+                <div class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-gray-600">
+                    <span>Level: <b class="text-gray-800">{{ m.employee.minerlevel|default:"—" }}</b></span>
+                    <span>Contract: <b class="text-gray-800">{{ m.employee.contractid.contractcode|default:"—" }}</b></span>
+                    <span>Position: <b class="text-gray-800">{{ m.assignment.positionid.positionname|default:"—" }}</b></span>
+                    <span>Since: <b class="text-gray-800">{{ m.assignment.startdate|date:"M j, Y" }}</b></span>
+                </div>
+                <div class="mt-3 flex gap-2 text-xs">
+                    <button type="button" data-grid-open="openLevel" data-employee-id="{{ m.employee.employeeid }}" data-employee-name="{{ m.employee.firstname }} {{ m.employee.lastname }}" data-minerlevel="{{ m.employee.minerlevel_id|default_if_none:'' }}" data-contractid="{{ m.employee.contractid_id|default:'' }}" class="px-2 py-1 rounded-lg border border-gray-300 hover:bg-gray-50">Edit level</button>
+                    {% if leader and not m.covering %}
+                    <button type="button" data-grid-open="openSeatActions" data-post-url="{% url 'crew_assignment_detail' leader.employeeid %}" data-assignment-id="{{ m.assignment.assignmentid }}" data-employee-id="{{ m.employee.employeeid }}" data-employee-name="{{ m.employee.firstname }} {{ m.employee.lastname }}" data-position-name="{{ m.assignment.positionid.positionname|default:'' }}" data-basket="{{ basket_key }}" class="px-2 py-1 rounded-lg border border-gray-300 hover:bg-gray-50">Replace</button>
+                    {% endif %}
+                    <button type="button" onclick="openHistory('{{ m.employee.employeeid|escapejs }}')" class="px-2 py-1 rounded-lg border border-gray-300 hover:bg-gray-50">History</button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-500">No members in this basket yet.</p>
+    {% endif %}
+
+    {% if also_here %}
+    <div class="bg-white rounded-2xl shadow p-4 mt-4">
+        <p class="text-sm font-semibold text-gray-700 mb-2">Also covers this basket</p>
+        <p class="text-xs text-gray-500 mb-2">Their home crew is somewhere else. Hours are filed under their home crew.</p>
+        <ul class="text-sm divide-y">
+            {% for c in also_here %}
+            <li class="py-1.5 flex justify-between gap-3"><span class="text-gray-900">{{ c.employee.firstname }} {{ c.employee.lastname }}</span><span class="text-xs text-gray-500">Home: {{ c.home }}</span></li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <!-- Quit or moved out -->
+    <details class="bg-white rounded-2xl shadow p-6">
+        <summary class="cursor-pointer text-sm font-semibold text-gray-700">Quit or moved out (last {{ ended|length }})</summary>
+        <div class="mt-4">
+            {% if ended %}
+            <ul class="divide-y text-sm">
+                {% for e in ended %}
+                <li class="py-2 flex justify-between">
+                    <span class="text-gray-900">{{ e.employee.firstname }} {{ e.employee.lastname }}</span>
+                    <span class="text-gray-500">{% if e.quit %}Quit{% else %}Moved{% endif %} · {{ e.enddate|date:"M j, Y" }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-sm text-gray-500">Nobody has left this basket.</p>
+            {% endif %}
+        </div>
+    </details>
+
+</div>
+
+{% include 'users/_grid_action_modals.html' %}
+{% include 'users/_grid_action_scripts.html' %}
+{% include 'users/_person_panel.html' %}
+
+
+<!-- Member history: one shared modal, filled from member_histories -->
+{{ member_histories|json_script:"member-histories-data" }}
+<div id="history-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5">
+        <div class="flex items-center justify-between mb-3">
+            <p id="history-title" class="text-sm font-semibold text-gray-700">History</p>
+            <button type="button" onclick="document.getElementById('history-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Seats (last 5)</p>
+        <ul id="history-seats" class="text-sm text-gray-700 divide-y mb-4"></ul>
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Coverage (last 5)</p>
+        <ul id="history-covers" class="text-sm text-gray-700 divide-y"></ul>
+    </div>
+</div>
+
+<script>
+    const memberHistories = JSON.parse(document.getElementById('member-histories-data').textContent);
+
+    function fillHistoryList(listId, rows, render) {
+        const list = document.getElementById(listId);
+        list.innerHTML = '';
+        if (!rows.length) {
+            const li = document.createElement('li');
+            li.className = 'py-2 text-gray-400';
+            li.textContent = 'None';
+            list.appendChild(li);
+            return;
+        }
+        rows.forEach(function (row) {
+            const li = document.createElement('li');
+            li.className = 'py-2';
+            li.textContent = render(row);
+            list.appendChild(li);
+        });
+    }
+
+    function openHistory(employeeId) {
+        const h = memberHistories[employeeId];
+        if (!h) return;
+        document.getElementById('history-title').textContent = 'History — ' + h.name;
+        fillHistoryList('history-seats', h.seats, function (r) {
+            return r.where + ' · ' + r.start + ' to ' + r.end;
+        });
+        fillHistoryList('history-covers', h.covers, function (r) {
+            return r.role + ' ' + r.where + (r.with ? ' with ' + r.with : '') + ' · ' + r.start + ' to ' + r.end;
+        });
+        document.getElementById('history-modal').classList.remove('hidden');
+    }
+    window.openHistory = openHistory;
+
+    // Each basket button names the Crew Grid opener it uses (data-grid-open).
+    document.querySelectorAll('[data-grid-open]').forEach(function (btn) {
+        btn.addEventListener('click', function () { window[btn.dataset.gridOpen](btn); });
+    });
+
+    const selectAll = document.getElementById('select-all');
+    if (selectAll) {
+        selectAll.addEventListener('change', function () {
+            document.querySelectorAll('.member-cb').forEach(function (cb) { cb.checked = selectAll.checked; });
+        });
+    }
+</script>
+{% endblock %}

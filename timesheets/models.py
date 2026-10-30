@@ -50,6 +50,167 @@ class Crews(models.Model):
         db_table = 'Crews'
 
 
+class CrewGroup(models.Model):
+    """A joint unit made of single crews, such as AB or CD. It runs its own
+    disciplines (Longhole, Logistics) and has its own shifter in each basket."""
+    groupid = models.AutoField(db_column='GroupID', primary_key=True)
+    groupname = models.CharField(db_column='GroupName', max_length=10, unique=True)
+    isactive = models.IntegerField(db_column='IsActive', default=1)
+
+    class Meta:
+        managed = True
+        db_table = 'CrewGroup'
+
+    def __str__(self):
+        return self.groupname
+
+
+class CrewGroupMember(models.Model):
+    memberid = models.AutoField(db_column='MemberID', primary_key=True)
+    group = models.ForeignKey(CrewGroup, models.PROTECT, db_column='GroupID', related_name='members')
+    crew = models.ForeignKey(Crews, models.PROTECT, db_column='CrewID', related_name='group_memberships')
+
+    class Meta:
+        managed = True
+        db_table = 'CrewGroupMember'
+        unique_together = ('group', 'crew')
+
+
+class UnitDiscipline(models.Model):
+    """Which disciplines a unit runs. A unit is a single crew or a crew group,
+    never both. Each row is a basket. Nothing is inherited: a unit runs only
+    the disciplines linked to it here."""
+    unitdisciplineid = models.AutoField(db_column='UnitDisciplineID', primary_key=True)
+    crew = models.ForeignKey(Crews, models.PROTECT, db_column='CrewID', blank=True, null=True, related_name='unit_disciplines')
+    group = models.ForeignKey(CrewGroup, models.PROTECT, db_column='GroupID', blank=True, null=True, related_name='unit_disciplines')
+    discipline = models.ForeignKey('Discipline', models.PROTECT, db_column='DisciplineID', related_name='unit_links')
+
+    class Meta:
+        managed = True
+        db_table = 'UnitDiscipline'
+        unique_together = (('crew', 'discipline'), ('group', 'discipline'))
+
+    @property
+    def unit_name(self):
+        return self.crew.crewname if self.crew_id else self.group.groupname
+
+    @property
+    def crew_row(self):
+        # The Crews row this basket is filed under: the crew itself, or the joint row for a group.
+        if self.crew_id:
+            return self.crew
+        return Crews.objects.filter(crewname=self.group.groupname).first()
+
+
+class Discipline(models.Model):
+    """A kind of work a basket does (Development, Production, Longhole, ...).
+    Sort order sets the row order on the grid. Linked from every record that
+    stores a discipline; PROTECT stops a discipline being deleted while in use."""
+    disciplineid = models.AutoField(db_column='DisciplineID', primary_key=True)
+    name = models.CharField(db_column='Name', max_length=20, unique=True)
+    sortorder = models.IntegerField(db_column='SortOrder', default=0)
+    isactive = models.IntegerField(db_column='IsActive', default=1)
+
+    class Meta:
+        managed = True
+        db_table = 'Discipline'
+        ordering = ['sortorder', 'name']
+
+    def __str__(self):
+        return self.name
+
+
+def sync_discipline(sender, instance, **kwargs):
+    # Keeps the discipline link in step with the discipline text the app still
+    # writes (shiftertype, or section on the operations header). Removed in the
+    # cleanup step, once everything reads the link directly.
+    name = getattr(instance, 'shiftertype', None) or getattr(instance, 'section', None)
+    instance.discipline = Discipline.objects.filter(name=name).first() if name else None
+
+
+def basket_for(crew, discipline_name):
+    """The basket (UnitDiscipline row) a crew and discipline text point at, or None.
+    A single crew is its own unit; a joint crew row (AB, CD) maps to its group."""
+    if crew is None or not discipline_name:
+        return None
+    discipline = Discipline.objects.filter(name=discipline_name).first()
+    if discipline is None:
+        return None
+    if len(crew.crewname) == 1:
+        return UnitDiscipline.objects.filter(crew=crew, discipline=discipline).first()
+    group = CrewGroup.objects.filter(groupname=crew.crewname).first()
+    return UnitDiscipline.objects.filter(group=group, discipline=discipline).first() if group else None
+
+
+def sync_basket(sender, instance, **kwargs):
+    # Keeps the assignment's basket in step with the crew and discipline text the
+    # app still writes. Removed in the cleanup step, once everything reads the basket.
+    instance.basket = basket_for(instance.crewid, instance.shiftertype)
+
+
+class BasketShifter(models.Model):
+    """Who runs a basket and whether it's their home. One active row per basket
+    (its shifter) and one active home per shifter. A second-basket lead is an
+    active row with is_home off. Ended rows keep their dates as history."""
+    basketshifterid = models.AutoField(db_column='BasketShifterID', primary_key=True)
+    basket = models.ForeignKey('UnitDiscipline', models.PROTECT, db_column='BasketID', related_name='shifter_rows')
+    shifter = models.ForeignKey('users.User', models.PROTECT, db_column='ShifterID', related_name='basket_rows')
+    is_home = models.BooleanField(db_column='IsHome', default=False)
+    startdate = models.DateField(db_column='StartDate')
+    enddate = models.DateField(db_column='EndDate', blank=True, null=True)
+    # Guards, set only while the row is active: one shifter per basket, one home per shifter.
+    basket_key = models.CharField(db_column='BasketKey', max_length=20, unique=True, null=True, blank=True, editable=False)
+    home_key = models.CharField(db_column='HomeKey', max_length=20, unique=True, null=True, blank=True, editable=False)
+
+    def save(self, *args, **kwargs):
+        active = self.enddate is None
+        self.basket_key = str(self.basket_id) if active else None
+        self.home_key = str(self.shifter_id) if active and self.is_home else None
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None:
+            extra = [f for f in ('basket_key', 'home_key') if f not in update_fields]
+            kwargs['update_fields'] = list(update_fields) + extra
+        super().save(*args, **kwargs)
+
+    class Meta:
+        managed = True
+        db_table = 'BasketShifter'
+
+
+def sync_user_home(sender, instance, **kwargs):
+    """Keeps a shifter's home row in step with their crew and discipline fields.
+    Removed in the cleanup step, once the basket table is the only source."""
+    today = timezone.now().date()
+    # A pending hire holds their basket while IT sets up access, as an active one does.
+    holds = instance.isactive or instance.onboarding_status == 'pending'
+    basket = basket_for(instance.crewid, instance.shiftertype) if holds else None
+    current = BasketShifter.objects.filter(shifter=instance, is_home=True, enddate__isnull=True)
+    if basket is not None and current.filter(basket=basket).exists():
+        return
+    for row in current:
+        row.enddate = today
+        row.save()
+    if basket is not None:
+        BasketShifter.objects.create(basket=basket, shifter=instance, is_home=True, startdate=today)
+
+
+def sync_basket_lead(sender, instance, **kwargs):
+    """Keeps a second-basket lead's row in step with the BasketLead record."""
+    today = timezone.now().date()
+    basket = basket_for(instance.crewid, instance.shiftertype)
+    if basket is None:
+        return
+    current = BasketShifter.objects.filter(
+        shifter=instance.shifter, basket=basket, is_home=False, enddate__isnull=True,
+    )
+    if instance.enddate is not None:
+        for row in current:
+            row.enddate = today
+            row.save()
+    elif not current.exists():
+        BasketShifter.objects.create(basket=basket, shifter=instance.shifter, is_home=False, startdate=instance.startdate)
+
+
 class LeaveType(models.Model):
     leavetypeid = models.AutoField(db_column='LeaveTypeID', primary_key=True)  # Field name made lowercase.
     leavetypename = models.CharField(db_column='LeaveTypeName', max_length=255)  # Field name made lowercase.
@@ -88,13 +249,13 @@ class StatHoliday(models.Model):
 
 
 class VacationRatePolicy(models.Model):
-    """Effective-dated monthly vacation accrual rate. A rate change (e.g. the
-    10->12 hr/month bump for Ops "other" shifter types) is a new row with a
-    later effective_year, not a code change — lookup takes the latest row at
-    or before the target year."""
+    """Effective-dated monthly vacation accrual rate. A rate change is a new
+    row with a later effective_year, not a code change — lookup takes the
+    latest row at or before the target year. The bucket follows employment
+    type for operations (Staff or Contract), not discipline."""
     BUCKET_CHOICES = [
-        ('ops_development', 'Operations - Development'),
-        ('ops_other', 'Operations - Production/Longhole/Logistics'),
+        ('ops_staff', 'Operations - Staff'),
+        ('ops_contract', 'Operations - Contract'),
         ('non_operations', 'Non-Operations (Business/Maintenance)'),
     ]
     policyid = models.AutoField(db_column='PolicyID', primary_key=True)
@@ -296,7 +457,7 @@ class MinerLevel(models.Model):
     levels and one level can have several valid contracts, so a single
     nullable field on either side can't represent the real relationship."""
     levelid = models.AutoField(db_column='LevelID', primary_key=True)
-    levelcode = models.CharField(db_column='LevelCode', max_length=4, unique=True)
+    levelcode = models.CharField(db_column='LevelCode', max_length=10, unique=True)
     sortorder = models.IntegerField(db_column='SortOrder', default=0)
 
     class Meta:
@@ -320,6 +481,18 @@ class Contract(models.Model):
     class Meta:
         managed = True
         db_table = 'Contract'
+
+
+def contracts_by_miner_level():
+    # Contract choices keyed by MinerLevel id. A contract with no Level is
+    # unclassified and stays hidden until it is given one.
+    by_level = {}
+    for level in MinerLevel.objects.all():
+        by_level[str(level.levelid)] = [
+            {'id': c.contractid, 'label': f'{c.contractcode} — {c.contracttitle}'}
+            for c in Contract.objects.filter(isactive=1, levels=level).order_by('contractcode')
+        ]
+    return by_level
 
 
 class Account(models.Model):
@@ -365,6 +538,7 @@ class OperationsHeader(models.Model):
         ('Logistics', 'Logistics'),
     ]
     section = models.CharField(db_column='Section', max_length=20, choices=SECTION_CHOICES, blank=True, null=True)
+    discipline = models.ForeignKey(Discipline, models.PROTECT, db_column='DisciplineID', blank=True, null=True)
 
     class Meta:
         managed = True

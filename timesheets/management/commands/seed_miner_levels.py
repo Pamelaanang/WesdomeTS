@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand
 
 from timesheets.models import MinerLevel
 
-LEVELS = ['Lead', '1', '2', '3', '4']
+LEVELS = ['Lead', '1', '2', '3', '4']  # Staff is seeded by migration 0036
 
 
 class Command(BaseCommand):

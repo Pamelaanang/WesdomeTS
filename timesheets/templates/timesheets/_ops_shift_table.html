@@ -9,11 +9,11 @@ show_status (bool — whether to render a per-entry Status column).
             <tr class="{% if header.shifttype == 'Night' %}bg-indigo-500{% else %}bg-amber-600{% endif %} text-white text-left">
                 <th colspan="{% if show_status %}9{% else %}8{% endif %}" class="p-2">
                     <i class="fa-solid {% if header.shifttype == 'Night' %}fa-moon{% else %}fa-sun{% endif %} mr-1"></i>
-                    {{ header.crewid.crewname }} Crew &mdash; {{ header.section|default:"—" }}
+                    {{ header.crewid.crewname }} Crew &mdash; {{ header.discipline.name|default:"—" }}
                     &mdash; {{ header.shifterid.firstname }} {{ header.shifterid.lastname }}
                     {% if header.coverageid %}
                     <span class="ml-2 font-normal text-xs {% if header.shifttype == 'Night' %}text-indigo-100{% else %}text-amber-100{% endif %}">
-                        <i class="fa-solid fa-arrows-rotate mr-0.5"></i> Covering {{ header.coverageid.home_shifter.firstname }} {{ header.coverageid.home_shifter.lastname }}
+                        <i class="fa-solid fa-arrows-rotate mr-0.5"></i> Covering {{ header.coverageid.home_label }}
                     </span>
                     {% endif %}
                     <span class="ml-2 font-normal text-xs {% if header.shifttype == 'Night' %}text-indigo-100{% else %}text-amber-100{% endif %}">
