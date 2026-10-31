@@ -1609,10 +1609,50 @@ def _contract_block(employee, posted_contractid):
     return None
 
 
+def _hours_error(hoursworked_str):
+    # Why this row's hours can't be saved, or None. Shared by the Operations
+    # add_row/edit_row actions — a 0 (or blank/invalid) entry isn't real work.
+    try:
+        hours = Decimal(hoursworked_str)
+    except (TypeError, InvalidOperation):
+        return 'Enter the hours worked.'
+    if hours <= 0:
+        return 'Hours worked must be greater than 0.'
+    return None
+
+
 @login_required(login_url='login')
 def new_ops_sheet(request):
     if request.user.access_level != 5:
         return redirect('profile')
+
+    # Clean up this shifter's own abandoned sheets: Drafts left untouched for
+    # 72+ hours, wherever they're from (e.g. one left behind under a crew
+    # they've since been moved off of). Empty ones are dropped; ones with real
+    # hours logged are submitted instead, same as the reactive check below —
+    # this just means it also fires on a sheet nobody ever reopens directly.
+    stale_cutoff = timezone.now() - timezone.timedelta(hours=72)
+    stale_drafts = list(OperationsHeader.objects.filter(
+        shifterid=request.user, overallstatus='Draft', startedat__lt=stale_cutoff,
+    ).annotate(
+        real_hours=Count('operationsentry', filter=Q(operationsentry__hoursworked__gt=0))
+    ))
+    stale_empty_ids = [h.opsheaderid for h in stale_drafts if h.real_hours == 0]
+    stale_with_hours = [h for h in stale_drafts if h.real_hours > 0]
+
+    OperationsEntry.objects.filter(opsheaderid__in=stale_empty_ids).delete()
+    OperationsHeader.objects.filter(opsheaderid__in=stale_empty_ids).delete()
+
+    for h in stale_with_hours:
+        h.overallstatus = 'Submitted'
+        h.submittedat = timezone.now()
+        h.save()
+        OperationsEntry.objects.filter(opsheaderid=h).update(linestatus='New')
+
+    if stale_empty_ids:
+        messages.warning(request, f'{len(stale_empty_ids)} old sheet{"s" if len(stale_empty_ids) != 1 else ""} with no hours logged, sitting for over 72 hours, {"were" if len(stale_empty_ids) != 1 else "was"} removed.')
+    if stale_with_hours:
+        messages.warning(request, f'{len(stale_with_hours)} old sheet{"s" if len(stale_with_hours) != 1 else ""} with hours logged, sitting for over 72 hours, {"were" if len(stale_with_hours) != 1 else "was"} automatically submitted.')
 
     today = timezone.now().date()
     active_coverages = CrewCoverage.objects.filter(
@@ -1663,15 +1703,21 @@ def new_ops_sheet(request):
         own_basket = request.POST.get('own_basket') or None
 
         try:
-            from datetime import date as _date
-            if shiftdate and _date.fromisoformat(shiftdate) > today:
+            from datetime import date as _date, timedelta as _timedelta
+            shiftdate_obj = _date.fromisoformat(shiftdate) if shiftdate else None
+            date_error = None
+            if shiftdate_obj and shiftdate_obj > today:
+                date_error = 'Crew sheets cannot be created for future dates.'
+            elif shiftdate_obj and shiftdate_obj < today - _timedelta(days=7):
+                date_error = 'Crew sheets can only be created for the last 7 days.'
+            if date_error:
                 return render(request, 'timesheets/ops_sheet.html', {
                     **base_context,
                     'coverage_sections': {},
                     'coverage_crews': {},
                     'own_basket_sections': {},
                     'own_basket_crews': {},
-                    'error': 'Crew sheets cannot be created for future dates.',
+                    'error': date_error,
                 })
         except ValueError:
             pass
@@ -1708,15 +1754,34 @@ def new_ops_sheet(request):
             )
             return render(request, 'timesheets/ops_sheet.html', {**base_context, 'error': error})
 
+        # Catches a duplicate sheet from either direction: this shifter already has
+        # one for this date/shift (crew left out of that half of the match — a
+        # shifter only ever has one permanent basket, so it's the same sheet no
+        # matter which crew it's tagged with, e.g. after a transfer), OR this exact
+        # crew already has one for this date/shift under a *different* shifter
+        # (e.g. the crew changed hands mid-stream). Coverage sheets stay distinct
+        # from the shifter's own-crew sheet and from each other purely via
+        # coverage_id, same as before.
         existing = OperationsHeader.objects.filter(
-            shifterid=request.user,
+            Q(shifterid=request.user) | Q(crewid=crew),
             shiftdate=shiftdate,
             shifttype=shifttype,
             coverageid_id=coverage_id,
-            crewid=crew,
         ).first()
         if existing:
-            return redirect('ops_sheet', pk=existing.opsheaderid)
+            if existing.shifterid_id == request.user.pk:
+                return redirect('ops_sheet', pk=existing.opsheaderid)
+            return render(request, 'timesheets/ops_sheet.html', {
+                **base_context,
+                'coverage_sections': {},
+                'coverage_crews': {},
+                'own_basket_sections': {},
+                'own_basket_crews': {},
+                'error': (
+                    f'{existing.shifterid.firstname} {existing.shifterid.lastname} already filed a sheet '
+                    f'for Crew {crew.crewname} on this date and shift. Contact your Superintendent if this needs correcting.'
+                ),
+            })
 
         header = OperationsHeader.objects.create(
             shifterid=request.user,
@@ -1790,11 +1855,18 @@ def ops_sheet(request, pk):
     if header.overallstatus == 'Draft':
         hours_elapsed = (timezone.now() - header.startedat).total_seconds() / 3600
         if hours_elapsed > 72:
-            header.overallstatus = 'Submitted'
-            header.submittedat = timezone.now()
-            header.save()
-            OperationsEntry.objects.filter(opsheaderid=header).update(linestatus='New')
-            messages.warning(request, 'Your operations sheet was automatically submitted after 72 hours of inactivity.')
+            has_real_hours = OperationsEntry.objects.filter(opsheaderid=header, hoursworked__gt=0).exists()
+            if has_real_hours:
+                header.overallstatus = 'Submitted'
+                header.submittedat = timezone.now()
+                header.save()
+                OperationsEntry.objects.filter(opsheaderid=header).update(linestatus='New')
+                messages.warning(request, 'Your operations sheet was automatically submitted after 72 hours of inactivity.')
+            else:
+                OperationsEntry.objects.filter(opsheaderid=header).delete()
+                header.delete()
+                messages.warning(request, 'This operations sheet had no hours logged after 72 hours of inactivity and was removed.')
+                return redirect('my_ops_sheets')
 
     hours_remaining = max(0, 72 - (timezone.now() - header.startedat).total_seconds() / 3600)
 
@@ -1807,8 +1879,8 @@ def ops_sheet(request, pk):
             leavetypeid = sel[3:] if sel.startswith('lt_') else None
             row_employee = User.objects.filter(pk=request.POST.get('employeeid')).first()
             hoursworked_str = request.POST.get('hoursworked')
-            leave_error = None
-            if row_employee:
+            leave_error = _hours_error(hoursworked_str)
+            if not leave_error and row_employee:
                 leave_error = _validate_leave_entry(row_employee, leavetypeid, str(header.shiftdate), hoursworked_str)
 
             if not leave_error and row_employee:
@@ -1878,9 +1950,11 @@ def ops_sheet(request, pk):
             opscategoryid = sel[3:] if sel.startswith('oc_') else None
             leavetypeid = sel[3:] if sel.startswith('lt_') else None
             hoursworked_str = request.POST.get('hoursworked')
-            leave_error = _validate_leave_entry(
-                entry.employeeid, leavetypeid, str(header.shiftdate), hoursworked_str, exclude_entry=entry,
-            )
+            leave_error = _hours_error(hoursworked_str)
+            if not leave_error:
+                leave_error = _validate_leave_entry(
+                    entry.employeeid, leavetypeid, str(header.shiftdate), hoursworked_str, exclude_entry=entry,
+                )
             if not leave_error:
                 leave_error = _contract_block(entry.employeeid, request.POST.get('contractid'))
 

@@ -49,6 +49,21 @@ class Crews(models.Model):
         managed = True
         db_table = 'Crews'
 
+    def clean(self):
+        # A single crew (A, B, C, ...) is told apart from a joint crew group
+        # (AB, CD, ...) purely by name length (see basket_for below) — a name
+        # longer than one character that isn't an existing Crew Group's name
+        # would silently never resolve a basket. Only fires where something
+        # calls full_clean() (an admin form, if this model is ever registered
+        # there) — plain .save()/.create() calls, including migrations and
+        # tests, are unaffected.
+        from django.core.exceptions import ValidationError
+        if len(self.crewname) != 1 and not CrewGroup.objects.filter(groupname=self.crewname).exists():
+            raise ValidationError({
+                'crewname': 'A single crew needs a one-character name (like A, B, C). '
+                             'A longer name is read as a joint crew group (like AB), and none exists with this name.',
+            })
+
 
 class CrewGroup(models.Model):
     """A joint unit made of single crews, such as AB or CD. It runs its own
@@ -89,6 +104,14 @@ class UnitDiscipline(models.Model):
         managed = True
         db_table = 'UnitDiscipline'
         unique_together = (('crew', 'discipline'), ('group', 'discipline'))
+
+    def clean(self):
+        # "A unit is a single crew or a crew group, never both" (see the
+        # docstring above) — nothing enforced that until now. Only fires
+        # through form validation (e.g. the admin), same as Crews.clean().
+        from django.core.exceptions import ValidationError
+        if bool(self.crew_id) == bool(self.group_id):
+            raise ValidationError('Set exactly one of Crew or Group — a basket belongs to a single crew or a crew group, never both and never neither.')
 
     @property
     def unit_name(self):

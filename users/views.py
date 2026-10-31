@@ -1095,9 +1095,16 @@ def _parse_basket(raw):
     return Crews.objects.filter(pk=crewid).first(), shiftertype
 
 
-def _hand_over_basket(shifter, crew, shiftertype, today):
+def _hand_over_basket(shifter, crew, shiftertype, today, assignedby):
     if _home_basket(shifter):
-        BasketLead.objects.create(shifter=shifter, crewid=crew, shiftertype=shiftertype, startdate=today)
+        # Already runs a basket — this is coverage, never a second permanent
+        # lead. Only a new hire or a promoted Spare Shifter (or Miner, via
+        # Transfer's own promote path) becomes someone's permanent second-
+        # basket leader.
+        CrewCoverage.objects.create(
+            covering_shifter=shifter, home_shifter=None, crewid=crew, shiftertype=shiftertype,
+            startdate=today, assignedby=assignedby,
+        )
     else:
         shifter.crewid = crew
         shifter.shiftertype = shiftertype
@@ -1246,15 +1253,14 @@ def crew_assignments(request):
         return redirect('crew_grid')
 
     if request.method == 'POST' and request.POST.get('action') == 'assign_basket':
-        # Fills a leaderless basket — either a shifter with no home basket at
-        # all (sets crewid/shiftertype as their new home, same as always), or
-        # an already-busy shifter picking up a second, currently-leaderless
-        # basket (mirrors the existing "hold two baskets" pattern Transfer
-        # Basket already allows for a promoted Spare Shifter): their own home
-        # basket is left untouched, they just also claim this one's roster.
-        # Only blocked when the target is busy AND this basket has no
-        # existing crew to hand them — nothing to actually put them in
-        # charge of, so Transfer Basket is the right tool there instead.
+        # Fills a leaderless basket with an existing Shift Coordinator. A
+        # shifter with no home basket at all takes this one on as their new
+        # home, same as always. A shifter who already runs a basket can
+        # never pick up a second one permanently — one person leads one
+        # basket (a joint crew group is still one basket) — so this is
+        # always coverage for them, exactly as temporary as Start Coverage.
+        # A real permanent second lead only ever comes from a new hire or a
+        # promoted Spare Shifter.
         target = get_object_or_404(User, employeeid=request.POST.get('shifter_id', '').strip(), roleid__accessid__accessid=5, isactive=True)
         crewid = request.POST.get('crewid') or None
         shiftertype = request.POST.get('shiftertype') or None
@@ -1277,20 +1283,27 @@ def crew_assignments(request):
                 target.crewid_id = crewid
                 target.shiftertype = shiftertype
                 target.save(update_fields=['crewid', 'shiftertype', 'discipline'])
+                verb = 'now runs'
             else:
-                BasketLead.objects.create(shifter=target, crewid=basket_crew, shiftertype=shiftertype,
-                                          startdate=timezone.now().date())
+                # Already runs a basket — this is coverage, never a second
+                # permanent lead. Only a new hire or a promoted Spare Shifter
+                # becomes someone's permanent second-basket leader.
+                CrewCoverage.objects.create(
+                    covering_shifter=target, home_shifter=None, crewid=basket_crew, shiftertype=shiftertype,
+                    startdate=timezone.now().date(), assignedby=request.user,
+                )
+                verb = 'is now covering'
             log_action(request.user, 'Assign Shifter to Basket', 'Employee', target.eid,
                        {'crewid': None, 'shiftertype': None}, {'crewid': crewid, 'shiftertype': shiftertype})
             crew_name = basket_crew.crewname
             if claimed:
                 messages.success(
                     request,
-                    f'{target.firstname} {target.lastname} now runs Crew {crew_name} — {shiftertype} '
+                    f'{target.firstname} {target.lastname} {verb} Crew {crew_name} — {shiftertype} '
                     f'({claimed} existing member{"s" if claimed != 1 else ""} picked up).'
                 )
             else:
-                messages.success(request, f'{target.firstname} {target.lastname} now runs Crew {crew_name} — {shiftertype}.')
+                messages.success(request, f'{target.firstname} {target.lastname} {verb} Crew {crew_name} — {shiftertype}.')
 
         next_url = request.POST.get('next', '').strip()
         if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
@@ -2178,14 +2191,16 @@ def crew_assignment_detail(request, shifter_id):
                 BasketLead.objects.filter(
                     shifter=shifter, basket=active_row, enddate__isnull=True
                 ).update(enddate=today)
-                _hand_over_basket(new_shifter, active_basket[0], active_basket[1], today)
+                becomes_coverage = bool(_home_basket(new_shifter))
+                _hand_over_basket(new_shifter, active_basket[0], active_basket[1], today, request.user)
 
                 log_action(request.user, 'Transfer Basket', 'CrewAssignment', shifter.eid,
                            old_values, {'shifter': new_shifter.eid, 'crewid': active_basket[0].crewid, 'shiftertype': active_basket[1]})
+                verb = 'to cover' if becomes_coverage else 'to'
                 messages.success(
                     request,
                     f'Transferred Crew {active_basket[0].crewname} — {active_basket[1]} '
-                    f'({len(members)} member{"s" if len(members) != 1 else ""}) to {new_shifter.firstname} {new_shifter.lastname}.'
+                    f'({len(members)} member{"s" if len(members) != 1 else ""}) {verb} {new_shifter.firstname} {new_shifter.lastname}.'
                 )
                 next_url = request.POST.get('next', '').strip()
                 if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):

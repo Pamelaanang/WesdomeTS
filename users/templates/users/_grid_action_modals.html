@@ -121,7 +121,7 @@
                 <input type="radio" name="grid_fill_mode" checked class="mt-0.5"
                     onchange="['grid-fill-existing','grid-fill-temporary','grid-fill-permanent','grid-fill-hire'].forEach(function(id){document.getElementById(id).classList.toggle('hidden', id !== 'grid-fill-existing');})">
                 <span><span class="font-semibold text-gray-700">Assign an Existing Shifter</span><br>
-                <span class="text-gray-400">Give this basket to a shifter already in the system. If they already run another basket, they keep it and take this one on as a second.</span></span>
+                <span class="text-gray-400">Give this basket to a shifter already in the system. If they already run another basket, this one is temporary coverage — recorded the same as Start Coverage, ending when it's handed off.</span></span>
             </label>
             <label class="flex items-start gap-2 cursor-pointer">
                 <input type="radio" name="grid_fill_mode" class="mt-0.5"
@@ -211,7 +211,7 @@
                 <input type="radio" name="grid_manage_mode" checked class="mt-0.5"
                     onchange="['grid-manage-transfer','grid-manage-coverage','grid-manage-swap'].forEach(function(id){document.getElementById(id).classList.toggle('hidden', id !== 'grid-manage-transfer');})">
                 <span><span class="font-semibold text-gray-700">Transfer</span><br>
-                <span id="grid-manage-transfer-desc" class="text-gray-400">Permanently hand this basket to someone else. They stop running it — their own home crew/section clears if this was it. Use this when they're not coming back to this basket at all.</span></span>
+                <span id="grid-manage-transfer-desc" class="text-gray-400">Permanently hand this basket to someone else. They stop running it — their own home crew/section clears if this was it. If the destination already runs their own basket, this becomes coverage for them instead, since one person can't permanently run two.</span></span>
             </label>
             <label class="flex items-start gap-2 cursor-pointer">
                 <input type="radio" name="grid_manage_mode" class="mt-0.5"

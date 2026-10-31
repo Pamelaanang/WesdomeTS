@@ -209,7 +209,7 @@
             document.getElementById('grid-manage-title').textContent = 'Manage ' + (btn.dataset.basketLabel || 'This Basket');
             const name = btn.dataset.shifterName || 'them';
             document.getElementById('grid-manage-transfer-desc').textContent =
-                'Permanently hand this basket to someone else. ' + name + ' stops running it — their own home crew/section clears if this was it. Use this when they\'re not coming back to this basket at all.';
+                'Permanently hand this basket to someone else. ' + name + ' stops running it — their own home crew/section clears if this was it. If the destination already runs their own basket, this becomes coverage for them instead, since one person can\'t permanently run two.';
             document.getElementById('grid-manage-coverage-desc').textContent =
                 'Keep ' + name + ' as the basket\'s real owner, but temporarily hand the day-to-day running to someone else. ' + name + ' resumes automatically once you end the coverage.';
 

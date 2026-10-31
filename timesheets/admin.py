@@ -1,9 +1,40 @@
 from django.contrib import admin
 from .models import (
-    ContractSeries, Contract, Account, ContractAccount, EmployeeBonus,
-    LeaveType, LeaveAllocation, VacationRatePolicy, LieuDayLedger,
-    Workcategory, Businesscategory, Opscategory,
+    ContractSeries, Contract, Account, ContractAccount, Crews, CrewGroup, CrewGroupMember,
+    EmployeeBonus, LeaveType, LeaveAllocation, UnitDiscipline, VacationRatePolicy,
+    LieuDayLedger, Workcategory, Businesscategory, Opscategory,
 )
+
+
+@admin.register(Crews)
+class CrewsAdmin(admin.ModelAdmin):
+    # Single crews (A, B, C, ...) and joint crew groups (AB, CD, ...) are both
+    # Crews rows, told apart by name length — see Crews.clean(). Crew Groups
+    # themselves (which single crews a joint name like "AB" actually pairs up)
+    # are set up separately, below.
+    list_display = ('crewname', 'isactive')
+    ordering = ('crewname',)
+
+
+@admin.register(CrewGroup)
+class CrewGroupAdmin(admin.ModelAdmin):
+    list_display = ('groupname', 'isactive')
+    ordering = ('groupname',)
+
+
+@admin.register(CrewGroupMember)
+class CrewGroupMemberAdmin(admin.ModelAdmin):
+    # Which single crews a joint group actually pairs up (e.g. AB = A + B).
+    list_display = ('group', 'crew')
+    list_filter = ('group',)
+    ordering = ('group__groupname', 'crew__crewname')
+
+
+@admin.register(UnitDiscipline)
+class UnitDisciplineAdmin(admin.ModelAdmin):
+    # Which disciplines a crew or crew group actually runs — each row is a basket.
+    list_display = ('unit_name', 'discipline')
+    list_filter = ('discipline',)
 
 
 @admin.register(ContractSeries)
