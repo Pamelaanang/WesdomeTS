@@ -15,3 +15,4 @@ def log_action(user, action, table_name, record_id, old_values=None, new_values=
         newvalue=new_values,
         timestamp=timezone.now(),
 )
+  

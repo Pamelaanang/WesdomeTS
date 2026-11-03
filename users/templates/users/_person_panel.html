@@ -74,6 +74,7 @@
         inBtn.type = 'button';
         inBtn.addEventListener('click', function () {
             if (!posSel.value || posSel.value === String(seat.position_id)) return;
+            if (!confirm('Move ' + d.name + ' to ' + posSel.options[posSel.selectedIndex].text + '?')) return;
             submitMove({ source_assignment_id: seat.id, basket: seat.basket, dest_position_id: posSel.value });
         });
         inBasket.appendChild(posSel);
@@ -96,6 +97,7 @@
         toBtn.type = 'button';
         toBtn.addEventListener('click', function () {
             if (!basketSel.value || !toPosSel.value) return;
+            if (!confirm('Move ' + d.name + ' to ' + basketSel.options[basketSel.selectedIndex].text + ' — ' + toPosSel.options[toPosSel.selectedIndex].text + '?')) return;
             submitMove({ source_assignment_id: seat.id, basket: basketSel.value, dest_position_id: toPosSel.value });
         });
         const toRow = el('div', 'flex flex-col gap-2');
@@ -120,6 +122,12 @@
             body.appendChild(sectionTitle('Recent coverage'));
             d.cover_history.forEach(function (c) {
                 body.appendChild(el('p', 'text-gray-600', c.role + ' · ' + c.basket + ' · with ' + c.with + ' · ' + c.start + ' → ' + c.end));
+            });
+        }
+        if (d.level_history && d.level_history.length) {
+            body.appendChild(sectionTitle('Recent level / contract changes'));
+            d.level_history.forEach(function (lv) {
+                body.appendChild(el('p', 'text-gray-600', lv.action + ': ' + lv.from + ' → ' + lv.to + ' · ' + lv.at));
             });
         }
     }

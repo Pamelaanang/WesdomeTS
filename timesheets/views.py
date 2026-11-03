@@ -5,18 +5,32 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from users.models import User, Department, CrewAssignment, CrewCoverage
 from .models import basket_for, contracts_by_miner_level, MainHeader, MainEntry, Crews, Workcategory, Opscategory, LeaveType, OperationsHeader, OperationsEntry, Contract, Account, ContractAccount, ContractSeries, MinerLevel, OperationsBonus, BONUS_RATE_CODES, StatHoliday, BusinessHeader, BusinessEntry, Businesscategory, MONTH_CHOICES, EmployeeBonus, BONUS_TYPE_CHOICES, Auditlog, submission_deadline
 from django.utils import timezone
 from django.db.models import Sum, Count, Min, Max, Q, Case, When, IntegerField, Prefetch
 from django.db.models.functions import TruncMonth
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from django.core.paginator import Paginator
 from collections import defaultdict
 from .audit import log_action
 from . import leave as leave_rules
 from django.core.management import call_command
 from io import StringIO
+
+
+def _valid_date_or_404(year, month, day=None):
+    # <int:year>/<int:month>/[<int:day>] URL segments accept any integer, so
+    # a nonsense value (month=13, day=32, Feb 30...) either crashed on a
+    # later date(year, month, 1) call or, on views that only ever filter by
+    # year__=/month__=, silently matched zero rows and rendered a normal-
+    # looking empty page. Neither is right for a URL that isn't a real date
+    # — it should 404, same as any other resource that doesn't exist.
+    try:
+        date(year, month, day or 1)
+    except ValueError:
+        raise Http404
 
 
 def _validate_leave_entry(user, leavetypeid, startdate_str, hoursworked_str, exclude_entry=None):
@@ -143,7 +157,17 @@ def add_entry(request, pk):
             startdate_str = request.POST.get('startdate')
             hoursworked_str = request.POST.get('hoursworked')
             existing_entry = MainEntry.objects.filter(mainentryid=entryid).first() if entryid else None
-            leave_error = _validate_leave_entry(request.user, leavetypeid, startdate_str, hoursworked_str, exclude_entry=existing_entry)
+            leave_error = (
+                _hours_error(hoursworked_str, enforce_max=bool(workcategoryid))
+                or _category_error(category_selection, Workcategory, 'wc_')
+                or _entry_date_error(startdate_str)
+                or _shifttype_error(request.POST.get('shifttype'))
+                or _month_lock_error(header, startdate_str)
+            )
+            if not leave_error:
+                leave_error = _validate_leave_entry(request.user, leavetypeid, startdate_str, hoursworked_str, exclude_entry=existing_entry)
+            if not leave_error and workcategoryid:
+                leave_error = _main_entry_day_hours_error(request.user, startdate_str, Decimal(hoursworked_str), exclude_entry=existing_entry)
 
             date_error = None
             if workcategoryid and not revision_mode and not leave_error:
@@ -333,21 +357,24 @@ def review_timesheet(request, pk):
 
         elif action == 'reject':
              entryid = request.POST.get('entryid')
-             if entryid:
+             note = request.POST.get('supervisornote', '').strip()
+             if entryid and note:
                  entry = get_object_or_404(MainEntry, mainentryid=entryid, mainheaderid=header)
                  old_status = entry.linestatus
                  entry.linestatus = 'Rejected'
                  entry.approvedat = timezone.now()
-                 entry.supervisornote = request.POST.get('supervisornote') or None
+                 entry.supervisornote = note
                  entry.approvedby = request.user
                  entry.save()
                  header.overallstatus = 'In Progress'
                  header.save()
                  log_action(request.user, 'Rejected', 'MainEntry', entry.mainentryid,
-                            old_values={'linestatus': old_status}, new_values={'linestatus': 'Rejected'})
+                            old_values={'linestatus': old_status}, new_values={'linestatus': 'Rejected', 'supervisornote': note})
 
         elif action == 'bulk_approve':
-            entryids = request.POST.getlist('entryids')
+            # A non-digit id in the list would otherwise crash the __in lookup
+            # with a 500 instead of just not matching that entry.
+            entryids = [e for e in request.POST.getlist('entryids') if e.isdigit()]
             to_approve = MainEntry.objects.filter(mainentryid__in=entryids, mainheaderid=header, linestatus='New')
             if to_approve.exists():
                 for entry in to_approve:
@@ -362,8 +389,11 @@ def review_timesheet(request, pk):
                 header.save()
 
         elif action == 'finish_review':
+            all_entries = MainEntry.objects.filter(mainheaderid=header)
+            if all_entries.filter(linestatus='New').exists():
+                return redirect('review_timesheet', pk=header.mainheaderid)
             old_status = header.overallstatus
-            if entries.filter(linestatus='Rejected').exists():
+            if all_entries.filter(linestatus='Rejected').exists():
                 header.overallstatus = 'Revision Required'
             else:
                 header.overallstatus = 'Completed'
@@ -378,6 +408,13 @@ def review_timesheet(request, pk):
     has_unreviewed = entries.filter(linestatus='New').exists()
     has_rejected = entries.filter(linestatus='Rejected').exists()
     stat_dates, stat_labels = _stat_info()
+    entries = list(entries)
+    has_resubmission = False
+    for row in entries:
+        row.resubmission_note = (
+            last_rejection_note('MainEntry', row.mainentryid, 'supervisornote') if row.linestatus == 'New' else None
+        )
+        has_resubmission = has_resubmission or bool(row.resubmission_note)
 
     return render(request, 'timesheets/review_timesheet.html', {
         'header': header,
@@ -389,6 +426,7 @@ def review_timesheet(request, pk):
         'hours_approved': hours_approved,
         'has_unreviewed': has_unreviewed,
         'has_rejected': has_rejected,
+        'has_resubmission': has_resubmission,
         'stat_dates': stat_dates,
         'stat_labels': stat_labels,
     })
@@ -463,13 +501,21 @@ def payroll_unprocessed_review(request, dept_id, pk):
         action = request.POST.get('action')
 
         if action == 'mark_as_paid':
-            header.paidat = timezone.now()
-            header.paidby = request.user
-            header.save()
-            log_action(request.user, 'MarkedPaid', 'MainHeader', header.mainheaderid,
-                       old_values={'paidat': None}, new_values={'paidat': str(header.paidat)})
-            messages.success(request, f'Payment for {header.employeeid.firstname} {header.employeeid.lastname} marked as complete.')
-            return redirect('payroll_unprocessed')
+            # overallstatus=='Completed' should already mean every entry is
+            # Approved (finish_review only gets there when none are New or
+            # Rejected) — but a header that reached Completed before that
+            # rule existed can still be sitting here, so payroll has to
+            # verify it independently rather than trust the header's status.
+            if MainEntry.objects.filter(mainheaderid=header).exclude(linestatus='Approved').exists():
+                messages.error(request, 'This timesheet has an entry that was never approved — it cannot be marked as paid.')
+            else:
+                header.paidat = timezone.now()
+                header.paidby = request.user
+                header.save()
+                log_action(request.user, 'MarkedPaid', 'MainHeader', header.mainheaderid,
+                           old_values={'paidat': None}, new_values={'paidat': str(header.paidat)})
+                messages.success(request, f'Payment for {header.employeeid.firstname} {header.employeeid.lastname} marked as complete.')
+                return redirect('payroll_unprocessed')
 
         elif action == 'mark_as_unpaid':
             old_paidat = header.paidat
@@ -565,17 +611,24 @@ def payroll_business_unprocessed_review(request, dept_id, pk):
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'mark_as_paid':
-            header.paidat = timezone.now()
-            header.paidby = request.user
-            header.save()
-            log_action(request.user, 'MarkedPaid', 'BusinessHeader', header.businessheaderid,
-                       old_values={'paidat': None}, new_values={'paidat': str(header.paidat)})
-            messages.success(
-                request,
-                f'Payment for {header.employeeid.firstname} {header.employeeid.lastname} '
-                f'({header.get_periodmonth_display()} {header.periodyear}) marked as complete.'
-            )
-            return redirect('payroll_business_unprocessed_dept', dept_id=dept_id)
+            # Same defense-in-depth as payroll_unprocessed_review: Completed
+            # should already mean every entry is Approved, but a header that
+            # reached Completed before that rule existed could still be
+            # sitting here, so verify it independently rather than trust it.
+            if BusinessEntry.objects.filter(businessheaderid=header).exclude(linestatus='Approved').exists():
+                messages.error(request, 'This timesheet has an entry that was never approved — it cannot be marked as paid.')
+            else:
+                header.paidat = timezone.now()
+                header.paidby = request.user
+                header.save()
+                log_action(request.user, 'MarkedPaid', 'BusinessHeader', header.businessheaderid,
+                           old_values={'paidat': None}, new_values={'paidat': str(header.paidat)})
+                messages.success(
+                    request,
+                    f'Payment for {header.employeeid.firstname} {header.employeeid.lastname} '
+                    f'({header.get_periodmonth_display()} {header.periodyear}) marked as complete.'
+                )
+                return redirect('payroll_business_unprocessed_dept', dept_id=dept_id)
 
     stat_dates, stat_labels = _stat_info()
     return render(request, 'timesheets/payroll_business_unprocessed_review.html', {
@@ -627,6 +680,7 @@ def payroll_processed_maintenance_employee(request, employee_id):
 def payroll_processed_maintenance_month(request, employee_id, year, month):
     if request.user.access_level != 7:
         return redirect('profile')
+    _valid_date_or_404(year, month)
     employee = get_object_or_404(User, employeeid=employee_id, isactive=True)
     entries = MainEntry.objects.filter(
         mainheaderid__employeeid=employee,
@@ -712,6 +766,7 @@ def payroll_processed_business_employee(request, dept_id, employee_id):
 def payroll_processed_business_month(request, dept_id, employee_id, year, month):
     if request.user.access_level != 7:
         return redirect('profile')
+    _valid_date_or_404(year, month)
     dept = get_object_or_404(Department, departmentid=dept_id)
     employee = get_object_or_404(User, employeeid=employee_id, isactive=True)
     entries = BusinessEntry.objects.filter(
@@ -806,6 +861,7 @@ def payroll_ops_daily(request):
 def payroll_ops_daily_month(request, year, month):
     if request.user.access_level != 7:
         return redirect('profile')
+    _valid_date_or_404(year, month)
 
     unpaid_header_ids = OperationsEntry.objects.filter(
         linestatus='Approved',
@@ -836,6 +892,7 @@ def payroll_ops_daily_month(request, year, month):
 def payroll_ops_daily_day(request, year, month, day):
     if request.user.access_level != 7:
         return redirect('profile')
+    _valid_date_or_404(year, month, day)
 
     unpaid_header_ids = OperationsEntry.objects.filter(
         linestatus='Approved',
@@ -867,6 +924,7 @@ def payroll_ops_daily_day(request, year, month, day):
 def payroll_ops_daily_shift(request, year, month, day, shifttype):
     if request.user.access_level != 7:
         return redirect('profile')
+    _valid_date_or_404(year, month, day)
 
     unpaid_header_ids = OperationsEntry.objects.filter(
         linestatus='Approved',
@@ -976,6 +1034,7 @@ def payroll_ops_member_detail(request, employee_id):
 def payroll_ops_member_month(request, employee_id, year, month):
     if request.user.access_level != 7:
         return redirect('profile')
+    _valid_date_or_404(year, month)
 
     member = get_object_or_404(User, employeeid=employee_id)
     month_date = date(year, month, 1)
@@ -1090,6 +1149,7 @@ def superintendent_approved_employee(request, employee_id):
 def superintendent_approved_month(request, employee_id, year, month):
     if request.user.access_level != 2:
         return redirect('profile')
+    _valid_date_or_404(year, month)
     employee = get_object_or_404(User, employeeid=employee_id, supervisorid=request.user)
     headers = BusinessHeader.objects.filter(
         employeeid=employee,
@@ -1154,6 +1214,7 @@ def superintendent_ops_daily(request):
 def superintendent_ops_daily_month(request, year, month):
     if request.user.access_level != 2:
         return redirect('profile')
+    _valid_date_or_404(year, month)
 
     days = OperationsHeader.objects.filter(
         overallstatus='Completed',
@@ -1177,6 +1238,7 @@ def superintendent_ops_daily_month(request, year, month):
 def superintendent_ops_daily_day(request, year, month, day):
     if request.user.access_level != 2:
         return redirect('profile')
+    _valid_date_or_404(year, month, day)
 
     target_date = date(year, month, day)
 
@@ -1201,6 +1263,7 @@ def superintendent_ops_daily_day(request, year, month, day):
 def superintendent_ops_daily_shift(request, year, month, day, shifttype):
     if request.user.access_level != 2:
         return redirect('profile')
+    _valid_date_or_404(year, month, day)
 
     target_date = date(year, month, day)
 
@@ -1282,6 +1345,7 @@ def superintendent_ops_member_detail(request, employee_id):
 def superintendent_ops_member_month(request, employee_id, year, month):
     if request.user.access_level != 2:
         return redirect('profile')
+    _valid_date_or_404(year, month)
     member = get_object_or_404(User, employeeid=employee_id)
     month_date = date(year, month, 1)
     entries = OperationsEntry.objects.filter(
@@ -1296,27 +1360,39 @@ def superintendent_ops_member_month(request, employee_id, year, month):
     ).order_by('opsheaderid__shiftdate', 'opsheaderid__shifttype')
     payable_hours, non_payable_hours, total_hours = _payable_hours_split(entries, 'opscategoryid')
     bonus = OperationsBonus.objects.filter(employeeid=member, bonusmonth=month_date).first()
+    error = None
 
     if request.method == 'POST':
-        if bonus and bonus.status == 'Applied':
+        # Submitted is locked from this side the same as Applied — the template's
+        # own render has no form for either status, but that alone doesn't stop
+        # a resubmitted/crafted POST, so the server has to refuse it too.
+        if bonus and bonus.status in ('Submitted', 'Applied'):
             return redirect('superintendent_ops_member_month', employee_id=employee_id, year=year, month=month)
         action = request.POST.get('action')
         ratecode = request.POST.get('bonusratecode', '').strip()
         notes = request.POST.get('notes', '').strip()
-        if not bonus:
-            bonus = OperationsBonus(employeeid=member, bonusmonth=month_date)
-        bonus.bonusratecode = ratecode
-        bonus.notes = notes or None
-        if action == 'confirm':
-            bonus.status = 'Submitted'
-            bonus.reviewedby = request.user
-            bonus.reviewedat = timezone.now()
+        # The dropdown's `required` only stops a normal browser submit — a direct
+        # POST (or sending with the field cleared) would otherwise save straight
+        # through, so confirm needs its own server-side check of the same rule.
+        if action == 'confirm' and ratecode not in dict(BONUS_RATE_CODES):
+            error = 'Pick a valid bonus rate before confirming to payroll.'
+        elif ratecode and ratecode not in dict(BONUS_RATE_CODES):
+            error = 'Pick a valid bonus rate.'
         else:
-            bonus.status = 'Draft'
-            bonus.reviewedby = None
-            bonus.reviewedat = None
-        bonus.save()
-        return redirect('superintendent_ops_member_month', employee_id=employee_id, year=year, month=month)
+            if not bonus:
+                bonus = OperationsBonus(employeeid=member, bonusmonth=month_date)
+            bonus.bonusratecode = ratecode
+            bonus.notes = notes or None
+            if action == 'confirm':
+                bonus.status = 'Submitted'
+                bonus.reviewedby = request.user
+                bonus.reviewedat = timezone.now()
+            else:
+                bonus.status = 'Draft'
+                bonus.reviewedby = None
+                bonus.reviewedat = None
+            bonus.save()
+            return redirect('superintendent_ops_member_month', employee_id=employee_id, year=year, month=month)
 
     stat_dates, stat_labels = _stat_info()
     return render(request, 'timesheets/superintendent_ops_member_month.html', {
@@ -1332,6 +1408,7 @@ def superintendent_ops_member_month(request, employee_id, year, month):
         'rate_codes': BONUS_RATE_CODES,
         'stat_dates': stat_dates,
         'stat_labels': stat_labels,
+        'error': error,
     })
 
 
@@ -1458,6 +1535,7 @@ def supervisor_approved_employee(request, employee_id):
 def supervisor_approved_month(request, employee_id, year, month):
     if request.user.access_level != 3:
         return redirect('profile')
+    _valid_date_or_404(year, month)
     employee = get_object_or_404(User, employeeid=employee_id, supervisorid=request.user)
 
     if employee.access_level == 9:
@@ -1532,6 +1610,7 @@ def my_timesheets_approved(request):
 def my_timesheets_approved_month(request, year, month):
     if request.user.access_level != 9:
         return redirect('profile')
+    _valid_date_or_404(year, month)
     entries = MainEntry.objects.filter(
         mainheaderid__employeeid=request.user,
         mainheaderid__overallstatus='Completed',
@@ -1575,6 +1654,7 @@ def my_timesheets_paid(request):
 def my_timesheets_paid_month(request, year, month):
     if request.user.access_level != 9:
         return redirect('profile')
+    _valid_date_or_404(year, month)
     entries = MainEntry.objects.filter(
         mainheaderid__employeeid=request.user,
         mainheaderid__paidat__isnull=False,
@@ -1597,27 +1677,293 @@ def my_timesheets_paid_month(request, year, month):
     })
 
 
-def _contract_block(employee, posted_contractid):
-    # Why an entry for this employee can't be saved without a contract, or None.
+def _contract_block(employee, posted_contractid, posted_accountid=None):
+    # Why an entry for this employee can't be saved, or None.
     # Staff and unclassified people carry no contract, so the picker is off for them.
     if employee.contractid_id:
-        return None
-    if not employee.minerlevel_id or employee.minerlevel.levelcode == 'Staff':
+        contract_id = employee.contractid_id
+    elif not employee.minerlevel_id or employee.minerlevel.levelcode == 'Staff':
         return f'{employee.firstname} {employee.lastname} has no contract on record. The Superintendent needs to classify them first.'
-    if not posted_contractid:
+    elif not posted_contractid:
         return 'Pick a contract for this entry.'
+    else:
+        contract_id = posted_contractid
+
+    # Account is only required once the contract actually has one to offer —
+    # a contract with nothing mapped yet stays optional, same as before.
+    if not posted_accountid and ContractAccount.objects.filter(contractid_id=contract_id).exists():
+        return 'Pick an account for this entry.'
     return None
 
 
-def _hours_error(hoursworked_str):
-    # Why this row's hours can't be saved, or None. Shared by the Operations
-    # add_row/edit_row actions — a 0 (or blank/invalid) entry isn't real work.
+def _hours_error(hoursworked_str, enforce_max=True):
+    # Why this row's hours can't be saved, or None. Shared by every
+    # add-entry flow — a 0 (or blank/invalid) entry isn't real work.
+    # enforce_max=False for leave-type entries (e.g. Unpaid Leave): those
+    # aren't a single day's hours, they're an overage/leave balance line,
+    # and are intentionally left uncapped (see test_unpaid_leave_not_capped).
     try:
         hours = Decimal(hoursworked_str)
     except (TypeError, InvalidOperation):
         return 'Enter the hours worked.'
-    if hours <= 0:
-        return 'Hours worked must be greater than 0.'
+    if hours < Decimal('0.5'):
+        return 'Hours worked must be at least 0.5.'
+    if enforce_max and hours > 24:
+        return 'Hours worked cannot exceed 24 for a single day.'
+    return None
+
+
+def _employee_day_hours_error(employee, shiftdate, new_hours, exclude_entry=None, is_self=False):
+    """Caps any employee's hours at 24 for one shift date, summed across
+    every OperationsEntry row they're on for that date — not just this one
+    row, and not just this one header. Nothing stops the same employee
+    being added more than once to a sheet (e.g. a second + Add Row for
+    someone already on it), and a shifter covering a second basket can
+    also log their own hours on two separate headers for the same day —
+    either way, no single row or header alone would catch the total going
+    over 24."""
+    qs = OperationsEntry.objects.filter(employeeid=employee, opsheaderid__shiftdate=shiftdate)
+    if exclude_entry:
+        qs = qs.exclude(pk=exclude_entry.pk)
+    existing_total = qs.aggregate(Sum('hoursworked'))['hoursworked__sum'] or Decimal('0')
+    new_total = existing_total + new_hours
+    if new_total > 24:
+        who = 'Your' if is_self else f'{employee.firstname} {employee.lastname}\'s'
+        return (
+            f'{who} logged hours for {shiftdate} would total {new_total} — '
+            f'over the 24-hour daily limit across all the rows and sheets for that day.'
+        )
+    return None
+
+
+def _haulage_error(request):
+    # Why this row's haulage/tonnage figures can't be saved, or None. None of
+    # these are real quantities below zero — a negative load isn't a thing.
+    fields = {
+        'hauledto': None,  # text field, not checked here
+        'tonnesorehauled': 'Tonnes ore hauled',
+        'tonneswastehauled': 'Tonnes waste hauled',
+        'lowgradehauled': 'Low grade hauled',
+        'tonnesoreskipped': 'Tonnes ore skipped',
+        'tonneswasteskipped': 'Tonnes waste skipped',
+        'lowgradeskipped': 'Low grade skipped',
+        'longholefootage': 'Longhole footage',
+    }
+    for field, label in fields.items():
+        if not label:
+            continue
+        raw = request.POST.get(field)
+        if not raw:
+            continue
+        try:
+            value = Decimal(raw)
+        except InvalidOperation:
+            return f'{label} must be a number.'
+        if value < 0:
+            return f'{label} cannot be negative.'
+    return None
+
+
+_HAULAGE_FIELD_LABELS = {
+    'tonnesorehauled': 'Tonnes ore hauled',
+    'tonneswastehauled': 'Tonnes waste hauled',
+    'lowgradehauled': 'Low grade hauled',
+    'tonnesoreskipped': 'Tonnes ore skipped',
+    'tonneswasteskipped': 'Tonnes waste skipped',
+    'lowgradeskipped': 'Low grade skipped',
+    'longholefootage': 'Longhole footage',
+}
+
+
+def legacy_entry_warnings(entry):
+    """Flags for an OperationsEntry whose already-saved values would fail the
+    checks a new save goes through today — e.g. rows saved before those
+    checks existed. A non-empty result blocks the Captain from approving
+    this row as-is; they can still Reject it (with a reason), which routes
+    it back to the shifter to fix through the normal revision flow."""
+    warnings = []
+    if entry.hoursworked is not None and (entry.hoursworked < Decimal('0.5') or entry.hoursworked > 24):
+        warnings.append(f'Hours worked ({entry.hoursworked}) is outside the normal 0.5–24 range.')
+    for field, label in _HAULAGE_FIELD_LABELS.items():
+        value = getattr(entry, field)
+        if value is not None and value < 0:
+            warnings.append(f'{label} ({value}) is negative.')
+    if entry.opscategoryid_id and not Opscategory.objects.filter(pk=entry.opscategoryid_id, isactive=1).exists():
+        warnings.append('Work category no longer exists or is inactive.')
+    if entry.leavetypeid_id and not LeaveType.objects.filter(pk=entry.leavetypeid_id, isactive=1).exists():
+        warnings.append('Leave type no longer exists or is inactive.')
+    if not entry.opscategoryid_id and not entry.leavetypeid_id:
+        warnings.append('No work category or leave type is set.')
+    return warnings
+
+
+def last_rejection_note(table_name, record_id, note_field):
+    """The reviewer's note from this entry's most recent rejection, read back
+    from the audit log, or None. The entry's own note field gets cleared
+    once the employee fixes and resaves it, so once it's pending again this
+    is the only place that reason still exists — used to flag a row as a
+    resubmission and show the reviewer what they asked to be corrected."""
+    log = Auditlog.objects.filter(
+        tablename=table_name, recordid=record_id, action='Rejected'
+    ).order_by('-timestamp').first()
+    if log and log.newvalue:
+        return log.newvalue.get(note_field)
+    return None
+
+
+def _category_error(sel, category_model=None, prefix='oc_'):
+    # Why this row's work category/leave type selection can't be saved, or
+    # None. A row always needs exactly one of the two — never neither, and
+    # never a stale/made-up id that no longer (or never did) exist. Shared by
+    # every add-entry flow — category_model/prefix pick which category table
+    # and selection-value prefix this one uses (Opscategory/'oc_' for
+    # Operations, Workcategory/'wc_' for the Maintenance Personal Timesheet).
+    category_model = category_model or Opscategory
+    if not sel:
+        return 'Pick a work category or leave type for this entry.'
+    if sel.startswith(prefix):
+        if not category_model.objects.filter(pk=sel[len(prefix):], isactive=1).exists():
+            return 'That work category no longer exists. Pick another.'
+    elif sel.startswith('lt_'):
+        if not LeaveType.objects.filter(pk=sel[3:], isactive=1).exists():
+            return 'That leave type no longer exists. Pick another.'
+    else:
+        return 'Pick a work category or leave type for this entry.'
+    return None
+
+
+def _bonus_fields_error(bonustype, periodstart_str, periodend_str, bonusratecode):
+    # Why this bonus can't be saved, or None. The blank checks a caller
+    # already does aren't enough — a non-blank but malformed/made-up value
+    # (a garbage date, a rate code nobody offers) used to reach the database
+    # and crash instead of stopping here with a message.
+    if bonustype not in dict(BONUS_TYPE_CHOICES):
+        return 'Pick a valid bonus type.'
+    if bonusratecode not in dict(BONUS_RATE_CODES):
+        return 'Pick a valid bonus rate.'
+    try:
+        start = date.fromisoformat(periodstart_str)
+        end = date.fromisoformat(periodend_str)
+    except (TypeError, ValueError):
+        return 'Enter valid start and end dates.'
+    if end < start:
+        return 'The period end date must be on or after the start date.'
+    return None
+
+
+def _future_work_date_error(category_id, date_str):
+    # A work-category entry can't be dated after today — you can't log (or
+    # get paid for) hours you haven't worked yet. Leave entries are exempt
+    # (category_id is None for those): booking vacation/leave ahead of time
+    # is normal and already allowed, same as the Maintenance timesheet.
+    if not category_id:
+        return None
+    try:
+        if date.fromisoformat(date_str) > timezone.now().date():
+            return 'Date cannot be a future date for this work category.'
+    except (TypeError, ValueError):
+        return None  # an invalid date is caught elsewhere
+    return None
+
+
+def _entry_date_error(date_str):
+    # Why this entry's date can't be saved, or None. Shared by every
+    # add-entry flow that takes a per-row date — missing or malformed input
+    # used to reach the database and crash on a NOT NULL/parse error instead
+    # of stopping here with a message.
+    if not date_str:
+        return 'Enter a date for this entry.'
+    try:
+        date.fromisoformat(date_str)
+    except (TypeError, ValueError):
+        return 'Enter a valid date.'
+    return None
+
+
+def _shifttype_error(shifttype, required=True):
+    # Why this entry's shift can't be saved, or None. 'required' is False
+    # wherever the field itself is optional (defaults to Day) — otherwise a
+    # blank/garbage value used to either violate a NOT NULL column or, worse,
+    # overflow ShiftType's 5-character limit and crash with a DB DataError.
+    if not shifttype:
+        return 'Pick a shift.' if required else None
+    if shifttype not in ('Day', 'Night'):
+        return 'Pick a valid shift (Day or Night).'
+    return None
+
+
+def _month_lock_error(header, startdate_str):
+    # Why this entry's date can't be saved, or None. A timesheet is for one
+    # pay month — every entry on it has to fall in the same calendar month
+    # as the header's first entry, not a mix pulled from different months.
+    # Deliberately never excludes the entry being edited: the first entry's
+    # own saved date is what established the lock, so editing that very
+    # entry out of its own month must still be caught, not just exempted
+    # because there's nothing else left to compare it against.
+    try:
+        new_date = date.fromisoformat(startdate_str)
+    except (TypeError, ValueError):
+        return None  # an invalid date is caught elsewhere
+    first = MainEntry.objects.filter(mainheaderid=header).order_by('mainentryid').first()
+    if first and (new_date.year, new_date.month) != (first.startdate.year, first.startdate.month):
+        return f'This timesheet is for {first.startdate:%B %Y} — pick a date in that month.'
+    return None
+
+
+def _business_month_lock_error(header, dateworked_str):
+    # Why this entry's date can't be saved, or None. Unlike MainHeader,
+    # BusinessHeader carries its own explicit periodmonth/periodyear, so the
+    # lock is anchored to that fixed field rather than inferred from
+    # whichever entry happens to be first — nothing to exclude or drift.
+    try:
+        new_date = date.fromisoformat(dateworked_str)
+    except (TypeError, ValueError):
+        return None  # an invalid date is caught elsewhere
+    if (new_date.year, new_date.month) != (header.periodyear, header.periodmonth):
+        return f'This timesheet is for {header.get_periodmonth_display()} {header.periodyear} — pick a date in that month.'
+    return None
+
+
+def _main_entry_day_hours_error(user, startdate_str, new_hours, exclude_entry=None):
+    """Caps a Maintenance Crew member's hours at 24 for one date, summed
+    across every MainEntry they have for that date — not just checked one
+    row at a time. Each individual entry can be <=24 on its own (e.g. three
+    separate 24-hour rows on the same day) and still add up to far more than
+    a day holds; this catches that total."""
+    try:
+        new_date = date.fromisoformat(startdate_str)
+    except (TypeError, ValueError):
+        return None  # an invalid date is caught elsewhere
+    qs = MainEntry.objects.filter(mainheaderid__employeeid=user, startdate=new_date)
+    if exclude_entry:
+        qs = qs.exclude(pk=exclude_entry.pk)
+    existing_total = qs.aggregate(Sum('hoursworked'))['hoursworked__sum'] or Decimal('0')
+    new_total = existing_total + new_hours
+    if new_total > 24:
+        return (
+            f'That would bring your total logged hours for {new_date} to {new_total} — '
+            f'over the 24-hour daily limit.'
+        )
+    return None
+
+
+def _business_entry_day_hours_error(user, dateworked_str, new_hours, exclude_entry=None):
+    """Same cumulative-per-day cap as _main_entry_day_hours_error, for the
+    Business Timesheet's BusinessEntry rows."""
+    try:
+        new_date = date.fromisoformat(dateworked_str)
+    except (TypeError, ValueError):
+        return None  # an invalid date is caught elsewhere
+    qs = BusinessEntry.objects.filter(businessheaderid__employeeid=user, dateworked=new_date)
+    if exclude_entry:
+        qs = qs.exclude(pk=exclude_entry.pk)
+    existing_total = qs.aggregate(Sum('hoursworked'))['hoursworked__sum'] or Decimal('0')
+    new_total = existing_total + new_hours
+    if new_total > 24:
+        return (
+            f'That would bring your total logged hours for {new_date} to {new_total} — '
+            f'over the 24-hour daily limit.'
+        )
     return None
 
 
@@ -1702,25 +2048,23 @@ def new_ops_sheet(request):
         coverage_id = request.POST.get('coverage_id') or None
         own_basket = request.POST.get('own_basket') or None
 
-        try:
-            from datetime import date as _date, timedelta as _timedelta
-            shiftdate_obj = _date.fromisoformat(shiftdate) if shiftdate else None
-            date_error = None
-            if shiftdate_obj and shiftdate_obj > today:
-                date_error = 'Crew sheets cannot be created for future dates.'
-            elif shiftdate_obj and shiftdate_obj < today - _timedelta(days=7):
-                date_error = 'Crew sheets can only be created for the last 7 days.'
-            if date_error:
-                return render(request, 'timesheets/ops_sheet.html', {
-                    **base_context,
-                    'coverage_sections': {},
-                    'coverage_crews': {},
-                    'own_basket_sections': {},
-                    'own_basket_crews': {},
-                    'error': date_error,
-                })
-        except ValueError:
-            pass
+        form_error = _entry_date_error(shiftdate) or _shifttype_error(shifttype)
+        if not form_error:
+            from datetime import timedelta as _timedelta
+            shiftdate_obj = date.fromisoformat(shiftdate)
+            if shiftdate_obj > today:
+                form_error = 'Crew sheets cannot be created for future dates.'
+            elif shiftdate_obj < today - _timedelta(days=7):
+                form_error = 'Crew sheets can only be created for the last 7 days.'
+        if form_error:
+            return render(request, 'timesheets/ops_sheet.html', {
+                **base_context,
+                'coverage_sections': {},
+                'coverage_crews': {},
+                'own_basket_sections': {},
+                'own_basket_crews': {},
+                'error': form_error,
+            })
 
         # Derive section + crew from the basket this sheet is actually for —
         # own home basket, a specific other own basket if running more than
@@ -1877,14 +2221,22 @@ def ops_sheet(request, pk):
             sel = request.POST.get('category_selection', '')
             opscategoryid = sel[3:] if sel.startswith('oc_') else None
             leavetypeid = sel[3:] if sel.startswith('lt_') else None
-            row_employee = User.objects.filter(pk=request.POST.get('employeeid')).first()
+            posted_employeeid = request.POST.get('employeeid')
+            row_employee = User.objects.filter(pk=posted_employeeid).first() if posted_employeeid else None
             hoursworked_str = request.POST.get('hoursworked')
-            leave_error = _hours_error(hoursworked_str)
+            leave_error = _hours_error(hoursworked_str) or _category_error(sel) or _haulage_error(request)
+            if not leave_error and not row_employee:
+                leave_error = 'Unknown employee.'
             if not leave_error and row_employee:
                 leave_error = _validate_leave_entry(row_employee, leavetypeid, str(header.shiftdate), hoursworked_str)
 
             if not leave_error and row_employee:
-                leave_error = _contract_block(row_employee, request.POST.get('contractid'))
+                leave_error = _contract_block(row_employee, request.POST.get('contractid'), request.POST.get('accountid'))
+            if not leave_error and row_employee:
+                leave_error = _employee_day_hours_error(
+                    row_employee, header.shiftdate, Decimal(hoursworked_str),
+                    is_self=row_employee.pk == request.user.pk,
+                )
             if leave_error:
                 messages.error(request, leave_error)
             else:
@@ -1929,7 +2281,19 @@ def ops_sheet(request, pk):
                 entry.delete()
 
         elif action == 'submit_sheet' and header.overallstatus == 'Draft':
-            if not OperationsEntry.objects.filter(opsheaderid=header).exists():
+            sheet_entries = OperationsEntry.objects.filter(opsheaderid=header)
+            if not sheet_entries.exists():
+                return redirect('ops_sheet', pk=header.opsheaderid)
+            # Roster rows are pre-filled at 0 hours when the sheet is created
+            # (see new_ops_sheet) — if the shifter never touches one, it's
+            # not real work and shouldn't be submittable as-is.
+            zero_entry = sheet_entries.filter(hoursworked__lt=Decimal('0.5')).select_related('employeeid').first()
+            if zero_entry:
+                messages.error(
+                    request,
+                    f'{zero_entry.employeeid.firstname} {zero_entry.employeeid.lastname} still has 0 hours — '
+                    f'enter their hours or remove the row before submitting.'
+                )
                 return redirect('ops_sheet', pk=header.opsheaderid)
             old_status = header.overallstatus
             header.overallstatus = 'Submitted'
@@ -1950,13 +2314,18 @@ def ops_sheet(request, pk):
             opscategoryid = sel[3:] if sel.startswith('oc_') else None
             leavetypeid = sel[3:] if sel.startswith('lt_') else None
             hoursworked_str = request.POST.get('hoursworked')
-            leave_error = _hours_error(hoursworked_str)
+            leave_error = _hours_error(hoursworked_str) or _category_error(sel) or _haulage_error(request)
             if not leave_error:
                 leave_error = _validate_leave_entry(
                     entry.employeeid, leavetypeid, str(header.shiftdate), hoursworked_str, exclude_entry=entry,
                 )
             if not leave_error:
-                leave_error = _contract_block(entry.employeeid, request.POST.get('contractid'))
+                leave_error = _contract_block(entry.employeeid, request.POST.get('contractid'), request.POST.get('accountid'))
+            if not leave_error:
+                leave_error = _employee_day_hours_error(
+                    entry.employeeid, header.shiftdate, Decimal(hoursworked_str), exclude_entry=entry,
+                    is_self=entry.employeeid_id == request.user.pk,
+                )
 
             if leave_error:
                 messages.error(request, leave_error)
@@ -1989,13 +2358,14 @@ def ops_sheet(request, pk):
                            old_values=old_values, new_values={'hoursworked': str(entry.hoursworked)})
 
         elif action == 'resubmit' and header.overallstatus == 'Revision Required':
-            OperationsEntry.objects.filter(opsheaderid=header).exclude(linestatus='Approved').update(linestatus='New')
-            old_status = header.overallstatus
-            header.overallstatus = 'Submitted'
-            header.save()
-            log_action(request.user, 'Resubmitted', 'OperationsHeader', header.opsheaderid,
-                       old_values={'overallstatus': old_status}, new_values={'overallstatus': 'Submitted'})
-            return redirect('my_ops_sheets')
+            if not OperationsEntry.objects.filter(opsheaderid=header, linestatus='Rejected').exists():
+                OperationsEntry.objects.filter(opsheaderid=header).exclude(linestatus='Approved').update(linestatus='New')
+                old_status = header.overallstatus
+                header.overallstatus = 'Submitted'
+                header.save()
+                log_action(request.user, 'Resubmitted', 'OperationsHeader', header.opsheaderid,
+                           old_values={'overallstatus': old_status}, new_values={'overallstatus': 'Submitted'})
+                return redirect('my_ops_sheets')
 
         return redirect('ops_sheet', pk=header.opsheaderid)
 
@@ -2016,7 +2386,12 @@ def ops_sheet(request, pk):
             shifter=request.user, enddate__isnull=True
         ).select_related('employee')
 
-    guest_employees = User.objects.filter(roleid__accessid__accessid=8, isactive=True)
+    # Excludes anyone already in active_assignments - someone on this crew
+    # whose role also happens to be the generic Miner/Guest role would
+    # otherwise show up twice in the Add Row dropdown (once per group).
+    guest_employees = User.objects.filter(roleid__accessid__accessid=8, isactive=True).exclude(
+        eid__in=active_assignments.values_list('employee_id', flat=True)
+    )
 
     contracts = Contract.objects.filter(isactive=1)
     opscategories = Opscategory.objects.filter(isactive=1)
@@ -2079,6 +2454,7 @@ def ops_sheet(request, pk):
     return render(request, 'timesheets/ops_sheet.html', {
         'header': header,
         'entries': entry_rows,
+        'has_rejected': any(row.linestatus == 'Rejected' for row in entry_rows),
         'active_assignments': active_assignments,
         'guest_employees': guest_employees,
         'contracts': contracts,
@@ -2116,6 +2492,7 @@ def my_ops_approvals(request):
 def my_ops_approvals_month(request, year, month):
     if request.user.access_level != 5:
         return redirect('profile')
+    _valid_date_or_404(year, month)
     sheets = OperationsHeader.objects.filter(
         shifterid=request.user,
         overallstatus='Completed',
@@ -2152,6 +2529,7 @@ def my_ops_completed(request):
 def my_ops_completed_month(request, year, month):
     if request.user.access_level != 4:
         return redirect('profile')
+    _valid_date_or_404(year, month)
     days = OperationsHeader.objects.filter(
         overallstatus='Completed',
         shiftdate__year=year,
@@ -2172,6 +2550,7 @@ def my_ops_completed_month(request, year, month):
 def my_ops_completed_day(request, year, month, day):
     if request.user.access_level != 4:
         return redirect('profile')
+    _valid_date_or_404(year, month, day)
     shift_date = date(year, month, day)
     shifts = OperationsHeader.objects.filter(
         overallstatus='Completed',
@@ -2192,6 +2571,7 @@ def my_ops_completed_day(request, year, month, day):
 def my_ops_completed_shift(request, year, month, day, shifttype):
     if request.user.access_level != 4:
         return redirect('profile')
+    _valid_date_or_404(year, month, day)
     shift_date = date(year, month, day)
     headers = OperationsHeader.objects.filter(
         overallstatus='Completed',
@@ -2240,6 +2620,7 @@ def my_pay_history(request):
 def my_pay_history_month(request, year, month):
     if not _is_contract_shifter(request.user):
         return redirect('profile')
+    _valid_date_or_404(year, month)
     entries = OperationsEntry.objects.filter(
         employeeid=request.user,
         opsheaderid__overallstatus='Completed',
@@ -2323,6 +2704,7 @@ def ops_approval_inbox(request):
 def ops_approval_inbox_date(request, year, month, day):
     if request.user.access_level != 4:
         return redirect('profile')
+    _valid_date_or_404(year, month, day)
 
     target_date = date(year, month, day)
     shifts = OperationsHeader.objects.filter(
@@ -2347,6 +2729,7 @@ def ops_approval_inbox_date(request, year, month, day):
 def ops_approval_inbox_shift(request, year, month, day, shifttype):
     if request.user.access_level != 4:
         return redirect('profile')
+    _valid_date_or_404(year, month, day)
 
     target_date = date(year, month, day)
     headers = OperationsHeader.objects.filter(
@@ -2363,11 +2746,22 @@ def ops_approval_inbox_shift(request, year, month, day, shifttype):
         entries = OperationsEntry.objects.filter(opsheaderid=header).select_related(
             'employeeid', 'contractid', 'accountid', 'opscategoryid', 'approvedby_capt'
         )
+        has_unreviewed = entries.filter(linestatus='New').exists()
+        has_rejected = entries.filter(linestatus='Rejected').exists()
+        entries = list(entries)
+        has_resubmission = False
+        for row in entries:
+            row.legacy_warnings = legacy_entry_warnings(row)
+            row.resubmission_note = (
+                last_rejection_note('OperationsEntry', row.opsentryid, 'captainnote') if row.linestatus == 'New' else None
+            )
+            has_resubmission = has_resubmission or bool(row.resubmission_note)
         panels.append({
             'header': header,
             'entries': entries,
-            'has_unreviewed': entries.filter(linestatus='New').exists(),
-            'has_rejected': entries.filter(linestatus='Rejected').exists(),
+            'has_unreviewed': has_unreviewed,
+            'has_rejected': has_rejected,
+            'has_resubmission': has_resubmission,
             'is_stat': header.shiftdate in stat_dates,
             'stat_label': stat_labels.get(header.shiftdate, ''),
         })
@@ -2401,6 +2795,10 @@ def review_ops_sheet(request,pk):
     if request.method == 'POST' and not readonly:
         action = request.POST.get('action')
         next_url = request.POST.get('next')
+        if next_url and not url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure(),
+        ):
+            next_url = None
 
         def _redirect_here():
             return redirect(next_url) if next_url else redirect('review_ops_sheet', pk=pk)
@@ -2410,6 +2808,10 @@ def review_ops_sheet(request,pk):
             old_status = entry.linestatus
 
             if action == 'approve':
+                warnings = legacy_entry_warnings(entry)
+                if warnings:
+                    messages.error(request, 'This entry has invalid data and cannot be approved as-is: ' + ' '.join(warnings))
+                    return _redirect_here()
                 entry.linestatus = 'Approved'
                 entry.approvedby_capt = request.user
                 entry.approvedat_capt = timezone.now()
@@ -2427,7 +2829,8 @@ def review_ops_sheet(request,pk):
                 entry.save()
 
             log_action(request.user, entry.linestatus, 'OperationsEntry', entry.opsentryid,
-                       old_values={'linestatus': old_status}, new_values={'linestatus': entry.linestatus})
+                       old_values={'linestatus': old_status},
+                       new_values={'linestatus': entry.linestatus, 'captainnote': entry.captainnote})
 
             if not header.ohapprovedby_capt:
                 header.ohapprovedby_capt = request.user
@@ -2439,17 +2842,27 @@ def review_ops_sheet(request,pk):
             return _redirect_here()
 
         elif action == 'bulk_approve':
-            entryids = request.POST.getlist('entryids')
-            to_approve = OperationsEntry.objects.filter(opsentryid__in=entryids, opsheaderid=header, linestatus='New')
-            if to_approve.exists():
-                for entry in to_approve:
-                    entry.linestatus = 'Approved'
-                    entry.approvedby_capt = request.user
-                    entry.approvedat_capt = timezone.now()
-                    entry.captainnote = None
-                    entry.save()
-                    log_action(request.user, 'Approved', 'OperationsEntry', entry.opsentryid,
-                               old_values={'linestatus': 'New'}, new_values={'linestatus': 'Approved'})
+            # A non-digit id in the list would otherwise crash the __in lookup
+            # with a 500 instead of just not matching that entry.
+            entryids = [e for e in request.POST.getlist('entryids') if e.isdigit()]
+            candidates = OperationsEntry.objects.filter(opsentryid__in=entryids, opsheaderid=header, linestatus='New')
+            skipped = 0
+            approved_any = False
+            for entry in candidates:
+                if legacy_entry_warnings(entry):
+                    skipped += 1
+                    continue
+                entry.linestatus = 'Approved'
+                entry.approvedby_capt = request.user
+                entry.approvedat_capt = timezone.now()
+                entry.captainnote = None
+                entry.save()
+                approved_any = True
+                log_action(request.user, 'Approved', 'OperationsEntry', entry.opsentryid,
+                           old_values={'linestatus': 'New'}, new_values={'linestatus': 'Approved'})
+            if skipped:
+                messages.error(request, f'{skipped} selected entr{"y" if skipped == 1 else "ies"} had invalid data and were not approved — reject them individually with a reason instead.')
+            if approved_any:
                 if not header.ohapprovedby_capt:
                     header.ohapprovedby_capt = request.user
                     header.overallstatus = 'In Progress'
@@ -2479,6 +2892,14 @@ def review_ops_sheet(request,pk):
         )
     has_unreviewed = entries.filter(linestatus='New').exists()
     has_rejected = entries.filter(linestatus='Rejected').exists()
+    entries = list(entries)
+    has_resubmission = False
+    for row in entries:
+        row.legacy_warnings = legacy_entry_warnings(row)
+        row.resubmission_note = (
+            last_rejection_note('OperationsEntry', row.opsentryid, 'captainnote') if row.linestatus == 'New' else None
+        )
+        has_resubmission = has_resubmission or bool(row.resubmission_note)
 
     stat_dates, stat_labels = _stat_info()
     return render(request, 'timesheets/review_ops_sheet.html', {
@@ -2486,6 +2907,7 @@ def review_ops_sheet(request,pk):
         'entries': entries,
         'has_unreviewed': has_unreviewed,
         'has_rejected': has_rejected,
+        'has_resubmission': has_resubmission,
         'readonly': readonly,
         'is_stat': header.shiftdate in stat_dates,
         'stat_label': stat_labels.get(header.shiftdate, ''),
@@ -2497,6 +2919,16 @@ def review_ops_sheet(request,pk):
 
 
 
+def _valid_pk(model, raw):
+    # A plain digit string that matches a real row, or None — isdigit() alone
+    # isn't enough (a well-formed but nonexistent id would still reach the
+    # ORM), and passing raw/non-digit text straight into a pk filter crashes
+    # the request with a 500 instead of just not matching anything.
+    if not raw or not raw.isdigit():
+        return None
+    return model.objects.filter(pk=raw).first()
+
+
 @login_required(login_url='login')
 def contract_account_management(request):
     if request.user.access_level != 2:
@@ -2506,51 +2938,46 @@ def contract_account_management(request):
         action = request.POST.get('action')
 
         if action == 'add':
-            contract_id = request.POST.get('contractid')
-            account_id = request.POST.get('accountid')
-            if contract_id and account_id:
-                ContractAccount.objects.get_or_create(
-                    contractid_id=contract_id,
-                    accountid_id=account_id
-                )
+            contract = _valid_pk(Contract, request.POST.get('contractid'))
+            account = _valid_pk(Account, request.POST.get('accountid'))
+            if contract and account:
+                ContractAccount.objects.get_or_create(contractid=contract, accountid=account)
 
         elif action == 'remove':
-            link_id = request.POST.get('contractaccountid')
-            ContractAccount.objects.filter(contractaccountid=link_id).delete()
+            link = _valid_pk(ContractAccount, request.POST.get('contractaccountid'))
+            if link:
+                link.delete()
 
         elif action == 'add_series':
-            contract_id = request.POST.get('contractid')
-            new_series_id = request.POST.get('new_series_id')
-            if contract_id and new_series_id:
-                contract = get_object_or_404(Contract, contractid=contract_id)
-                contract.series.add(new_series_id)
+            contract = _valid_pk(Contract, request.POST.get('contractid'))
+            series = _valid_pk(ContractSeries, request.POST.get('new_series_id'))
+            if contract and series:
+                contract.series.add(series)
 
         elif action == 'remove_series':
-            contract_id = request.POST.get('contractid')
-            remove_series_id = request.POST.get('remove_series_id')
-            contract = get_object_or_404(Contract, contractid=contract_id)
-            contract.series.remove(remove_series_id)
+            contract = _valid_pk(Contract, request.POST.get('contractid'))
+            series = _valid_pk(ContractSeries, request.POST.get('remove_series_id'))
+            if contract and series:
+                contract.series.remove(series)
 
         elif action == 'add_level':
-            contract_id = request.POST.get('contractid')
-            new_level_id = request.POST.get('new_level_id')
-            if contract_id and new_level_id:
-                contract = get_object_or_404(Contract, contractid=contract_id)
-                contract.levels.add(new_level_id)
+            contract = _valid_pk(Contract, request.POST.get('contractid'))
+            level = _valid_pk(MinerLevel, request.POST.get('new_level_id'))
+            if contract and level:
+                contract.levels.add(level)
 
         elif action == 'remove_level':
-            contract_id = request.POST.get('contractid')
-            remove_level_id = request.POST.get('remove_level_id')
-            contract = get_object_or_404(Contract, contractid=contract_id)
-            contract.levels.remove(remove_level_id)
+            contract = _valid_pk(Contract, request.POST.get('contractid'))
+            level = _valid_pk(MinerLevel, request.POST.get('remove_level_id'))
+            if contract and level:
+                contract.levels.remove(level)
 
         elif action == 'bulk_assign_account':
-            bulk_series_id = request.POST.get('bulk_series_id')
-            bulk_account_id = request.POST.get('bulk_account_id')
-            if bulk_series_id and bulk_account_id:
-                series = get_object_or_404(ContractSeries, seriesid=bulk_series_id)
+            series = _valid_pk(ContractSeries, request.POST.get('bulk_series_id'))
+            account = _valid_pk(Account, request.POST.get('bulk_account_id'))
+            if series and account:
                 for contract in series.contracts.filter(isactive=1):
-                    ContractAccount.objects.get_or_create(contractid=contract, accountid_id=bulk_account_id)
+                    ContractAccount.objects.get_or_create(contractid=contract, accountid=account)
 
         series_id = request.POST.get('series_id', '')
         base_url = reverse('contract_account_management')
@@ -2603,6 +3030,7 @@ def new_business_timesheet(request):
         return redirect('profile')
 
     now = timezone.now()
+    current_year = now.year
 
     if request.method == 'POST':
         try:
@@ -2611,13 +3039,24 @@ def new_business_timesheet(request):
         except (ValueError, TypeError):
             month, year = 0, 0
 
+        form_error = None
         if not (1 <= month <= 12) or year < 2020:
-            messages.error(request, 'Please select a valid month and year.')
-            return redirect('new_business_timesheet')
-
-        if (year, month) > (now.year, now.month):
-            messages.error(request, "You can't start a timesheet for a future month.")
-            return redirect('new_business_timesheet')
+            form_error = 'Please select a valid month and year.'
+        elif (year, month) > (now.year, now.month):
+            form_error = "You can't start a timesheet for a future month."
+        if form_error:
+            # Rendered inline, not redirect+message — a message queued here
+            # would otherwise sit in the session and surface on whatever
+            # unrelated page the user visits next, instead of this one.
+            return render(request, 'timesheets/business_new.html', {
+                'month_choices': MONTH_CHOICES,
+                'year_choices': [current_year - 1, current_year],
+                'default_month': month if 1 <= month <= 12 else now.month,
+                'default_year': year if year >= 2020 else current_year,
+                'current_year': current_year,
+                'current_month': now.month,
+                'error': form_error,
+            })
 
         existing = BusinessHeader.objects.filter(
             employeeid=request.user,
@@ -2639,7 +3078,6 @@ def new_business_timesheet(request):
         log_action(request.user, 'Created', 'BusinessHeader', header.businessheaderid, new_values={'overallstatus': 'Draft'})
         return redirect('add_business_entry', pk=header.businessheaderid)
 
-    current_year = now.year
     return render(request, 'timesheets/business_new.html', {
         'month_choices': MONTH_CHOICES,
         'year_choices': [current_year - 1, current_year],
@@ -2669,7 +3107,18 @@ def add_business_entry(request, pk):
                 dateworked_str = request.POST.get('dateworked')
                 hoursworked_str = request.POST.get('hoursworked')
                 existing_entry = BusinessEntry.objects.filter(businessentryid=entryid).first() if entryid else None
-                leave_error = _validate_leave_entry(request.user, lt_id, dateworked_str, hoursworked_str, exclude_entry=existing_entry)
+                leave_error = (
+                    _hours_error(hoursworked_str, enforce_max=bool(bcat_id))
+                    or _category_error(sel, Businesscategory, 'bc_')
+                    or _entry_date_error(dateworked_str)
+                    or _shifttype_error(request.POST.get('shifttype'), required=False)
+                    or _future_work_date_error(bcat_id, dateworked_str)
+                    or _business_month_lock_error(header, dateworked_str)
+                )
+                if not leave_error:
+                    leave_error = _validate_leave_entry(request.user, lt_id, dateworked_str, hoursworked_str, exclude_entry=existing_entry)
+                if not leave_error and bcat_id:
+                    leave_error = _business_entry_day_hours_error(request.user, dateworked_str, Decimal(hoursworked_str), exclude_entry=existing_entry)
                 if leave_error:
                     messages.error(request, leave_error)
                 elif entryid:
@@ -2765,7 +3214,18 @@ def add_business_entry(request, pk):
             dateworked_str = request.POST.get('dateworked')
             hoursworked_str = request.POST.get('hoursworked')
             existing_entry = BusinessEntry.objects.filter(businessentryid=entryid).first() if entryid else None
-            leave_error = _validate_leave_entry(request.user, lt_id, dateworked_str, hoursworked_str, exclude_entry=existing_entry)
+            leave_error = (
+                _hours_error(hoursworked_str, enforce_max=bool(bcat_id))
+                or _category_error(sel, Businesscategory, 'bc_')
+                or _entry_date_error(dateworked_str)
+                or _shifttype_error(request.POST.get('shifttype'), required=False)
+                or _future_work_date_error(bcat_id, dateworked_str)
+                or _business_month_lock_error(header, dateworked_str)
+            )
+            if not leave_error:
+                leave_error = _validate_leave_entry(request.user, lt_id, dateworked_str, hoursworked_str, exclude_entry=existing_entry)
+            if not leave_error and bcat_id:
+                leave_error = _business_entry_day_hours_error(request.user, dateworked_str, Decimal(hoursworked_str), exclude_entry=existing_entry)
 
             if leave_error:
                 messages.error(request, leave_error)
@@ -2909,6 +3369,7 @@ def my_business_approved(request):
 def my_business_approved_month(request, year, month):
     if request.user.access_level not in _BUSINESS_SUBMITTERS:
         return redirect('profile')
+    _valid_date_or_404(year, month)
 
     headers = BusinessHeader.objects.filter(
         employeeid=request.user,
@@ -3000,12 +3461,13 @@ def review_business_timesheet(request, pk):
 
         if action in ('approve', 'reject'):
             entryid = request.POST.get('entryid')
-            if entryid:
+            note = request.POST.get('supervisornote', '').strip()
+            if entryid and (action == 'approve' or note):
                 entry = get_object_or_404(BusinessEntry, businessentryid=entryid, businessheaderid=header)
                 old_status = entry.linestatus
                 entry.linestatus = 'Approved' if action == 'approve' else 'Rejected'
                 entry.approvedat = timezone.now()
-                entry.supervisornote = request.POST.get('supervisornote') or None
+                entry.supervisornote = note or None
                 entry.approvedby = request.user
                 entry.save()
                 header.overallstatus = 'In Progress'
@@ -3013,12 +3475,15 @@ def review_business_timesheet(request, pk):
                     header.bh_approvedby_capt = request.user
                 header.save()
                 log_action(request.user, entry.linestatus, 'BusinessEntry', entry.businessentryid,
-                           old_values={'linestatus': old_status}, new_values={'linestatus': entry.linestatus})
+                           old_values={'linestatus': old_status},
+                           new_values={'linestatus': entry.linestatus, 'supervisornote': entry.supervisornote})
                 if action == 'approve' and entry.leavetypeid_id and entry.leavetypeid.leavetypename == leave_rules.LIEU_DAY_TYPE_NAME:
                     leave_rules.consume_lieu_day(header.employeeid, entry)
 
         elif action == 'bulk_approve':
-            entryids = request.POST.getlist('entryids')
+            # A non-digit id in the list would otherwise crash the __in lookup
+            # with a 500 instead of just not matching that entry.
+            entryids = [e for e in request.POST.getlist('entryids') if e.isdigit()]
             to_approve = BusinessEntry.objects.filter(businessentryid__in=entryids, businessheaderid=header, linestatus='New')
             if to_approve.exists():
                 for entry in to_approve:
@@ -3037,8 +3502,11 @@ def review_business_timesheet(request, pk):
                 header.save()
 
         elif action == 'finish_review':
+            all_entries_now = BusinessEntry.objects.filter(businessheaderid=header)
+            if all_entries_now.filter(linestatus='New').exists():
+                return redirect('review_business_timesheet', pk=header.businessheaderid)
             old_status = header.overallstatus
-            has_rejected_now = BusinessEntry.objects.filter(businessheaderid=header, linestatus='Rejected').exists()
+            has_rejected_now = all_entries_now.filter(linestatus='Rejected').exists()
             if has_rejected_now:
                 header.overallstatus = 'Revision Required'
             else:
@@ -3059,6 +3527,13 @@ def review_business_timesheet(request, pk):
     has_unreviewed = entries.filter(linestatus='New').exists()
     has_rejected = entries.filter(linestatus='Rejected').exists()
     stat_dates, stat_labels = _stat_info()
+    entries = list(entries)
+    has_resubmission = False
+    for row in entries:
+        row.resubmission_note = (
+            last_rejection_note('BusinessEntry', row.businessentryid, 'supervisornote') if row.linestatus == 'New' else None
+        )
+        has_resubmission = has_resubmission or bool(row.resubmission_note)
 
     return render(request, 'timesheets/review_business_timesheet.html', {
         'header': header,
@@ -3069,6 +3544,7 @@ def review_business_timesheet(request, pk):
         'hours_approved': hours_approved,
         'has_unreviewed': has_unreviewed,
         'has_rejected': has_rejected,
+        'has_resubmission': has_resubmission,
         'month_names': _MONTH_NAMES,
         'stat_dates': stat_dates,
         'stat_labels': stat_labels,
@@ -3108,6 +3584,7 @@ def mine_captain_approved_employee(request, employee_id):
 def mine_captain_approved_month(request, employee_id, year, month):
     if request.user.access_level != 4:
         return redirect('profile')
+    _valid_date_or_404(year, month)
     employee = get_object_or_404(User, employeeid=employee_id, roleid__accessid__accessid=5)
     headers = BusinessHeader.objects.filter(
         employeeid=employee,
@@ -3167,29 +3644,41 @@ def bonus_employee_detail(request, employee_id):
             if not all([bonustype, periodstart, periodend, bonusratecode]):
                 messages.error(request, "All fields are required to assign a bonus.")
             else:
-                EmployeeBonus.objects.create(
-                    employeeid=employee,
-                    bonustype=bonustype,
-                    periodstart=periodstart,
-                    periodend=periodend,
-                    bonusratecode=bonusratecode,
-                    notes=notes,
-                    assignedby=request.user,
-                )
-                messages.success(request, "Bonus assigned.")
+                bonus_error = _bonus_fields_error(bonustype, periodstart, periodend, bonusratecode)
+                if bonus_error:
+                    messages.error(request, bonus_error)
+                else:
+                    EmployeeBonus.objects.create(
+                        employeeid=employee,
+                        bonustype=bonustype,
+                        periodstart=periodstart,
+                        periodend=periodend,
+                        bonusratecode=bonusratecode,
+                        notes=notes,
+                        assignedby=request.user,
+                    )
+                    messages.success(request, "Bonus assigned.")
 
         elif action == 'edit':
             bonus = get_object_or_404(
                 EmployeeBonus, employeebonusid=request.POST.get('bonusid'),
                 employeeid=employee, appliedbypayroll__isnull=True,
             )
-            bonus.bonustype = request.POST.get('bonustype', '').strip() or bonus.bonustype
-            bonus.periodstart = request.POST.get('periodstart') or bonus.periodstart
-            bonus.periodend = request.POST.get('periodend') or bonus.periodend
-            bonus.bonusratecode = request.POST.get('bonusratecode', '').strip() or bonus.bonusratecode
-            bonus.notes = request.POST.get('notes', '').strip() or None
-            bonus.save()
-            messages.success(request, "Bonus updated.")
+            new_bonustype = request.POST.get('bonustype', '').strip() or bonus.bonustype
+            new_periodstart = request.POST.get('periodstart') or str(bonus.periodstart)
+            new_periodend = request.POST.get('periodend') or str(bonus.periodend)
+            new_bonusratecode = request.POST.get('bonusratecode', '').strip() or bonus.bonusratecode
+            bonus_error = _bonus_fields_error(new_bonustype, new_periodstart, new_periodend, new_bonusratecode)
+            if bonus_error:
+                messages.error(request, bonus_error)
+            else:
+                bonus.bonustype = new_bonustype
+                bonus.periodstart = new_periodstart
+                bonus.periodend = new_periodend
+                bonus.bonusratecode = new_bonusratecode
+                bonus.notes = request.POST.get('notes', '').strip() or None
+                bonus.save()
+                messages.success(request, "Bonus updated.")
 
         elif action == 'delete':
             EmployeeBonus.objects.filter(

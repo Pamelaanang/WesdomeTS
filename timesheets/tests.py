@@ -221,7 +221,8 @@ class OverageValidationTests(LeaveTestBase):
 
         resp = c.post(f'/business/{header_resp.businessheaderid}/', {
             'action': 'save_entry', 'category_selection': f'lt_{self.vacation_type.leavetypeid}',
-            'dateworked': f'{self.year}-06-01', 'shifttype': 'Day', 'hoursworked': '9999',
+            'dateworked': datetime.date(header_resp.periodyear, header_resp.periodmonth, 1).isoformat(),
+            'shifttype': 'Day', 'hoursworked': '9999',
         })
         self.assertEqual(resp.status_code, 302)
 
@@ -236,7 +237,8 @@ class OverageValidationTests(LeaveTestBase):
 
         resp = c.post(f'/business/{header.businessheaderid}/', {
             'action': 'save_entry', 'category_selection': f'lt_{self.unpaid_type.leavetypeid}',
-            'dateworked': f'{self.year}-06-01', 'shifttype': 'Day', 'hoursworked': '999',
+            'dateworked': datetime.date(header.periodyear, header.periodmonth, 1).isoformat(),
+            'shifttype': 'Day', 'hoursworked': '999',
         })
         self.assertEqual(resp.status_code, 302)
         from timesheets.models import BusinessEntry

@@ -53,10 +53,11 @@
     </div>
 </div>
 
-{% include 'timesheets/_ops_review_panel.html' with header=header entries=entries has_unreviewed=has_unreviewed has_rejected=has_rejected readonly=readonly next_url='' %}
+{% include 'timesheets/_ops_review_panel.html' with header=header entries=entries has_unreviewed=has_unreviewed has_rejected=has_rejected has_resubmission=has_resubmission readonly=readonly next_url='' %}
 
 {% if not readonly %}
 {% include 'timesheets/_ops_reject_modal.html' %}
 {% endif %}
 
+<script>window._pageBackLabel = 'Ops Inbox';</script>
 {% endblock %}

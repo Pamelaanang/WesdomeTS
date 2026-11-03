@@ -442,8 +442,15 @@
     }
 
 
-    // ---- Drag and drop: drag a name onto any cell to move it there. Goes through the same
-    // move as the person panel, so the same rules apply on both screens. ----
+    // ---- Drag and drop: drag a name onto any cell to move it there. ----
+    // Disabled: Crew Grid is meant to be read-only (its view docstring says so —
+    // the only actions there are adding a member and adding a position row),
+    // same as the person panel's move/cover/replace/quit buttons being hidden
+    // on this page via panel_can_move=False. This drag-and-drop path used to
+    // bypass that and still move people, so it's commented out rather than
+    // deleted — uncomment this block (it's a no-op on Crew Management, which
+    // has no draggable chips or drop targets) if the read-only call changes.
+    /*
     document.querySelectorAll('[data-assignment-id][draggable="true"]').forEach(function (chip) {
         chip.addEventListener('dragstart', function (e) {
             e.dataTransfer.setData('text/plain', chip.dataset.assignmentId);
@@ -481,5 +488,6 @@
             form.submit();
         });
     });
+    */
 })();
 </script>

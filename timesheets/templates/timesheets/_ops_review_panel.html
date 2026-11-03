@@ -1,5 +1,5 @@
 {% comment %}
-Expects: header, entries, has_unreviewed, has_rejected, readonly, next_url
+Expects: header, entries, has_unreviewed, has_rejected, has_resubmission, readonly, next_url
 (next_url: where to redirect back to after any action on this panel — empty
 string means "stay on this header's own review page", the standalone default).
 Included once per header — wrap multiple inclusions in their own containers;
@@ -36,7 +36,7 @@ this partial's own .ops-review-band div scopes all JS to just this panel.
                     <th class="p-2">Haulage / Footage</th>
                     <th class="p-2">Remarks</th>
                     <th class="p-2">Status</th>
-                    {% if has_rejected %}<th class="p-2">Note</th>{% endif %}
+                    {% if has_rejected or has_resubmission %}<th class="p-2">Note</th>{% endif %}
                     {% if not readonly %}<th class="p-2"></th>{% endif %}
                 </tr>
             </thead>
@@ -53,7 +53,7 @@ this partial's own .ops-review-band div scopes all JS to just this panel.
 
                     {% if not readonly %}
                     <td class="p-2">
-                        {% if entry.linestatus == 'New' %}<input type="checkbox" class="row-checkbox" value="{{ entry.opsentryid }}">{% endif %}
+                        {% if entry.linestatus == 'New' and not entry.legacy_warnings %}<input type="checkbox" class="row-checkbox" value="{{ entry.opsentryid }}">{% endif %}
                     </td>
                     {% endif %}
                     <td class="p-2">{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</td>
@@ -62,11 +62,20 @@ this partial's own .ops-review-band div scopes all JS to just this panel.
                     <td class="p-2">{{ entry.opscategoryid.categoryname|default:"—" }}</td>
                     <td class="p-2">{{ entry.hoursworked }}</td>
                     <td class="p-2 text-gray-500">
+                        {% if entry.hauledto %}To: {{ entry.hauledto }} &nbsp;{% endif %}
                         {% if entry.tonnesorehauled %}Ore: {{ entry.tonnesorehauled }}t &nbsp;{% endif %}
                         {% if entry.tonneswastehauled %}Waste: {{ entry.tonneswastehauled }}t &nbsp;{% endif %}
+                        {% if entry.lowgradehauled %}Low Grade: {{ entry.lowgradehauled }}t &nbsp;{% endif %}
                         {% if entry.tonnesoreskipped %}Skip: {{ entry.tonnesoreskipped }}t &nbsp;{% endif %}
+                        {% if entry.tonneswasteskipped %}Waste Skip: {{ entry.tonneswasteskipped }}t &nbsp;{% endif %}
+                        {% if entry.lowgradeskipped %}Low Grade Skip: {{ entry.lowgradeskipped }}t &nbsp;{% endif %}
                         {% if entry.longholefootage %}LH: {{ entry.longholefootage }}ft{% endif %}
-                        {% if not entry.tonnesorehauled and not entry.tonneswastehauled and not entry.tonnesoreskipped and not entry.longholefootage %}—{% endif %}
+                        {% if not entry.hauledto and not entry.tonnesorehauled and not entry.tonneswastehauled and not entry.lowgradehauled and not entry.tonnesoreskipped and not entry.tonneswasteskipped and not entry.lowgradeskipped and not entry.longholefootage %}—{% endif %}
+                        {% if entry.legacy_warnings %}
+                        <div class="mt-1 text-red-600" title="{{ entry.legacy_warnings|join:' ' }}">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Invalid — can't approve as-is
+                        </div>
+                        {% endif %}
                     </td>
                     <td class="p-2">{{ entry.remarks|default:"—" }}</td>
 
@@ -82,15 +91,20 @@ this partial's own .ops-review-band div scopes all JS to just this panel.
                         {% if entry.approvedby_capt %}
                         <br><span class="text-gray-400 text-xs">by {{ entry.approvedby_capt.firstname }} {{ entry.approvedby_capt.lastname }}</span>
                         {% endif %}
+                        {% elif entry.resubmission_note %}
+                        <span class="text-gray-400">Pending</span>
+                        <br><span class="text-amber-600 text-xs font-semibold">Resubmitted</span>
                         {% else %}
                         <span class="text-gray-400">Pending</span>
                         {% endif %}
                     </td>
 
                     <!-- NOTE CELL (conditional column) -->
-                    {% if has_rejected %}
+                    {% if has_rejected or has_resubmission %}
                     <td class="p-2 text-left text-red-600 max-w-xs">
-                        {% if entry.captainnote %}{{ entry.captainnote }}{% endif %}
+                        {% if entry.captainnote %}{{ entry.captainnote }}
+                        {% elif entry.resubmission_note %}<span class="text-amber-700">Previously rejected:</span> {{ entry.resubmission_note }}
+                        {% endif %}
                     </td>
                     {% endif %}
 
@@ -103,9 +117,10 @@ this partial's own .ops-review-band div scopes all JS to just this panel.
                                 <input type="hidden" name="action" value="approve">
                                 <input type="hidden" name="entryid" value="{{ entry.opsentryid }}">
                                 <input type="hidden" name="next" value="{{ next_url }}">
-                                <button type="submit"
+                                <button type="submit" {% if entry.legacy_warnings %}disabled title="{{ entry.legacy_warnings|join:' ' }}"{% endif %}
                                     class="border text-xs px-3 py-1 rounded
-                                    {% if entry.linestatus == 'Approved' %}bg-green-600 text-white border-green-600{% else %}border-green-600 text-green-700 hover:bg-green-50{% endif %}">
+                                    {% if entry.legacy_warnings %}bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed
+                                    {% elif entry.linestatus == 'Approved' %}bg-green-600 text-white border-green-600{% else %}border-green-600 text-green-700 hover:bg-green-50{% endif %}">
                                     Approve
                                 </button>
                             </form>
@@ -120,7 +135,7 @@ this partial's own .ops-review-band div scopes all JS to just this panel.
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="{% if not readonly %}{% if has_rejected %}11{% else %}10{% endif %}{% else %}{% if has_rejected %}9{% else %}8{% endif %}{% endif %}" class="text-center text-gray-400 py-6">
+                    <td colspan="{% if not readonly %}{% if has_rejected or has_resubmission %}11{% else %}10{% endif %}{% else %}{% if has_rejected or has_resubmission %}9{% else %}8{% endif %}{% endif %}" class="text-center text-gray-400 py-6">
                         No entries on this sheet.
                     </td>
                 </tr>
@@ -139,7 +154,7 @@ this partial's own .ops-review-band div scopes all JS to just this panel.
                 Bulk Approve Selected
             </button>
             {% endif %}
-            <form method="POST" action="{% url 'review_ops_sheet' header.opsheaderid %}">
+            <form method="POST" action="{% url 'review_ops_sheet' header.opsheaderid %}" onsubmit="return confirm('Finish review on this sheet? This closes it out to the shifter.');">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="finish_review">
                 <input type="hidden" name="next" value="{{ next_url }}">

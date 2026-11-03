@@ -26,10 +26,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.app.github.dev']
 CSRF_TRUSTED_ORIGINS = ['https://*.app.github.dev', 'https://friendly-potato-x6q9jp6vx9jfpr9r-8000.app.github.dev', 'http://localhost:8000', 'https://localhost:8000',]
+CSRF_FAILURE_VIEW = 'users.views.csrf_failure'
 
 
 # Application definition
@@ -94,6 +95,14 @@ DATABASES = {
 }
 
 AUTH_USER_MODEL = 'users.User'
+
+# Default message storage prefers cookies, which are sent on every request
+# from the browser regardless of tab — a message set in one tab (or a page
+# left open from before a redirect) can resurface on a completely unrelated
+# page the next time any request reads that cookie, instead of being cleared
+# the moment it's actually shown once. Session storage is server-side and
+# only clears once the message has genuinely been displayed to this session.
+MESSAGE_STORAGE = 'django.contrib.messages.storage.session.SessionStorage'
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators

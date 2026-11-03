@@ -105,11 +105,13 @@
                 <td rowspan="{{ row.rowspan }}" class="px-4 py-2.5 text-sm font-medium text-gray-700 border-b border-r border-gray-200 align-top">{{ row.position.positionname }}</td>
                 {% endif %}
                 {% for cell in row.cells %}
-                <td colspan="{{ cell.col.colspan }}" class="grid-cell grid-drop-target px-3 py-2.5 text-center border-b border-r border-gray-200 last:border-r-0 {% if cell.links %}border-t-4 border-t-[#28348A]{% endif %}" data-basket="{{ cell.col.basket }}" data-position-id="{{ row.position.positionid }}">
+                {# grid-drop-target dropped: drag-and-drop move is disabled, see _grid_action_scripts.html #}
+                <td colspan="{{ cell.col.colspan }}" class="grid-cell px-3 py-2.5 text-center border-b border-r border-gray-200 last:border-r-0 {% if cell.links %}border-t-4 border-t-[#28348A]{% endif %}" data-basket="{{ cell.col.basket }}" data-position-id="{{ row.position.positionid }}">
                     <div class="flex items-stretch justify-center flex-wrap divide-x divide-gray-300">
                         {% for assignment in cell.items %}
                         {% if assignment %}
-                        <div class="flex flex-col items-center justify-center px-2 cursor-move" draggable="true" data-assignment-id="{{ assignment.assignmentid }}">
+                        {# draggable dropped along with grid-drop-target above #}
+                        <div class="flex flex-col items-center justify-center px-2" data-assignment-id="{{ assignment.assignmentid }}">
                             {% if assignment.employee_id in covering_eids %}
                             <span class="text-sm font-semibold text-gray-400 italic">{{ assignment.employee.firstname }} {{ assignment.employee.lastname }} <span class="text-[10px] not-italic">(covering)</span></span>
                             {% else %}
@@ -182,4 +184,5 @@
         });
     });
 </script>
+<script>window._pageBackLabel = 'Back';</script>
 {% endblock content %}

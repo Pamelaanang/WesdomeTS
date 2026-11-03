@@ -3,6 +3,17 @@
 {% block content %}
 <div class="mx-10 space-y-8">
 
+    {% if messages %}
+    <div class="container w-full">
+        {% for message in messages %}
+        <div class="flex items-center gap-3 text-sm px-4 py-3 rounded-xl mb-2 {% if message.tags == 'error' %}bg-red-50 border border-red-200 text-red-800{% elif message.tags == 'warning' %}bg-amber-50 border border-amber-200 text-amber-800{% else %}bg-green-50 border border-green-200 text-green-800{% endif %}">
+            <i class="fa-solid {% if message.tags == 'error' %}fa-circle-exclamation{% elif message.tags == 'warning' %}fa-triangle-exclamation{% else %}fa-circle-check{% endif %}"></i>
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <div class="container w-full p-4 bg-white rounded-2xl shadow">
         <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
         <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>

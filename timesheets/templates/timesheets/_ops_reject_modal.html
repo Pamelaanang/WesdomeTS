@@ -54,6 +54,7 @@ function submitBulkApprove(button) {
     var band = button.closest('.ops-review-band');
     const checked = band.querySelectorAll('.row-checkbox:checked');
     if (checked.length === 0) { alert('Select at least one pending entry to approve.'); return; }
+    if (!confirm(`Approve ${checked.length} selected entr${checked.length === 1 ? 'y' : 'ies'}?`)) return;
     const form = band.querySelector('.bulk-approve-form');
     form.querySelectorAll('input[name="entryids"]').forEach(function (el) { el.remove(); });
     checked.forEach(function (cb) {

@@ -105,6 +105,11 @@
 
     {% else %}
     {# Draft or no bonus — editable form #}
+    {% if error %}
+    <div class="mb-4 bg-red-50 border border-red-300 text-red-700 text-sm rounded px-4 py-2">
+        <i class="fa-solid fa-circle-exclamation mr-1"></i>{{ error }}
+    </div>
+    {% endif %}
     <form method="post">
         {% csrf_token %}
         <div class="flex flex-col gap-4">
@@ -133,6 +138,7 @@
                     Save Draft
                 </button>
                 <button type="submit" name="action" value="confirm"
+                    onclick="return confirm('Confirm this bonus to payroll? This locks it from further changes on this side.');"
                     class="px-4 py-2 text-sm rounded-lg bg-[#28348A] text-white hover:bg-[#1e2a6e] transition-colors">
                     Confirm to Payroll
                 </button>

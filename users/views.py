@@ -14,11 +14,11 @@ from django.db import transaction
 from datetime import date as date_type
 from django.contrib.auth import update_session_auth_hash
 from django.contrib import messages
-from timesheets.models import MainHeader, MainEntry, OperationsHeader, OperationsEntry, BusinessHeader, BusinessEntry, Crews, Contract, Account, MinerLevel, contracts_by_miner_level, CrewGroup, Discipline, UnitDiscipline
+from timesheets.models import MainHeader, MainEntry, OperationsHeader, OperationsEntry, BusinessHeader, BusinessEntry, Crews, Contract, Account, MinerLevel, contracts_by_miner_level, CrewGroup, Discipline, UnitDiscipline, Auditlog
 from timesheets.crew_units import also_covers_error, single_crews
 from timesheets.models import BasketShifter, UnitDiscipline, basket_for
 from django.db.models import Count, Q, Sum
-from django.urls import reverse
+from django.urls import reverse, resolve, Resolver404
 from django.utils.http import url_has_allowed_host_and_scheme
 from calendar import month_name as _month_name
 from timesheets import leave as leave_rules
@@ -81,6 +81,17 @@ def forgot_password_view(request):
         messages.success(request, "If that Employee ID and phone number match our records, a temporary password has been sent by SMS.")
         return redirect('login')
     return render(request, 'forgot_password.html')
+
+
+def csrf_failure(request, reason=""):
+    """Replaces Django's bare CSRF error page. Most often hit when a form was
+    left open in one tab while a session refresh (or a fresh login) happened
+    in another — the open tab's token no longer matches. There's nothing to
+    recover (the browser's already left the form by the time this renders),
+    so this just explains it in plain terms and sends them back to retry,
+    rather than a raw technical error page."""
+    return render(request, 'csrf_failure.html', status=403)
+
 
 def _miner_level_choices():
     return [(level.levelid, level.levelcode) for level in MinerLevel.objects.all()]
@@ -162,6 +173,12 @@ def reactivate_employee(request, employeeid):
         messages.error(request, f'{user.firstname} {user.lastname} is awaiting IT onboarding. IT activates them from IT Onboarding.')
         return redirect('user_list')
 
+    # Quitting (_retire_shifter) clears crewid/shiftertype and ends the basket seat,
+    # and reactivating can't guess which crew/discipline they should come back to —
+    # so a Shifter or Miner comes back with no seat, same as a brand-new hire, and
+    # gets placed the same way: from Crew Management's Unassigned list.
+    needs_placement = user.access_level in (5, 8)
+
     temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
     user.set_password(temp_password)
     user.isactive = True
@@ -171,7 +188,14 @@ def reactivate_employee(request, employeeid):
     user.save()
     log_action(request.user, 'Reactivate Employee', 'Employee', user.eid, {'isactive': False}, {'isactive': True})
     print(f"SMS to {user.phonenumber}: Temp password for {user.firstname} {user.lastname} is {temp_password}")
-    messages.success(request, f'{user.firstname} {user.lastname} reactivated. Temporary password sent.')
+    if needs_placement:
+        messages.success(
+            request,
+            f'{user.firstname} {user.lastname} reactivated. Temporary password sent. '
+            f'They have no crew yet — place them from Crew Management → Unassigned.'
+        )
+    else:
+        messages.success(request, f'{user.firstname} {user.lastname} reactivated. Temporary password sent.')
     return redirect('user_list')
 
 
@@ -266,26 +290,57 @@ def profile(request):
             employeeid__in=direct_reports, overallstatus='Completed',
             completedat__year=today.year, completedat__month=today.month
         ).count()
-        shifters = User.objects.filter(supervisorid__in=direct_reports)
+        # Crew Daily Sheets, mine-wide (not scoped to direct-report Captains —
+        # an unclaimed Submitted sheet has no approver yet to scope by, and
+        # this matches superintendent_ops_daily, the only other place this
+        # data gets browsed). Scoped by shiftdate, not approval date: a sheet
+        # worked on Oct 31 but approved Nov 1 is October's work, not
+        # November's — scoping by approval date instead used to misfile it
+        # into the wrong month entirely (and, going through the shifter's own
+        # supervisorid to get there, undercounted besides, since that field
+        # is usually unset for shifters — they're organized by crew/basket).
+        ops_logged_month = OperationsHeader.objects.filter(
+            shiftdate__year=today.year, shiftdate__month=today.month,
+        ).exclude(overallstatus='Draft').count()
         ops_completed_month = OperationsHeader.objects.filter(
-            shifterid__in=shifters,
+            shiftdate__year=today.year, shiftdate__month=today.month,
+            overallstatus='Completed',
+        ).count()
+        # Stragglers: Completed this month, but for a shift from an earlier
+        # month — not folded into the two counts above (that would make them
+        # mean two different things depending on timing), surfaced instead as
+        # a small separate note so a late approval doesn't look like this
+        # month's pace sagging.
+        ops_stragglers_month = OperationsHeader.objects.filter(
             overallstatus='Completed',
             ohapprovedat_capt__year=today.year,
             ohapprovedat_capt__month=today.month,
-        ).count()
+        ).exclude(shiftdate__year=today.year, shiftdate__month=today.month).count()
 
         # Workforce headcount — active Shifters (al=5, Spare Shifters included)
         # and active Miners (al=8), mine-wide, not scoped to direct reports.
         total_shifters = User.objects.filter(roleid__accessid__accessid=5, isactive=True).count()
         total_miners = User.objects.filter(roleid__accessid__accessid=8, isactive=True).count()
 
+        # My Team — headcount of this Superintendent's own direct reports
+        # (Captains, plus everyone else who reports straight to them:
+        # Supervisors, Business Employees, etc.), separate from the mine-wide
+        # Workforce numbers above.
+        active_direct_reports = direct_reports.filter(isactive=True)
+        direct_captains = active_direct_reports.filter(roleid__accessid__accessid=4).count()
+        direct_other_employees = active_direct_reports.exclude(roleid__accessid__accessid=4).count()
+
         return render(request, 'users/profile.html', {
             'today': today,
             'personal_pending': personal_pending,
             'personal_completed': personal_completed,
+            'ops_logged_month': ops_logged_month,
             'ops_completed_month': ops_completed_month,
+            'ops_stragglers_month': ops_stragglers_month,
             'total_shifters': total_shifters,
             'total_miners': total_miners,
+            'direct_captains': direct_captains,
+            'direct_other_employees': direct_other_employees,
         })
 
     elif al == 4:  # Mine Captain
@@ -330,9 +385,15 @@ def profile(request):
         shifters_revision = BusinessHeader.objects.filter(
             Q(overallstatus='Revision Required'), shifter_ownership
         ).distinct().count()
+        # Unlike the pending/revision buckets above, "completed" isn't a
+        # claimable-queue concept — crediting it to this captain requires
+        # they actually did it, not just that nobody else has claimed it yet.
+        completed_ownership = Q(employeeid__in=business_subordinates) | Q(
+            employeeid__roleid__accessid__accessid=5, bh_approvedby_capt=user,
+        )
         shifters_completed_month = BusinessHeader.objects.filter(
             Q(overallstatus='Completed', completedat__year=today.year, completedat__month=today.month),
-            shifter_ownership,
+            completed_ownership,
         ).distinct().count()
 
         return render(request, 'users/profile.html', {
@@ -1077,8 +1138,12 @@ def _basket_leaderless(crew, shiftertype):
 
 def _basket_label(basket):
     # "Crew A — Production" for a basket row, read from the basket table.
+    # A CrewAssignment can exist with no basket resolved (e.g. placed from
+    # Unassigned before a crew/discipline was set) — "Unassigned" reads as a
+    # real state there, where the old "Crew ? — ?" placeholder just looked
+    # like broken data, especially next to a real position name in History.
     if basket is None:
-        return 'Crew ? — ?'
+        return 'Unassigned'
     return f'Crew {basket.unit_name} — {basket.discipline.name}'
 
 
@@ -1261,12 +1326,19 @@ def crew_assignments(request):
         # always coverage for them, exactly as temporary as Start Coverage.
         # A real permanent second lead only ever comes from a new hire or a
         # promoted Spare Shifter.
-        target = get_object_or_404(User, employeeid=request.POST.get('shifter_id', '').strip(), roleid__accessid__accessid=5, isactive=True)
+        shifter_id = request.POST.get('shifter_id', '').strip()
         crewid = request.POST.get('crewid') or None
         shiftertype = request.POST.get('shiftertype') or None
-        if not crewid or not shiftertype:
+        if not shifter_id:
+            # A required <select> normally stops this client-side, but an
+            # empty submission that still reaches the server (e.g. nothing
+            # was eligible to list) used to 404 on get_object_or_404 instead
+            # of saying anything.
+            messages.error(request, 'Select a shifter to assign.')
+        elif not crewid or not shiftertype:
             messages.error(request, 'Select both a crew and a discipline.')
         else:
+            target = get_object_or_404(User, employeeid=shifter_id, roleid__accessid__accessid=5, isactive=True)
             is_home_free = _home_basket(target) is None
             basket_crew = Crews.objects.get(pk=crewid)
             if not _basket_leaderless(basket_crew, shiftertype):
@@ -1315,12 +1387,15 @@ def crew_assignments(request):
         # the Grid's version of promote_to_shifter_permanent, so a leaderless
         # basket can be filled by promoting from within the ranks without a
         # separate trip to Shifter/Miner Management.
-        target = get_object_or_404(User, employeeid=request.POST.get('employee_id', '').strip(), roleid__accessid__accessid=8, isactive=True)
+        employee_id = request.POST.get('employee_id', '').strip()
         crewid = request.POST.get('crewid') or None
         shiftertype = request.POST.get('shiftertype') or None
-        if not crewid or not shiftertype:
+        if not employee_id:
+            messages.error(request, 'Select a Miner to promote.')
+        elif not crewid or not shiftertype:
             messages.error(request, 'Select both a crew and a discipline.')
         else:
+            target = get_object_or_404(User, employeeid=employee_id, roleid__accessid__accessid=8, isactive=True)
             shifter_role = get_object_or_404(Roles, rolename='Shift Coordinator')
             target.roleid = shifter_role
             _leave_member_seats(target)
@@ -1348,17 +1423,20 @@ def crew_assignments(request):
         return redirect('crew_grid')
 
     if request.method == 'POST' and request.POST.get('action') == 'promote_and_assign_basket_temporary':
-        target = get_object_or_404(
-            User, employeeid=request.POST.get('employee_id', '').strip(),
-            roleid__accessid__accessid=8, minerlevel__levelcode__in=['Lead', '1', '2'], isactive=True,
-        )
+        employee_id = request.POST.get('employee_id', '').strip()
         crew = Crews.objects.filter(pk=request.POST.get('crewid') or None).first()
         shiftertype = request.POST.get('shiftertype') or None
-        if not crew or not shiftertype:
+        if not employee_id:
+            messages.error(request, 'Select a Miner to cover temporarily.')
+        elif not crew or not shiftertype:
             messages.error(request, 'Select both a crew and a discipline.')
         elif not _basket_leaderless(crew, shiftertype):
             messages.error(request, 'This basket already has a leader.')
         else:
+            target = get_object_or_404(
+                User, employeeid=employee_id,
+                roleid__accessid__accessid=8, minerlevel__levelcode__in=['Lead', '1', '2'], isactive=True,
+            )
             _apply_exit_fill(request.user, {'kind': 'cover_temp', 'crew': crew, 'shiftertype': shiftertype, 'employee': target}, timezone.now().date())
             messages.success(request, f'{target.firstname} {target.lastname} is covering Crew {crew.crewname} — {shiftertype} temporarily.')
 
@@ -1397,7 +1475,13 @@ def crew_assignments(request):
             added = []
             basket = basket_for(crew, shiftertype)
             for employee_id in employee_ids:
-                employee = get_object_or_404(User, employeeid=employee_id, roleid__accessid__accessid=8, isactive=True)
+                # Matches available_employees above: a Miner, or a Spare
+                # Shifter currently covering a different basket — covering is
+                # a leadership role elsewhere, not a member seat here.
+                employee = get_object_or_404(
+                    User, Q(roleid__accessid__accessid=8) | Q(roleid__rolename='Spare Shifter'),
+                    employeeid=employee_id, isactive=True,
+                )
                 position_id = request.POST.get(f'position_{employee_id}') or None
                 primary = basket_for(crew, shiftertype)
                 also, also_error = _also_covers_basket(request, employee_id, primary)
@@ -1430,21 +1514,40 @@ def crew_assignments(request):
         # Miner (promotion only flips roleid), so the badge/modal need to
         # reach them at their current access level too.
         target = get_object_or_404(User, employeeid=request.POST.get('employee_id', '').strip(), roleid__accessid__accessid__in=[5, 8], isactive=True)
-        minerlevel = _level_from_post(request.POST.get('minerlevel'))
-        contractid = request.POST.get('contractid') or None
-        # A Contract is only offered under a Level, so a person with no Level
-        # can't hold one.
-        if minerlevel is None:
-            contractid = None
-        old_values = {'minerlevel': _level_code(target.minerlevel), 'contractid': target.contractid_id}
-        target.minerlevel = minerlevel
-        target.contractid_id = contractid
-        target.save(update_fields=['minerlevel', 'contractid'])
-        log_action(request.user, 'Edit Level/Contract', 'Employee', target.eid,
-                   old_values, {'minerlevel': _level_code(minerlevel), 'contractid': contractid})
-        messages.success(request, f'Updated {target.firstname} {target.lastname}.')
-
+        raw_level = request.POST.get('minerlevel', '').strip()
+        raw_contractid = request.POST.get('contractid', '').strip()
+        minerlevel = _level_from_post(raw_level)
         next_url = request.POST.get('next', '').strip()
+        # _level_from_post also returns None for "-- Unclassified --" (a
+        # deliberate clear), so a non-blank value that still failed to resolve
+        # — a stale/tampered id — has to be caught separately, or it would
+        # silently wipe the level instead of being rejected.
+        # Same idea for the Contract: it's only offered under a Level, so a
+        # mismatched or stale id (including one left over after the Level
+        # above got cleared/changed) is rejected rather than saved or quietly dropped.
+        contract = (
+            Contract.objects.filter(pk=int(raw_contractid), levels=minerlevel, isactive=1).first()
+            if (minerlevel and raw_contractid.isdigit()) else None
+        )
+        if raw_level and minerlevel is None:
+            error = 'That level no longer exists — pick a current one.'
+        elif raw_contractid and contract is None:
+            error = "That contract isn't offered at the chosen level."
+        else:
+            error = None
+
+        if error:
+            messages.error(request, error)
+        else:
+            contractid = contract.contractid if contract else None
+            old_values = {'minerlevel': _level_code(target.minerlevel), 'contractid': target.contractid_id}
+            target.minerlevel = minerlevel
+            target.contractid_id = contractid
+            target.save(update_fields=['minerlevel', 'contractid'])
+            log_action(request.user, 'Edit Level/Contract', 'Employee', target.eid,
+                       old_values, {'minerlevel': _level_code(minerlevel), 'contractid': contractid})
+            messages.success(request, f'Updated {target.firstname} {target.lastname}.')
+
         if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
             return redirect(next_url)
         return redirect('crew_grid')
@@ -1877,6 +1980,33 @@ def _recent_covers(person, limit=5):
     ]
 
 
+def _recent_level_changes(person, limit=5, scan=50):
+    # The newest Level/Contract changes for one person, for the History panel.
+    # Auditlog.employeeid is the actor who made the change, not this person —
+    # the only way to find rows about them is tablename='Employee' + their
+    # own eid as recordid, same lookup last_rejection_note uses elsewhere.
+    # Scans the last `scan` log rows for this employee (any action) rather
+    # than filtering by action name, so it also catches a level change made
+    # as a side effect of something else (a promotion, demotion, or rehire),
+    # not just the dedicated Edit Level/Contract action.
+    rows = Auditlog.objects.filter(
+        tablename='Employee', recordid=person.eid,
+    ).order_by('-timestamp')[:scan]
+    changes = []
+    for row in rows:
+        if not row.newvalue or 'minerlevel' not in row.newvalue:
+            continue
+        changes.append({
+            'action': row.action,
+            'from': (row.oldvalue or {}).get('minerlevel') or '—',
+            'to': row.newvalue.get('minerlevel') or '—',
+            'at': row.timestamp.strftime('%b %d, %Y'),
+        })
+        if len(changes) >= limit:
+            break
+    return changes
+
+
 @login_required(login_url='login')
 def crew_management_basket(request, crewname, section):
     # One basket: the shifter on top, then the members, with the basket actions.
@@ -1916,6 +2046,7 @@ def crew_management_basket(request, crewname, section):
             'name': f'{a.employee.firstname} {a.employee.lastname}',
             'seats': _recent_seats(a.employee),
             'covers': _recent_covers(a.employee),
+            'levels': _recent_level_changes(a.employee),
         }
 
     # People whose home is another crew but who also cover this one.
@@ -1925,11 +2056,15 @@ def crew_management_basket(request, crewname, section):
             also_here.append({'employee': a.employee, 'home': _basket_label(a.basket)})
 
     # Quit or moved out: the last 10 roster rows that ended in this basket.
+    # "Quit" means THIS row ended the day they quit outright (_retire_shifter
+    # sets terminationdate to the same date it ends their seat) — not just
+    # "they're inactive today", which would relabel every older remove/replace/
+    # promotion row as a Quit too, the moment they later quit for any reason.
     ended = []
     for a in seats.filter(
         enddate__isnull=False, employee__isnull=False,
     ).select_related('employee').order_by('-enddate')[:10]:
-        ended.append({'employee': a.employee, 'enddate': a.enddate, 'quit': not a.employee.isactive})
+        ended.append({'employee': a.employee, 'enddate': a.enddate, 'quit': a.enddate == a.employee.terminationdate})
 
     return render(request, 'users/crew_management_basket.html', {
         **grid_action_data(),
@@ -1987,7 +2122,13 @@ def crew_assignment_detail(request, shifter_id):
             )
 
     assigned_ids = CrewAssignment.objects.filter(enddate__isnull=True).values_list('employee_id', flat=True)
-    available_employees = User.objects.filter(roleid__accessid__accessid=8, isactive=True).exclude(eid__in=assigned_ids)
+    # Miners, plus Spare Shifters currently covering another basket — covering
+    # is a leadership role on a different crew (CrewCoverage), not a member
+    # seat, so it doesn't stop someone also being added as a plain member
+    # here. Only an existing member seat (CrewAssignment) does that.
+    available_employees = User.objects.filter(
+        Q(roleid__accessid__accessid=8) | Q(roleid__rolename='Spare Shifter'), isactive=True,
+    ).exclude(eid__in=assigned_ids)
 
     # Every active Miner, for the Replace panel — includes people currently
     # assigned elsewhere (picking one moves them: their old assignment ends
@@ -2022,7 +2163,13 @@ def crew_assignment_detail(request, shifter_id):
             employee_ids = request.POST.getlist('employee_ids')
             added = []
             for employee_id in employee_ids:
-                employee = get_object_or_404(User, employeeid=employee_id, roleid__accessid__accessid=8, isactive=True)
+                # Matches available_employees above: a Miner, or a Spare
+                # Shifter currently covering a different basket — covering is
+                # a leadership role elsewhere, not a member seat here.
+                employee = get_object_or_404(
+                    User, Q(roleid__accessid__accessid=8) | Q(roleid__rolename='Spare Shifter'),
+                    employeeid=employee_id, isactive=True,
+                )
                 position_id = request.POST.get(f'position_{employee_id}') or None
                 also, also_error = _also_covers_basket(request, employee_id, active_row)
                 if also_error:
@@ -2422,6 +2569,18 @@ def person_move(request):
     # Used by the person panel on Crew Management. Any basket can take a seat, led or not.
     if request.user.access_level not in (1, 2) or request.method != 'POST':
         return redirect('crew_management')
+    # Crew Grid is read-only by design (its own view says so) — the person
+    # panel's move controls are hidden there and drag-and-drop is disabled,
+    # but both pages share this one endpoint at the same access level, so a
+    # direct POST bypassing the UI would otherwise still go through. Reject
+    # it here too, keyed off the same `next` destination the UI itself sends.
+    next_url = request.POST.get('next', '').strip()
+    try:
+        if next_url and resolve(next_url).url_name == 'crew_grid':
+            messages.error(request, 'Moves are not available from the Crew Grid — use Crew Management instead.')
+            return redirect('crew_grid')
+    except Resolver404:
+        pass
     source = get_object_or_404(CrewAssignment, assignmentid=request.POST.get('source_assignment_id'), enddate__isnull=True)
     crew, section = _parse_basket(request.POST.get('basket'))
     target = basket_for(crew, section) if crew and section else None
@@ -2507,8 +2666,10 @@ def grid_action_data():
     crew_pair_map = layout['pair_map']
 
     assigned_ids = CrewAssignment.objects.filter(enddate__isnull=True).values_list('employee_id', flat=True)
+    # Miners, plus Spare Shifters currently covering another basket (see the
+    # same note on crew_assignment_detail's available_employees above).
     available_employees = User.objects.filter(
-        roleid__accessid__accessid=8, isactive=True
+        Q(roleid__accessid__accessid=8) | Q(roleid__rolename='Spare Shifter'), isactive=True,
     ).exclude(eid__in=assigned_ids).order_by('lastname', 'firstname')
     available_employees_for_modal = [
         {'employeeid': e.employeeid, 'name': f'{e.firstname} {e.lastname}'} for e in available_employees
@@ -2594,6 +2755,7 @@ def grid_action_data():
             }
             for c in CrewCoverage.objects.filter(Q(covering_shifter=u) | Q(home_shifter=u)).select_related('basket__crew', 'basket__group', 'basket__discipline', 'covering_shifter', 'home_shifter').order_by('-startdate')[:5]
         ]
+        level_history = _recent_level_changes(u)
         person_panels[u.employeeid] = {
             'name': f'{u.firstname} {u.lastname}',
             'employeeid': u.employeeid,
@@ -2614,6 +2776,7 @@ def grid_action_data():
             'contractid': u.contractid_id or '',
             'history': history,
             'cover_history': cover_history,
+            'level_history': level_history,
         }
 
     return {

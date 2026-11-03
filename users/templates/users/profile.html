@@ -184,10 +184,30 @@
             </div>
         </div>
         <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">Crew Daily Sheets</p>
-        <div class="space-y-3 mb-4">
+        <div class="space-y-3 mb-1">
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#FFDE59]"></i> Logged This Month</span>
+                <span class="text-xl font-bold">{{ ops_logged_month }}</span>
+            </div>
             <div class="flex items-center justify-between text-base">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#097d45]"></i> Completed This Month</span>
                 <span class="text-xl font-bold">{{ops_completed_month }}</span>
+            </div>
+        </div>
+        {% if ops_stragglers_month %}
+        <p class="text-xs text-gray-400 mb-4">Also closed out this month, not counted above: {{ ops_stragglers_month }} sheet{{ ops_stragglers_month|pluralize }} from an earlier month</p>
+        {% else %}
+        <div class="mb-4"></div>
+        {% endif %}
+        <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">My Team</p>
+        <div class="space-y-3 mb-4">
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-user-tie text-[#28348A]"></i> Captains</span>
+                <span class="text-xl font-bold">{{ direct_captains }}</span>
+            </div>
+            <div class="flex items-center justify-between text-base">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-users text-[#B45309]"></i> Other Employees</span>
+                <span class="text-xl font-bold">{{ direct_other_employees }}</span>
             </div>
         </div>
         <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">Workforce</p>
@@ -396,7 +416,7 @@
                 class="flex items-center gap-3 px-4 py-3 bg-[#1D4ED8] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-inbox"></i> Employee Submissions Inbox
             </a>
-            <a href="#"
+            <a href="{% url 'superintendent_ops_daily' %}"
                 class="flex items-center gap-3 px-4 py-3 bg-[#B45309] text-white rounded-xl text-sm font-medium hover:opacity-90">
                 <i class="fa-solid fa-clipboard-list"></i> Crew Daily Sheets Inbox
             </a>

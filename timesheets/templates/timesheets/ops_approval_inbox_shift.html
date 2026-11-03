@@ -38,7 +38,7 @@
         {% endif %}
     </div>
 </div>
-{% include 'timesheets/_ops_review_panel.html' with header=panel.header entries=panel.entries has_unreviewed=panel.has_unreviewed has_rejected=panel.has_rejected readonly=False next_url=request.path %}
+{% include 'timesheets/_ops_review_panel.html' with header=panel.header entries=panel.entries has_unreviewed=panel.has_unreviewed has_rejected=panel.has_rejected has_resubmission=panel.has_resubmission readonly=False next_url=request.path %}
 {% endfor %}
 
 {% if panels %}

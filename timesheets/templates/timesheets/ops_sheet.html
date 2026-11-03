@@ -22,7 +22,14 @@
     </button>
     <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
     <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
-    <p class="text-center text-sm text-gray-500 mt-1"><span class="font-semibold text-gray-700">CREW SHEET:</span> {% if not header %}Fill in the details below to start a new crew sheet.{% else %}This is Your Crew Sheet. Make Your Entries Below.{% endif %}</p>
+    <p class="text-center text-sm text-gray-500 mt-1"><span class="font-semibold text-gray-700">CREW SHEET:</span>
+        {% if not header %}Fill in the details below to start a new crew sheet.
+        {% elif header.overallstatus == 'Draft' %}This is Your Crew Sheet. Make Your Entries Below.
+        {% elif header.overallstatus == 'Revision Required' %}Correct the flagged entries below, then resubmit.
+        {% elif header.overallstatus == 'Completed' %}Read-only — approved record.
+        {% else %}Read-only — awaiting review.
+        {% endif %}
+    </p>
 
     {% if not header %}
     {% if error %}
@@ -177,7 +184,12 @@
 {% elif header.overallstatus == 'Completed' %}
 <div class="container mx-auto mt-2 px-4">
     <div class="bg-green-50 border border-green-300 text-green-800 text-sm rounded px-4 py-2">
-        <i class="fa-solid fa-circle-check mr-1"></i> This sheet has been approved by the captain.
+        <i class="fa-solid fa-circle-check mr-1"></i>
+        {% if header.ohapprovedby_capt %}
+        Approved by {{ header.ohapprovedby_capt.firstname }} {{ header.ohapprovedby_capt.lastname }}{% if header.ohapprovedat_capt %} on {{ header.ohapprovedat_capt|date:"M j, Y" }}{% endif %}.
+        {% else %}
+        This sheet has been approved by the captain.
+        {% endif %}
     </div>
 </div>
 {% endif %}
@@ -220,7 +232,7 @@
                     {% else %}
                     <tr class="border-b hover:bg-gray-50 text-center">
                     {% endif %}
-                        <td class="p-2">{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</td>
+                        <td class="p-2"><div>{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</div><div class="text-gray-400 text-xs">{{ entry.employeeid.employeeid }}</div></td>
                         <td class="p-2">
                             <div class="font-medium">{{ entry.contractid.contractcode }}</div>
                             {% if entry.contractid.contracttitle %}<div class="text-gray-400 text-xs">{{ entry.contractid.contracttitle }}</div>{% endif %}
@@ -234,11 +246,15 @@
                         <td class="p-2">{% if entry.opscategoryid %}{{ entry.opscategoryid.categoryname }}{% elif entry.leavetypeid %}{{ entry.leavetypeid.leavetypename }}{% else %}—{% endif %}</td>
                         <td class="p-2">{{ entry.hoursworked }}</td>
                         <td class="p-2 text-gray-500">
+                            {% if entry.hauledto %}To: {{ entry.hauledto }} &nbsp;{% endif %}
                             {% if entry.tonnesorehauled %}Ore: {{ entry.tonnesorehauled }}t &nbsp;{% endif %}
                             {% if entry.tonneswastehauled %}Waste: {{ entry.tonneswastehauled }}t &nbsp;{% endif %}
+                            {% if entry.lowgradehauled %}Low Grade: {{ entry.lowgradehauled }}t &nbsp;{% endif %}
                             {% if entry.tonnesoreskipped %}Skip: {{ entry.tonnesoreskipped }}t &nbsp;{% endif %}
+                            {% if entry.tonneswasteskipped %}Waste Skip: {{ entry.tonneswasteskipped }}t &nbsp;{% endif %}
+                            {% if entry.lowgradeskipped %}Low Grade Skip: {{ entry.lowgradeskipped }}t &nbsp;{% endif %}
                             {% if entry.longholefootage %}LH: {{ entry.longholefootage }}ft{% endif %}
-                            {% if not entry.tonnesorehauled and not entry.tonneswastehauled and not entry.tonnesoreskipped and not entry.longholefootage %}—{% endif %}
+                            {% if not entry.hauledto and not entry.tonnesorehauled and not entry.tonneswastehauled and not entry.lowgradehauled and not entry.tonnesoreskipped and not entry.tonneswasteskipped and not entry.lowgradeskipped and not entry.longholefootage %}—{% endif %}
                         </td>
                         <td class="p-2">{{ entry.remarks|default:"—" }}</td>
                         {% if header.overallstatus == 'Revision Required' %}
@@ -281,7 +297,7 @@
                     {# ── INLINE EDIT ROW (Draft) ── #}
                     {% if header.overallstatus == 'Draft' %}
                     <tr id="edit-row-{{ entry.opsentryid }}" class="hidden border-b bg-blue-50 text-center">
-                        <td class="p-2 font-medium text-xs text-left">{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</td>
+                        <td class="p-2 font-medium text-xs text-left"><div>{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</div><div class="text-gray-400 font-normal">{{ entry.employeeid.employeeid }}</div></td>
                         <td class="p-2">
                             <select id="contract-edit-{{ entry.opsentryid }}"
                                 onchange="onEditContractChange('{{ entry.opsentryid }}')"
@@ -357,7 +373,7 @@
                     {# ── INLINE EDIT ROW (Revision Required — Rejected entries only) ── #}
                     {% elif header.overallstatus == 'Revision Required' and entry.linestatus == 'Rejected' %}
                     <tr id="edit-row-{{ entry.opsentryid }}" class="hidden border-b bg-red-50 text-center">
-                        <td class="p-2 font-medium text-xs text-left">{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</td>
+                        <td class="p-2 font-medium text-xs text-left"><div>{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</div><div class="text-gray-400 font-normal">{{ entry.employeeid.employeeid }}</div></td>
                         <td class="p-2">
                             <select id="contract-edit-{{ entry.opsentryid }}"
                                 onchange="onEditContractChange('{{ entry.opsentryid }}')"
@@ -452,20 +468,20 @@
                                 {% if active_assignments %}
                                 <optgroup label="{% if coverage %}{{ coverage.home_label }}'s Crew{% else %}Your Crew{% endif %}">
                                     {% for a in active_assignments %}
-                                    <option value="{{ a.employee.eid }}">{{ a.employee.firstname }} {{ a.employee.lastname }}</option>
+                                    <option value="{{ a.employee.eid }}">{{ a.employee.firstname }} {{ a.employee.lastname }} ({{ a.employee.employeeid }})</option>
                                     {% endfor %}
                                 </optgroup>
                                 {% endif %}
                                 {% if guest_employees %}
                                 <optgroup label="Guests">
                                     {% for g in guest_employees %}
-                                    <option value="{{ g.eid }}">{{ g.firstname }} {{ g.lastname }}</option>
+                                    <option value="{{ g.eid }}">{{ g.firstname }} {{ g.lastname }} ({{ g.employeeid }})</option>
                                     {% endfor %}
                                 </optgroup>
                                 {% endif %}
                                 {% if request.user.employmenttype == 'Contract' %}
                                 <optgroup label="Yourself">
-                                    <option value="{{ request.user.eid }}">{{ request.user.firstname }} {{ request.user.lastname }} (You)</option>
+                                    <option value="{{ request.user.eid }}">{{ request.user.firstname }} {{ request.user.lastname }} ({{ request.user.employeeid }}) (You)</option>
                                 </optgroup>
                                 {% endif %}
                             </select>
@@ -580,11 +596,19 @@
                 class="bg-[#097d45] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Submit Sheet</button>
         </div>
         {% elif header.overallstatus == 'Revision Required' %}
-        <div class="flex flex-wrap gap-3 mt-6 justify-between">
+        <div class="flex flex-wrap gap-3 mt-6 justify-between items-center">
             <button type="button" onclick="toggleAddRow()"
                 class="bg-[#28348A] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">+ Add Row</button>
-            <button type="button" onclick="resubmitSheet()"
-                class="bg-[#097d45] text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Resubmit Sheet</button>
+            <div class="flex flex-col items-end gap-1">
+                <button type="button" onclick="resubmitSheet()" {% if has_rejected %}disabled{% endif %}
+                    class="text-sm px-4 py-2 rounded-xl
+                    {% if has_rejected %}bg-gray-200 text-gray-400 cursor-not-allowed{% else %}bg-[#097d45] text-white hover:opacity-90{% endif %}">
+                    Resubmit Sheet
+                </button>
+                {% if has_rejected %}
+                <p class="text-xs text-gray-400">Fix or remove all rejected entries before resubmitting.</p>
+                {% endif %}
+            </div>
         </div>
         {% endif %}
     </form>
@@ -797,6 +821,30 @@
         document.getElementById('haulage-row').classList.toggle('hidden');
     }
 
+    // Shared by saveRow/saveEditRow — mirrors the server's own haulage check
+    // (timesheets/views.py `_haulage_error`), so a stray negative number never
+    // makes the trip to the server just to bounce back.
+    const HAULAGE_FIELDS = [
+        ['tonnesorehauled', 'Ore hauled'],
+        ['tonneswastehauled', 'Waste hauled'],
+        ['lowgradehauled', 'Low grade hauled'],
+        ['tonnesoreskipped', 'Ore skipped'],
+        ['tonneswasteskipped', 'Waste skipped'],
+        ['lowgradeskipped', 'Low grade skipped'],
+        ['longholefootage', 'Longhole footage'],
+    ];
+
+    function haulageErrorFromValues(values) {
+        for (const [field, label] of HAULAGE_FIELDS) {
+            const raw = values[field];
+            if (!raw) continue;
+            const num = parseFloat(raw);
+            if (isNaN(num)) return label + ' must be a number.';
+            if (num < 0) return label + ' cannot be negative.';
+        }
+        return null;
+    }
+
     function saveRow() {
         const emp = document.querySelector('[name="employeeid"]').value;
         const contract = document.querySelector('[name="contractid"]').value;
@@ -809,6 +857,26 @@
             alert('Hours worked must be between 0.5 and 24.');
             return;
         }
+        const category = document.querySelector('[name="category_selection"]').value;
+        if (!category) {
+            alert('Pick a work category or leave type for this entry.');
+            return;
+        }
+        const account = document.querySelector('[name="accountid"]').value;
+        if (!account && addRowAccounts.length > 0) {
+            alert('Pick an account for this entry.');
+            return;
+        }
+        const haulageValues = {};
+        HAULAGE_FIELDS.forEach(([field]) => {
+            const el = document.querySelector('[name="' + field + '"]');
+            if (el) haulageValues[field] = el.value;
+        });
+        const haulageError = haulageErrorFromValues(haulageValues);
+        if (haulageError) {
+            alert(haulageError);
+            return;
+        }
         const btn = document.querySelector('#add-row button[onclick="saveRow()"]');
         btn.disabled = true;
         btn.textContent = 'Saving...';
@@ -817,6 +885,7 @@
     }
 
     function deleteRow(entryId) {
+        if (!confirm('Delete this entry?')) return;
         document.getElementById('form-action').value = 'delete_row';
         document.getElementById('form-entryid').value = entryId;
         document.getElementById('entry-form').submit();
@@ -828,11 +897,13 @@
             alert('Cannot submit an empty sheet. Please add at least one entry.');
             return;
         }
+        if (!confirm("Submit this sheet for review? You won't be able to add more entries after this.")) return;
         document.getElementById('form-action').value = 'submit_sheet';
         document.getElementById('entry-form').submit();
     }
 
     function resubmitSheet() {
+        if (!confirm('Resubmit this sheet for review?')) return;
         document.getElementById('form-action').value = 'resubmit';
         document.getElementById('entry-form').submit();
     }
@@ -917,6 +988,28 @@
         if (!contract) { alert('Contract is required.'); return; }
         if (!hours || hours <= 0 || hours > 24) { alert('Hours must be between 0.5 and 24.'); return; }
 
+        const categoryEl = document.getElementById('category-edit-' + entryId);
+        if (categoryEl && !categoryEl.value) {
+            alert('Pick a work category or leave type for this entry.');
+            return;
+        }
+        const accountEl = document.getElementById('account-edit-' + entryId);
+        const loadedAccounts = (accountEl && accountEl._accounts) || [];
+        if (accountEl && !accountEl.value && loadedAccounts.length > 0) {
+            alert('Pick an account for this entry.');
+            return;
+        }
+        const haulageValues = {};
+        HAULAGE_FIELDS.forEach(([field]) => {
+            const el = document.getElementById(field + '-edit-' + entryId);
+            if (el) haulageValues[field] = el.value;
+        });
+        const haulageError = haulageErrorFromValues(haulageValues);
+        if (haulageError) {
+            alert(haulageError);
+            return;
+        }
+
         document.querySelectorAll('.temp-edit-input').forEach(el => el.remove());
         document.getElementById('form-action').value = 'edit_row';
         document.getElementById('form-entryid').value = entryId;
@@ -951,4 +1044,5 @@
 
 {% endif %}
 
+<script>window._pageBackLabel = 'My Daily Sheets';</script>
 {% endblock content %}
