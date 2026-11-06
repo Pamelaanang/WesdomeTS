@@ -15,3 +15,6 @@ django-tailwind>=3.8.0
 
 # Statutory holiday data by country/province
 holidays>=0.60
+
+# Image validation for profile photo uploads
+Pillow>=10.0.0

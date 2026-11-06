@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import login_required
 import random
 import string
 import os
+from PIL import Image, UnidentifiedImageError
 from collections import Counter
 from django.utils import timezone
 from django.db import transaction
@@ -552,27 +553,40 @@ def upload_profile_photo(request):
         profile_photo = request.FILES['profile_photo']
         ext = profile_photo.name.rsplit('.', 1)[-1].lower()
 
-        if ext in ['jpg', 'jpeg', 'png', 'webp']:
-            # Filename includes a timestamp so every upload gets a new URL —
-            # a fixed filename meant re-uploads kept the old browser-cached image.
-            old_path = request.user.profilepic
-            timestamp = timezone.now().strftime('%Y%m%d%H%M%S%f')
-            filename = f"profile_{request.user.employeeid}_{timestamp}.{ext}"
-            save_path = os.path.join(settings.MEDIA_ROOT, 'profile_photos', filename)
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
-            with open(save_path, 'wb+') as destination:
-                for chunk in profile_photo.chunks():
-                    destination.write(chunk)
-
-            request.user.profilepic = f"profile_photos/{filename}"
-            request.user.save()
-
-            if old_path:
-                old_full_path = os.path.join(settings.MEDIA_ROOT, old_path)
-                if os.path.isfile(old_full_path):
-                    os.remove(old_full_path)
-        else:
+        if ext not in ['jpg', 'jpeg', 'png', 'webp']:
             messages.error(request, f'"{profile_photo.name}" was not uploaded — only JPG, PNG, or WEBP images are allowed.')
+            return redirect('profile')
+
+        # The extension alone is just a filename, not a guarantee — a renamed
+        # text file would otherwise get saved and served as a broken "photo".
+        # Pillow actually decodes the file to confirm it's a real image before
+        # anything touches disk; any failure here (not an image, truncated,
+        # corrupted) is treated the same as a disallowed file type.
+        try:
+            Image.open(profile_photo).verify()
+        except (UnidentifiedImageError, OSError):
+            messages.error(request, f'"{profile_photo.name}" was not uploaded — the file isn\'t a valid image.')
+            return redirect('profile')
+        profile_photo.seek(0)
+
+        # Filename includes a timestamp so every upload gets a new URL —
+        # a fixed filename meant re-uploads kept the old browser-cached image.
+        old_path = request.user.profilepic
+        timestamp = timezone.now().strftime('%Y%m%d%H%M%S%f')
+        filename = f"profile_{request.user.employeeid}_{timestamp}.{ext}"
+        save_path = os.path.join(settings.MEDIA_ROOT, 'profile_photos', filename)
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        with open(save_path, 'wb+') as destination:
+            for chunk in profile_photo.chunks():
+                destination.write(chunk)
+
+        request.user.profilepic = f"profile_photos/{filename}"
+        request.user.save()
+
+        if old_path:
+            old_full_path = os.path.join(settings.MEDIA_ROOT, old_path)
+            if os.path.isfile(old_full_path):
+                os.remove(old_full_path)
 
     return redirect('profile')
 
