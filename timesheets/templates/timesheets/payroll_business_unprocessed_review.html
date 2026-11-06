@@ -34,10 +34,7 @@
                     {% endif %}
                 </h2>
                 <p class="text-sm text-gray-500 mt-0.5">
-                    {% if header.employeeid.access_level == 3 %}Supervisor
-                    {% elif header.employeeid.access_level == 4 %}Mine Captain
-                    {% elif header.employeeid.access_level == 5 %}Shifter
-                    {% endif %}
+                    {{ header.employeeid.roleid.rolename }}
                     &mdash; {{ header.get_periodmonth_display }} {{ header.periodyear }}
                 </p>
                 {% if header.employeeid.employmenttype == 'Contract' and header.employeeid.contractid %}
@@ -74,6 +71,7 @@
                     <th class="px-4 py-3">Hours</th>
                     <th class="px-4 py-3">Description</th>
                     <th class="px-4 py-3">Status</th>
+                    <th class="px-4 py-3">Approved By</th>
                 </tr>
             </thead>
             <tbody>
@@ -99,10 +97,13 @@
                         <span class="text-gray-400">{{ entry.linestatus }}</span>
                         {% endif %}
                     </td>
+                    <td class="px-4 py-3 text-gray-500">
+                        {% if entry.approvedby %}{{ entry.approvedby.firstname }} {{ entry.approvedby.lastname }}{% else %}—{% endif %}
+                    </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" class="text-center text-gray-400 py-6">No entries on this timesheet.</td>
+                    <td colspan="9" class="text-center text-gray-400 py-6">No entries on this timesheet.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -111,9 +112,9 @@
 </div>
 
 <div class="container mx-auto flex flex-wrap justify-between items-center">
-    <p class="text-sm text-gray-700">Payable: <span class="font-bold">{{ payable_hours }}</span> &bull; Non-Payable: <span class="font-bold">{{ non_payable_hours }}</span> &bull; Total Approved Hours: <span class="font-bold">{{ total_hours }}</span></p>
+    {% include 'timesheets/_hours_metrics_block.html' %}
     {% if not header.paidat %}
-    <form method="POST">
+    <form method="POST" onsubmit="return confirm('Mark this timesheet as paid? This is final and cannot be undone from here.');">
         {% csrf_token %}
         <input type="hidden" name="action" value="mark_as_paid">
         <button type="submit" class="cursor-pointer px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">

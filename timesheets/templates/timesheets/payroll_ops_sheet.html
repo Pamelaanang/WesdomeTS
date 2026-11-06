@@ -116,7 +116,7 @@
     <div class="mt-6 flex justify-between items-center">
         <p class="text-sm text-gray-700">Employees: <span class="font-bold">{{ opsentries|length }}</span></p>
         {% if not all_paid %}
-        <form method="POST">
+        <form method="POST" onsubmit="return confirm('Mark this operations sheet as paid? This is final and cannot be undone from here.');">
             {% csrf_token %}
             <input type="hidden" name="action" value="mark_as_paid">
             <button type="submit"

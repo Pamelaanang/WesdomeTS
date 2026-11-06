@@ -55,5 +55,30 @@
     <div id="member-no-results" class="hidden text-center text-gray-400 text-sm py-10">No submissions match your search.</div>
 </div>
 
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-8">
+    <div class="mb-1">
+        <h2 class="text-lg font-bold">
+            Awaiting Correction
+            <span class="ml-2 text-sm font-normal text-gray-400">({{ pending_revision|length }})</span>
+        </h2>
+        <p class="text-xs text-gray-400 mt-0.5">You've sent these back. The employee is correcting them — no action needed from you yet.</p>
+    </div>
+    <div class="flex flex-wrap gap-2 mt-3">
+        {% if pending_revision %}
+        {% for header in pending_revision %}
+        <div class="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-2 w-52 flex flex-col items-center gap-2 opacity-75">
+            {% include 'timesheets/_avatar.html' with person=header.employeeid extra_class='mb-2 mt-2' %}
+            <p class="text-xs font-normal text-center mb-1">{{ header.employeeid.firstname }} {{ header.employeeid.lastname }}</p>
+            <p class="text-xs font-normal text-center mb-1">{{ header.employeeid.roleid.rolename }}</p>
+            <p class="text-xs text-center text-orange-600 mb-1">{{ header.rejected_count }} entr{{ header.rejected_count|pluralize:"y,ies" }} rejected</p>
+            <span class="mt-1 bg-orange-100 text-orange-700 text-xs font-semibold px-2 py-0.5 rounded-full">Pending Correction</span>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="text-sm text-gray-400 py-4 w-full text-center">No submissions pending correction.</p>
+        {% endif %}
+    </div>
+</div>
+
 <script>window._pageBackLabel = 'Pending Submissions';</script>
 {% endblock content %}

@@ -14,7 +14,7 @@ from django.db import transaction
 from datetime import date as date_type
 from django.contrib.auth import update_session_auth_hash
 from django.contrib import messages
-from timesheets.models import MainHeader, MainEntry, OperationsHeader, OperationsEntry, BusinessHeader, BusinessEntry, Crews, Contract, Account, MinerLevel, contracts_by_miner_level, CrewGroup, Discipline, UnitDiscipline, Auditlog
+from timesheets.models import MainHeader, MainEntry, OperationsHeader, OperationsEntry, BusinessHeader, BusinessEntry, Crews, Contract, Account, MinerLevel, contracts_by_miner_level, CrewGroup, Discipline, UnitDiscipline, Auditlog, OperationsBonus, EmployeeBonus
 from timesheets.crew_units import also_covers_error, single_crews
 from timesheets.models import BasketShifter, UnitDiscipline, basket_for
 from django.db.models import Count, Q, Sum
@@ -492,6 +492,12 @@ def profile(request):
             paidat__year=today.year, paidat__month=today.month,
         ).count()
 
+        # Bonuses — crew (OperationsBonus) and captain/ad-hoc (EmployeeBonus)
+        # only count once confirmed by the supervisor/superintendent side
+        # ('Submitted'); drafts aren't payroll's to see yet.
+        crew_bonus_pending = OperationsBonus.objects.filter(status='Submitted').count()
+        employee_bonus_pending = EmployeeBonus.objects.filter(status='Submitted').count()
+
         return render(request, 'users/profile.html', {
             'today': today,
             'current_month': today.strftime('%B %Y'),
@@ -501,6 +507,8 @@ def profile(request):
             'ops_paid_month': ops_paid_month,
             'business_pending': business_pending,
             'business_paid_month': business_paid_month,
+            'crew_bonus_pending': crew_bonus_pending,
+            'employee_bonus_pending': employee_bonus_pending,
         })
 
     elif al == 6:  # Business Unit Employee
@@ -563,6 +571,8 @@ def upload_profile_photo(request):
                 old_full_path = os.path.join(settings.MEDIA_ROOT, old_path)
                 if os.path.isfile(old_full_path):
                     os.remove(old_full_path)
+        else:
+            messages.error(request, f'"{profile_photo.name}" was not uploaded — only JPG, PNG, or WEBP images are allowed.')
 
     return redirect('profile')
 

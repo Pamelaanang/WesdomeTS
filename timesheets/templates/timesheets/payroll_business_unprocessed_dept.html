@@ -32,17 +32,8 @@
             class="bg-white rounded-2xl shadow p-5 w-64 hover:bg-[#E9F4FB] transition duration-200 ease-in-out cursor-pointer block">
 
             <!-- Role chip -->
-            <p class="text-xs font-medium mb-2
-                {% if sub.employeeid.roleid.accessid.accessid == 3 %}text-blue-600
-                {% elif sub.employeeid.roleid.accessid.accessid == 4 %}text-amber-600
-                {% else %}text-green-700{% endif %}">
-                {% if sub.employeeid.roleid.accessid.accessid == 3 %}
-                <i class="fa-solid fa-user-tie mr-1"></i> Supervisor
-                {% elif sub.employeeid.roleid.accessid.accessid == 4 %}
-                <i class="fa-solid fa-star mr-1"></i> Mine Captain
-                {% else %}
-                <i class="fa-solid fa-helmet-safety mr-1"></i> Shifter
-                {% endif %}
+            <p class="text-xs font-medium mb-2 text-green-700">
+                <i class="fa-solid fa-briefcase mr-1"></i> {{ sub.employeeid.roleid.rolename }}
                 {% if sub.employeeid.employmenttype == 'Contract' %}
                 <span class="ml-1 inline-block bg-amber-100 text-amber-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full align-middle">Contract</span>
                 {% endif %}

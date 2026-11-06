@@ -60,7 +60,7 @@
 </div>
 
 <div class="container mx-auto flex flex-wrap justify-between items-center gap-2 mb-8">
-    <p class="text-sm text-gray-700">Payable: <span class="font-bold">{{ payable_hours }}</span> &bull; Non-Payable: <span class="font-bold">{{ non_payable_hours }}</span> &bull; Total Hours: <span class="font-bold">{{ total_hours }}</span></p>
+    {% include 'timesheets/_hours_metrics_block.html' %}
     {% if entries %}
     {% with entries.0.mainheaderid as hdr %}
     {% if hdr.paidby %}

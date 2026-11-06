@@ -15,7 +15,7 @@
 </div>
 
 <div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-8">
-    {% include 'timesheets/_ops_shift_table.html' with headers=headers show_status=False %}
+    {% include 'timesheets/_ops_shift_table.html' with headers=headers show_status=False show_paid=True %}
 </div>
 
 <script>window._pageBackLabel = '{{ target_date|date:"F j, Y" }}';</script>

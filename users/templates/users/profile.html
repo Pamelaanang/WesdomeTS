@@ -3,6 +3,17 @@
 {% block content %}
 {% with al=request.user.access_level %}
 
+{% if messages %}
+<div class="mx-10 mt-6">
+    {% for message in messages %}
+    <div class="flex items-center gap-3 text-sm px-4 py-3 rounded-xl {% if message.tags == 'error' %}bg-red-50 border border-red-200 text-red-800{% elif message.tags == 'warning' %}bg-amber-50 border border-amber-200 text-amber-800{% else %}bg-blue-50 border border-blue-200 text-blue-800{% endif %}">
+        <i class="fa-solid {% if message.tags == 'error' %}fa-circle-exclamation{% elif message.tags == 'warning' %}fa-triangle-exclamation{% else %}fa-circle-info{% endif %}"></i>
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
 <div class="mb-4 ml-10 mt-6">
     <h2 class="text-xl">{{ request.user.roleid.departmentid.departmentname }} User Profile</h2>
     <p class="text-sm text-black">{{ today | date:"l, F j, Y" }}</p>
@@ -369,6 +380,17 @@
                 <span class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-[#097d45]"></i> Paid This Month</span>
                 <span class="text-xl font-bold">{{ business_paid_month }}</span>
             </div>
+        </div>
+        <p class="text-xs font-medium text-gray-400 uppercase mb-2 pt-2 border-t">Bonuses</p>
+        <div class="space-y-3">
+            <a href="{% url 'payroll_crew_bonuses' %}" class="flex items-center justify-between text-base hover:text-[#28348A]">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-gift text-[#FF914D]"></i> Crew Bonuses Awaiting</span>
+                <span class="text-xl font-bold">{{ crew_bonus_pending }}</span>
+            </a>
+            <a href="{% url 'payroll_employee_bonuses' %}" class="flex items-center justify-between text-base hover:text-[#28348A]">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-gift text-[#FF914D]"></i> Employee Bonuses Awaiting</span>
+                <span class="text-xl font-bold">{{ employee_bonus_pending }}</span>
+            </a>
         </div>
         {% else %} <!-- Employee -->
         <p class="text-xs font-medium text-gray-400 uppercase mb-2">My Timesheet</p>

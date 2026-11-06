@@ -31,9 +31,6 @@
         <div class="flex flex-wrap justify-between items-center mt-4 text-sm gap-y-2 px-4">
             <span>Payroll ID: <span class="font-medium">{{ request.user.employeeid }}</span></span>
             <span>Period: <span class="font-medium">{{ header.get_periodmonth_display }} {{ header.periodyear }}</span></span>
-            <span>Payable: <span class="font-medium">{{ payable_hours }}</span></span>
-            <span>Non-Payable: <span class="font-medium">{{ non_payable_hours }}</span></span>
-            <span>Total Hours: <span class="font-medium">{{ total_hours }}</span></span>
             <span>Status:
                 {% if header.overallstatus == 'Submitted' %}
                 <span class="inline-flex items-center bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full">Pending Approval</span>
@@ -47,6 +44,12 @@
                 <span class="font-medium">{{ header.overallstatus }}</span>
                 {% endif %}
             </span>
+        </div>
+        <div class="mt-2 px-4 flex flex-col gap-3">
+            {% include 'timesheets/_payable_metrics_row.html' %}
+            {% if readonly %}
+            {% include 'timesheets/_worked_metrics_row.html' %}
+            {% endif %}
         </div>
     </div>
 

@@ -43,6 +43,7 @@
                 {% if draft.date_from %}
                 <p class="text-xs font-normal text-center text-gray-400">Contains {{ draft.date_from|date:"M j" }} – {{ draft.date_to|date:"M j, Y" }}</p>
                 {% else %}
+                <p class="font-semibold text-sm text-center">{{ draft.startedat|date:"F Y" }}</p>
                 <p class="text-xs text-gray-400 text-center">No entries yet</p>
                 {% endif %}
                 <p class="text-xs">{{ draft.entry_count }} entr{{ draft.entry_count|pluralize:"y,ies" }}</p>
@@ -72,6 +73,7 @@
             {% if draft.date_from %}
             <p class="text-xs font-normal text-center text-gray-400"> Contains:<br> {{ draft.date_from|date:"M j" }} – {{ draft.date_to|date:"M j, Y" }}</p>
             {% else %}
+            <p class="font-semibold text-sm text-center">{{ draft.startedat|date:"F Y" }}</p>
             <p class="text-xs text-gray-400 text-center">No entries yet</p>
             {% endif %}
             <p class="text-xs">{{ draft.entry_count }} entr{{ draft.entry_count|pluralize:"y,ies" }}</p>

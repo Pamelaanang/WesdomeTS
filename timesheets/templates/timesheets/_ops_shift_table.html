@@ -1,13 +1,14 @@
 {% comment %}
 Expects: headers (queryset of OperationsHeader with prefetched operationsentry_set),
-show_status (bool — whether to render a per-entry Status column).
+show_status (bool — whether to render a per-entry Status column),
+show_paid (bool — whether to render a per-entry Paid By column).
 {% endcomment %}
 <div class="overflow-x-auto">
     <table class="w-full text-xs min-w-[960px]">
         {% for header in headers %}
         <thead>
             <tr class="{% if header.shifttype == 'Night' %}bg-indigo-500{% else %}bg-amber-600{% endif %} text-white text-left">
-                <th colspan="{% if show_status %}9{% else %}8{% endif %}" class="p-2">
+                <th colspan="{% if show_status %}9{% elif show_paid %}9{% else %}8{% endif %}" class="p-2">
                     <i class="fa-solid {% if header.shifttype == 'Night' %}fa-moon{% else %}fa-sun{% endif %} mr-1"></i>
                     {{ header.crewid.crewname }} Crew &mdash; {{ header.discipline.name|default:"—" }}
                     &mdash; {{ header.shifterid.firstname }} {{ header.shifterid.lastname }}
@@ -32,6 +33,7 @@ show_status (bool — whether to render a per-entry Status column).
                 <th class="p-2 font-medium">Haulage / Footage</th>
                 <th class="p-2 font-medium">Remarks</th>
                 {% if show_status %}<th class="p-2 font-medium">Status</th>{% endif %}
+                {% if show_paid %}<th class="p-2 font-medium">Paid By</th>{% endif %}
             </tr>
         </thead>
         <tbody>
@@ -62,9 +64,19 @@ show_status (bool — whether to render a per-entry Status column).
                     {% endif %}
                 </td>
                 {% endif %}
+                {% if show_paid %}
+                <td class="p-2 text-gray-500">
+                    {% if entry.paidby %}
+                    {{ entry.paidby.firstname }} {{ entry.paidby.lastname }}<br>
+                    <span class="text-gray-400">{{ entry.paidat|date:"M j, Y" }}</span>
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+                {% endif %}
             </tr>
             {% empty %}
-            <tr><td colspan="{% if show_status %}9{% else %}8{% endif %}" class="p-2 text-center text-gray-400">No entries on this sheet.</td></tr>
+            <tr><td colspan="{% if show_status %}9{% elif show_paid %}9{% else %}8{% endif %}" class="p-2 text-center text-gray-400">No entries on this sheet.</td></tr>
             {% endfor %}
         </tbody>
         {% empty %}

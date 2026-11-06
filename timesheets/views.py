@@ -1,3 +1,4 @@
+import calendar
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from types import SimpleNamespace
@@ -65,12 +66,39 @@ def _stat_info():
 def _payable_hours_split(entries, category_field):
     """Given an entries queryset and its category FK field name (e.g. 'workcategoryid',
     'businesscategoryid', 'opscategoryid'), return (payable_hours, non_payable_hours, total_hours).
-    A row is payable if whichever of category/leave type is actually set on it has ispayable=True."""
+    Payable: any row (category or leave) where whichever is set has ispayable=True.
+    Non-payable: LEAVE ONLY where ispayable=False — a non-payable category row
+    (there are a few legacy ones still being cleaned up) is deliberately
+    outside both buckets, not swept into non_payable, since it isn't leave.
+    Total: every hour on the sheet, unscoped by either of the above."""
     total = entries.aggregate(Sum('hoursworked'))['hoursworked__sum'] or 0
     payable = entries.filter(
         Q(**{f'{category_field}__ispayable': True}) | Q(leavetypeid__ispayable=True)
     ).aggregate(Sum('hoursworked'))['hoursworked__sum'] or 0
-    return payable, total - payable, total
+    non_payable = entries.filter(
+        **{f'{category_field}__isnull': True}, leavetypeid__ispayable=False,
+    ).aggregate(Sum('hoursworked'))['hoursworked__sum'] or 0
+    return payable, non_payable, total
+
+
+def _worked_hours_breakdown(entries, category_field, date_field, stat_dates):
+    """Split an entries queryset's CATEGORY-TABLE hours only (leave is out of
+    scope entirely here) into three mutually exclusive totals: overtime (a
+    category-table entry with isovertime=True), statutory worked (a
+    category-table entry on a stat date that isn't already overtime), and
+    regular (everything else category-table). Returns (regular, stat_worked, overtime)."""
+    worked = entries.filter(**{f'{category_field}__isnull': False})
+    overtime = worked.filter(
+        **{f'{category_field}__isovertime': True}
+    ).aggregate(Sum('hoursworked'))['hoursworked__sum'] or 0
+    not_overtime = worked.filter(**{f'{category_field}__isovertime': False})
+    stat_worked = not_overtime.filter(
+        **{f'{date_field}__in': stat_dates}
+    ).aggregate(Sum('hoursworked'))['hoursworked__sum'] or 0
+    regular = not_overtime.exclude(
+        **{f'{date_field}__in': stat_dates}
+    ).aggregate(Sum('hoursworked'))['hoursworked__sum'] or 0
+    return regular, stat_worked, overtime
 
 
 def _last_entry_prefill(entries, category_field, category_prefix):
@@ -104,16 +132,14 @@ def new_timesheet(request):
     MainHeader.objects.filter(employeeid=request.user, overallstatus='Draft', startedat__lt=two_months_ago).delete()
 
     now = timezone.now()
-    drafts_this_month = MainHeader.objects.filter(
+    existing_draft = MainHeader.objects.filter(
         employeeid=request.user,
         overallstatus='Draft',
         startedat__year=now.year,
-        startedat__month=now.month
-    ).count()
-
-    if drafts_this_month >= 3:
-        messages.warning(request, 'You have reached the maximum of 3 drafts this month. Continue a previous draft or delete one to start fresh.')
-        return redirect('my_drafts')
+        startedat__month=now.month,
+    ).order_by('-startedat').first()
+    if existing_draft:
+        return redirect('add_entry', pk=existing_draft.mainheaderid)
 
     header = MainHeader.objects.create(employeeid=request.user)
     log_action(request.user, 'Created', 'MainHeader', header.mainheaderid, new_values={'overallstatus': 'Draft'})
@@ -137,7 +163,8 @@ def add_entry(request, pk):
     header = get_object_or_404(MainHeader, mainheaderid=pk, employeeid=request.user)
 
     if header.overallstatus not in ('Draft', 'Revision Required'):
-        return redirect('profile')
+        messages.info(request, 'This timesheet has already been submitted and can no longer be edited.')
+        return redirect('view_timesheet', pk=header.mainheaderid)
 
     revision_mode = header.overallstatus == 'Revision Required'
 
@@ -255,7 +282,7 @@ def add_entry(request, pk):
         return redirect('add_entry', pk=header.mainheaderid)
 
     entries = MainEntry.objects.filter(mainheaderid=header).select_related('workcategoryid', 'leavetypeid')
-    workcategories = Workcategory.objects.all()
+    workcategories = Workcategory.objects.filter(isactive=1)
     # Maintenance Crew (al=9) is hourly — never lieu-eligible, so Lieu Day never appears here.
     leavetypes = LeaveType.objects.filter(isactive=1).exclude(leavetypename=leave_rules.LIEU_DAY_TYPE_NAME)
     payable_hours, non_payable_hours, hours = _payable_hours_split(entries, 'workcategoryid')
@@ -264,6 +291,17 @@ def add_entry(request, pk):
     last_category_selection, last_shifttype, last_hours = _last_entry_prefill(
         MainEntry.objects.filter(mainheaderid__employeeid=request.user), 'workcategoryid', 'wc_'
     )
+
+    # The first entry on this header establishes its locked month (see
+    # _month_lock_error) — once that exists, the date picker should steer
+    # toward that month instead of letting the browser offer any date only
+    # for the server to reject it on save.
+    first_entry = entries.order_by('mainentryid').first()
+    date_min = date_max = None
+    if first_entry:
+        date_min = first_entry.startdate.replace(day=1)
+        last_day = calendar.monthrange(first_entry.startdate.year, first_entry.startdate.month)[1]
+        date_max = first_entry.startdate.replace(day=last_day)
 
     context = {
         'header': header,
@@ -281,6 +319,8 @@ def add_entry(request, pk):
         'last_category_selection': last_category_selection,
         'last_shifttype': last_shifttype,
         'last_hours': last_hours,
+        'date_min': date_min,
+        'date_max': date_max,
         **leave_rules.leave_type_ids_context(),
     }
     if revision_mode:
@@ -316,8 +356,22 @@ def approval_inbox(request):
         date_to=Max('mainentry__startdate')
     ).order_by('employeeid__lastname', 'employeeid__firstname', 'date_from')
     cards_waiting = pending.count()
-                     
-    return render(request, 'timesheets/approval_inbox.html', {'pending': pending, 'cards_waiting': cards_waiting})
+
+    # Read-only, mirroring ops_approval_inbox's pending_revision_sheets — once
+    # sent back, it's the employee's turn to fix it, but the supervisor still
+    # needs to see WHICH submission that count on their dashboard refers to.
+    pending_revision = MainHeader.objects.filter(
+        employeeid__in=subordinates, overallstatus='Revision Required',
+    ).select_related('employeeid__roleid').annotate(
+        entry_count=Count('mainentry'),
+        rejected_count=Count('mainentry', filter=Q(mainentry__linestatus='Rejected')),
+    ).order_by('employeeid__lastname', 'employeeid__firstname')
+
+    return render(request, 'timesheets/approval_inbox.html', {
+        'pending': pending,
+        'cards_waiting': cards_waiting,
+        'pending_revision': pending_revision,
+    })
 
 
 
@@ -336,6 +390,10 @@ def review_timesheet(request, pk):
     entries = MainEntry.objects.filter(mainheaderid=header)
     payable_hours, non_payable_hours, total_hours = _payable_hours_split(entries, 'workcategoryid')
     hours_approved = entries.filter(linestatus='Approved').aggregate(Sum('hoursworked'))['hoursworked__sum'] or 0
+    stat_dates, stat_labels = _stat_info()
+    regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
+        entries, 'workcategoryid', 'startdate', stat_dates
+    )
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -407,7 +465,6 @@ def review_timesheet(request, pk):
 
     has_unreviewed = entries.filter(linestatus='New').exists()
     has_rejected = entries.filter(linestatus='Rejected').exists()
-    stat_dates, stat_labels = _stat_info()
     entries = list(entries)
     has_resubmission = False
     for row in entries:
@@ -423,6 +480,9 @@ def review_timesheet(request, pk):
         'total_hours': total_hours,
         'payable_hours': payable_hours,
         'non_payable_hours': non_payable_hours,
+        'regular_hours': regular_hours,
+        'stat_worked_hours': stat_worked_hours,
+        'overtime_hours': overtime_hours,
         'hours_approved': hours_approved,
         'has_unreviewed': has_unreviewed,
         'has_rejected': has_rejected,
@@ -494,8 +554,12 @@ def payroll_unprocessed_review(request, dept_id, pk):
     if header.overallstatus != 'Completed':
         return redirect('payroll_unprocessed_dept', dept_id=dept_id)
 
-    entries = MainEntry.objects.filter(mainheaderid=header, linestatus='Approved').select_related('workcategoryid', 'leavetypeid')
+    entries = MainEntry.objects.filter(mainheaderid=header, linestatus='Approved').select_related('workcategoryid', 'leavetypeid', 'approvedby')
     payable_hours, non_payable_hours, total_hours = _payable_hours_split(entries, 'workcategoryid')
+    stat_dates, stat_labels = _stat_info()
+    regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
+        entries, 'workcategoryid', 'startdate', stat_dates
+    )
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -526,7 +590,6 @@ def payroll_unprocessed_review(request, dept_id, pk):
                        old_values={'paidat': str(old_paidat) if old_paidat else None}, new_values={'paidat': None})
             return redirect('payroll_unprocessed')
 
-    stat_dates, stat_labels = _stat_info()
     return render(request, 'timesheets/payroll_unprocessed_review.html', {
         'dept': dept,
         'header': header,
@@ -534,6 +597,9 @@ def payroll_unprocessed_review(request, dept_id, pk):
         'total_hours': total_hours,
         'payable_hours': payable_hours,
         'non_payable_hours': non_payable_hours,
+        'regular_hours': regular_hours,
+        'stat_worked_hours': stat_worked_hours,
+        'overtime_hours': overtime_hours,
         'stat_dates': stat_dates,
         'stat_labels': stat_labels,
     })
@@ -545,11 +611,17 @@ def payroll_business_unprocessed(request):
         return redirect('profile')
 
     departments = Department.objects.filter(isactive=1).annotate(
+        # Must match payroll_business_unprocessed_dept's own entry_count__gt=0
+        # filter — a Completed header with no Approved entries has nothing
+        # for payroll to pay, and the dept detail list already excludes it,
+        # so the card badge has to require an Approved entry too or it
+        # overcounts against what's actually listed below it.
         unpaid_count=Count(
             'roles__user__businessheader',
             filter=Q(
                 roles__user__businessheader__overallstatus='Completed',
                 roles__user__businessheader__paidat__isnull=True,
+                roles__user__businessheader__businessentry__linestatus='Approved',
             ),
             distinct=True
         )
@@ -600,10 +672,14 @@ def payroll_business_unprocessed_review(request, dept_id, pk):
 
     entries = BusinessEntry.objects.filter(
         businessheaderid=header,
-    ).select_related('businesscategoryid', 'leavetypeid').order_by('dateworked')
+    ).select_related('businesscategoryid', 'leavetypeid', 'approvedby').order_by('dateworked')
 
     payable_hours, non_payable_hours, total_hours = _payable_hours_split(
         entries.filter(linestatus='Approved'), 'businesscategoryid'
+    )
+    stat_dates, stat_labels = _stat_info()
+    regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
+        entries.filter(linestatus='Approved'), 'businesscategoryid', 'dateworked', stat_dates
     )
 
     dept_id = header.employeeid.roleid.departmentid_id
@@ -630,13 +706,15 @@ def payroll_business_unprocessed_review(request, dept_id, pk):
                 )
                 return redirect('payroll_business_unprocessed_dept', dept_id=dept_id)
 
-    stat_dates, stat_labels = _stat_info()
     return render(request, 'timesheets/payroll_business_unprocessed_review.html', {
         'header': header,
         'entries': entries,
         'total_hours': total_hours,
         'payable_hours': payable_hours,
         'non_payable_hours': non_payable_hours,
+        'regular_hours': regular_hours,
+        'stat_worked_hours': stat_worked_hours,
+        'overtime_hours': overtime_hours,
         'dept_id': dept_id,
         'stat_dates': stat_dates,
         'stat_labels': stat_labels,
@@ -691,6 +769,9 @@ def payroll_processed_maintenance_month(request, employee_id, year, month):
     ).select_related('workcategoryid', 'leavetypeid', 'mainheaderid__paidby').order_by('startdate')
     payable_hours, non_payable_hours, total_hours = _payable_hours_split(entries, 'workcategoryid')
     stat_dates, stat_labels = _stat_info()
+    regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
+        entries, 'workcategoryid', 'startdate', stat_dates
+    )
     month_date = date(year, month, 1)
     return render(request, 'timesheets/payroll_processed_maintenance_month.html', {
         'employee': employee,
@@ -698,6 +779,9 @@ def payroll_processed_maintenance_month(request, employee_id, year, month):
         'total_hours': total_hours,
         'payable_hours': payable_hours,
         'non_payable_hours': non_payable_hours,
+        'regular_hours': regular_hours,
+        'stat_worked_hours': stat_worked_hours,
+        'overtime_hours': overtime_hours,
         'month_date': month_date,
         'stat_dates': stat_dates,
         'stat_labels': stat_labels,
@@ -779,6 +863,9 @@ def payroll_processed_business_month(request, dept_id, employee_id, year, month)
     payable_hours, non_payable_hours, total_hours = _payable_hours_split(entries, 'businesscategoryid')
     month_date = date(year, month, 1)
     stat_dates, stat_labels = _stat_info()
+    regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
+        entries, 'businesscategoryid', 'dateworked', stat_dates
+    )
     return render(request, 'timesheets/payroll_processed_business_month.html', {
         'dept': dept,
         'employee': employee,
@@ -786,6 +873,9 @@ def payroll_processed_business_month(request, dept_id, employee_id, year, month)
         'total_hours': total_hours,
         'payable_hours': payable_hours,
         'non_payable_hours': non_payable_hours,
+        'regular_hours': regular_hours,
+        'stat_worked_hours': stat_worked_hours,
+        'overtime_hours': overtime_hours,
         'month_date': month_date,
         'stat_dates': stat_dates,
         'stat_labels': stat_labels,
@@ -947,7 +1037,7 @@ def payroll_ops_daily_shift(request, year, month, day, shifttype):
             queryset=OperationsEntry.objects.filter(
                 linestatus='Approved'
             ).select_related(
-                'employeeid', 'contractid', 'accountid', 'opscategoryid', 'leavetypeid'
+                'employeeid', 'contractid', 'accountid', 'opscategoryid', 'leavetypeid', 'paidby'
             ).order_by('employeeid__lastname', 'employeeid__firstname'),
         )
     ).order_by('crewid__crewname', 'discipline__name', 'shifterid__lastname', 'shifterid__firstname')
@@ -1041,10 +1131,14 @@ def payroll_ops_member_month(request, employee_id, year, month):
 
     if request.method == 'POST' and request.POST.get('action') == 'apply_bonus':
         bonus = get_object_or_404(OperationsBonus, employeeid=member, bonusmonth=month_date, status='Submitted')
-        bonus.status = 'Applied'
-        bonus.appliedbypayroll = request.user
-        bonus.appliedatpayroll = timezone.now()
-        bonus.save()
+        if bonus.bonusratecode not in dict(BONUS_RATE_CODES):
+            messages.error(request, 'This bonus has no valid rate — it cannot be applied.')
+        else:
+            bonus.status = 'Applied'
+            bonus.appliedbypayroll = request.user
+            bonus.appliedatpayroll = timezone.now()
+            bonus.save()
+            messages.success(request, f'Bonus for {member.firstname} {member.lastname} ({month_date:%B %Y}) applied.')
         return redirect('payroll_ops_member_month', employee_id=employee_id, year=year, month=month)
 
     entries = OperationsEntry.objects.filter(
@@ -1061,12 +1155,18 @@ def payroll_ops_member_month(request, employee_id, year, month):
     bonus = OperationsBonus.objects.filter(employeeid=member, bonusmonth=month_date).first()
 
     stat_dates, stat_labels = _stat_info()
+    regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
+        entries, 'opscategoryid', 'opsheaderid__shiftdate', stat_dates
+    )
     return render(request, 'timesheets/payroll_ops_member_month.html', {
         'member': member,
         'entries': entries,
         'total_hours': total_hours,
         'payable_hours': payable_hours,
         'non_payable_hours': non_payable_hours,
+        'regular_hours': regular_hours,
+        'stat_worked_hours': stat_worked_hours,
+        'overtime_hours': overtime_hours,
         'year': year,
         'month': month,
         'month_date': month_date,
@@ -1077,13 +1177,67 @@ def payroll_ops_member_month(request, employee_id, year, month):
 
 
 @login_required(login_url='login')
+def payroll_crew_bonuses(request):
+    if request.user.access_level != 7:
+        return redirect('profile')
+
+    months = OperationsBonus.objects.filter(status='Submitted').annotate(
+        month=TruncMonth('bonusmonth')
+    ).values('month').annotate(
+        bonus_count=Count('opsbonusid')
+    ).order_by('-month')
+
+    return render(request, 'timesheets/payroll_crew_bonuses.html', {'months': months})
+
+
+@login_required(login_url='login')
+def payroll_crew_bonuses_month(request, year, month):
+    if request.user.access_level != 7:
+        return redirect('profile')
+    _valid_date_or_404(year, month)
+    month_date = date(year, month, 1)
+
+    if request.method == 'POST' and request.POST.get('action') == 'apply_bonus':
+        bonusid = request.POST.get('bonusid', '')
+        if not bonusid.isdigit():
+            raise Http404('Invalid bonus id')
+        bonus = get_object_or_404(
+            OperationsBonus, opsbonusid=bonusid,
+            status='Submitted', bonusmonth=month_date,
+        )
+        if bonus.bonusratecode not in dict(BONUS_RATE_CODES):
+            messages.error(request, 'This bonus has no valid rate — it cannot be applied.')
+        else:
+            bonus.status = 'Applied'
+            bonus.appliedbypayroll = request.user
+            bonus.appliedatpayroll = timezone.now()
+            bonus.save()
+            messages.success(
+                request,
+                f'Bonus for {bonus.employeeid.firstname} {bonus.employeeid.lastname} ({month_date:%B %Y}) applied.'
+            )
+        return redirect('payroll_crew_bonuses_month', year=year, month=month)
+
+    bonuses = OperationsBonus.objects.filter(
+        status='Submitted', bonusmonth=month_date,
+    ).select_related('employeeid', 'reviewedby').order_by('employeeid__lastname', 'employeeid__firstname')
+
+    return render(request, 'timesheets/payroll_crew_bonuses_month.html', {
+        'bonuses': bonuses,
+        'month_date': month_date,
+        'year': year,
+        'month': month,
+    })
+
+
+@login_required(login_url='login')
 def payroll_employee_bonuses(request):
     if request.user.access_level != 7:
         return redirect('profile')
     departments = Department.objects.filter(isactive=1).annotate(
         pending_count=Count(
             'roles__user__bonuses',
-            filter=Q(roles__user__bonuses__appliedbypayroll__isnull=True),
+            filter=Q(roles__user__bonuses__status='Submitted'),
             distinct=True,
         )
     )
@@ -1097,22 +1251,34 @@ def payroll_employee_bonuses_dept(request, dept_id):
     dept = get_object_or_404(Department, departmentid=dept_id)
 
     if request.method == 'POST' and request.POST.get('action') == 'apply':
+        bonusid = request.POST.get('bonusid', '')
+        if not bonusid.isdigit():
+            raise Http404('Invalid bonus id')
         bonus = get_object_or_404(
-            EmployeeBonus, employeebonusid=request.POST.get('bonusid'),
-            employeeid__roleid__departmentid=dept_id, appliedbypayroll__isnull=True,
+            EmployeeBonus, employeebonusid=bonusid,
+            employeeid__roleid__departmentid=dept_id, status='Submitted',
         )
+        bonus.status = 'Applied'
         bonus.appliedbypayroll = request.user
         bonus.appliedatpayroll = timezone.now()
         bonus.save()
+        messages.success(request, f'Bonus for {bonus.employeeid.firstname} {bonus.employeeid.lastname} marked applied.')
         return redirect('payroll_employee_bonuses_dept', dept_id=dept_id)
 
-    bonuses = EmployeeBonus.objects.filter(
-        employeeid__roleid__departmentid=dept_id, appliedbypayroll__isnull=True,
-    ).select_related('employeeid', 'assignedby').order_by('employeeid__lastname', 'employeeid__firstname', '-periodend')
+    show_applied = request.GET.get('view') == 'applied'
+    if show_applied:
+        bonuses = EmployeeBonus.objects.filter(
+            employeeid__roleid__departmentid=dept_id, status='Applied',
+        ).select_related('employeeid', 'assignedby', 'appliedbypayroll').order_by('-appliedatpayroll')
+    else:
+        bonuses = EmployeeBonus.objects.filter(
+            employeeid__roleid__departmentid=dept_id, status='Submitted',
+        ).select_related('employeeid', 'assignedby').order_by('employeeid__lastname', 'employeeid__firstname', '-periodend')
 
     return render(request, 'timesheets/payroll_employee_bonuses_dept.html', {
         'dept': dept,
         'bonuses': bonuses,
+        'show_applied': show_applied,
     })
 
 
@@ -1164,12 +1330,18 @@ def superintendent_approved_month(request, employee_id, year, month):
         entries.filter(linestatus='Approved'), 'businesscategoryid'
     )
     stat_dates, stat_labels = _stat_info()
+    regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
+        entries.filter(linestatus='Approved'), 'businesscategoryid', 'dateworked', stat_dates
+    )
     return render(request, 'timesheets/superintendent_approved_month.html', {
         'employee': employee,
         'entries': entries,
         'total_hours': total_hours,
         'payable_hours': payable_hours,
         'non_payable_hours': non_payable_hours,
+        'regular_hours': regular_hours,
+        'stat_worked_hours': stat_worked_hours,
+        'overtime_hours': overtime_hours,
         'year': year,
         'month': month,
         'month_name': _MONTH_NAMES.get(month, ''),
@@ -1359,6 +1531,10 @@ def superintendent_ops_member_month(request, employee_id, year, month):
         'contractid', 'accountid', 'opscategoryid',
     ).order_by('opsheaderid__shiftdate', 'opsheaderid__shifttype')
     payable_hours, non_payable_hours, total_hours = _payable_hours_split(entries, 'opscategoryid')
+    stat_dates, stat_labels = _stat_info()
+    regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
+        entries, 'opscategoryid', 'opsheaderid__shiftdate', stat_dates
+    )
     bonus = OperationsBonus.objects.filter(employeeid=member, bonusmonth=month_date).first()
     error = None
 
@@ -1394,13 +1570,15 @@ def superintendent_ops_member_month(request, employee_id, year, month):
             bonus.save()
             return redirect('superintendent_ops_member_month', employee_id=employee_id, year=year, month=month)
 
-    stat_dates, stat_labels = _stat_info()
     return render(request, 'timesheets/superintendent_ops_member_month.html', {
         'member': member,
         'entries': entries,
         'total_hours': total_hours,
         'payable_hours': payable_hours,
         'non_payable_hours': non_payable_hours,
+        'regular_hours': regular_hours,
+        'stat_worked_hours': stat_worked_hours,
+        'overtime_hours': overtime_hours,
         'year': year,
         'month': month,
         'month_date': month_date,
@@ -1470,12 +1648,18 @@ def view_timesheet(request, pk):
     entries = MainEntry.objects.filter(mainheaderid=header).select_related('workcategoryid', 'leavetypeid')
     payable_hours, non_payable_hours, total_hours = _payable_hours_split(entries, 'workcategoryid')
     stat_dates, stat_labels = _stat_info()
+    regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
+        entries, 'workcategoryid', 'startdate', stat_dates
+    )
     return render(request, 'timesheets/view_timesheet.html', {
         'header': header,
         'entries': entries,
         'total_hours': total_hours,
         'payable_hours': payable_hours,
         'non_payable_hours': non_payable_hours,
+        'regular_hours': regular_hours,
+        'stat_worked_hours': stat_worked_hours,
+        'overtime_hours': overtime_hours,
         'stat_dates': stat_dates,
         'stat_labels': stat_labels,
     })
@@ -1537,6 +1721,7 @@ def supervisor_approved_month(request, employee_id, year, month):
         return redirect('profile')
     _valid_date_or_404(year, month)
     employee = get_object_or_404(User, employeeid=employee_id, supervisorid=request.user)
+    stat_dates, stat_labels = _stat_info()
 
     if employee.access_level == 9:
         entries = MainEntry.objects.filter(
@@ -1549,6 +1734,9 @@ def supervisor_approved_month(request, employee_id, year, month):
             'mainheaderid', 'workcategoryid', 'leavetypeid',
         ).order_by('startdate')
         payable_hours, non_payable_hours, total_hours = _payable_hours_split(entries, 'workcategoryid')
+        regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
+            entries, 'workcategoryid', 'startdate', stat_dates
+        )
     else:
         business_entries = BusinessEntry.objects.filter(
             businessheaderid__employeeid=employee,
@@ -1558,6 +1746,9 @@ def supervisor_approved_month(request, employee_id, year, month):
             dateworked__month=month,
         ).select_related('businesscategoryid', 'leavetypeid').order_by('dateworked')
         payable_hours, non_payable_hours, total_hours = _payable_hours_split(business_entries, 'businesscategoryid')
+        regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
+            business_entries, 'businesscategoryid', 'dateworked', stat_dates
+        )
         # Normalize onto the same field names supervisor_approved_month.html already
         # renders for MainEntry, so one template serves both domains unchanged.
         entries = [
@@ -1574,13 +1765,15 @@ def supervisor_approved_month(request, employee_id, year, month):
             for e in business_entries
         ]
 
-    stat_dates, stat_labels = _stat_info()
     return render(request, 'timesheets/supervisor_approved_month.html', {
         'employee': employee,
         'entries': entries,
         'total_hours': total_hours,
         'payable_hours': payable_hours,
         'non_payable_hours': non_payable_hours,
+        'regular_hours': regular_hours,
+        'stat_worked_hours': stat_worked_hours,
+        'overtime_hours': overtime_hours,
         'year': year,
         'month': month,
         'month_date': date(year, month, 1),
@@ -1620,11 +1813,17 @@ def my_timesheets_approved_month(request, year, month):
     ).select_related('workcategoryid', 'leavetypeid').order_by('startdate')
     payable_hours, non_payable_hours, total_hours = _payable_hours_split(entries, 'workcategoryid')
     stat_dates, stat_labels = _stat_info()
+    regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
+        entries, 'workcategoryid', 'startdate', stat_dates
+    )
     return render(request, 'timesheets/my_timesheets_approved_month.html', {
         'entries': entries,
         'total_hours': total_hours,
         'payable_hours': payable_hours,
         'non_payable_hours': non_payable_hours,
+        'regular_hours': regular_hours,
+        'stat_worked_hours': stat_worked_hours,
+        'overtime_hours': overtime_hours,
         'year': year,
         'month': month,
         'month_date': date(year, month, 1),
@@ -1664,11 +1863,17 @@ def my_timesheets_paid_month(request, year, month):
     ).select_related('workcategoryid', 'leavetypeid', 'mainheaderid__paidby').order_by('startdate')
     payable_hours, non_payable_hours, total_hours = _payable_hours_split(entries, 'workcategoryid')
     stat_dates, stat_labels = _stat_info()
+    regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
+        entries, 'workcategoryid', 'startdate', stat_dates
+    )
     return render(request, 'timesheets/my_timesheets_paid_month.html', {
         'entries': entries,
         'total_hours': total_hours,
         'payable_hours': payable_hours,
         'non_payable_hours': non_payable_hours,
+        'regular_hours': regular_hours,
+        'stat_worked_hours': stat_worked_hours,
+        'overtime_hours': overtime_hours,
         'year': year,
         'month': month,
         'month_date': date(year, month, 1),
@@ -1848,6 +2053,21 @@ def _bonus_fields_error(bonustype, periodstart_str, periodend_str, bonusratecode
         return 'Enter valid start and end dates.'
     if end < start:
         return 'The period end date must be on or after the start date.'
+    return None
+
+
+def _duplicate_bonus_error(employee, bonustype, periodstart_str, periodend_str, exclude_bonus=None):
+    # Why this bonus collides with one already on file, or None. Catches the
+    # same type+period being assigned twice for one employee — nothing else
+    # stopped a second identical Ad-Hoc/Year-End bonus from being accepted.
+    qs = EmployeeBonus.objects.filter(
+        employeeid=employee, bonustype=bonustype,
+        periodstart=periodstart_str, periodend=periodend_str,
+    )
+    if exclude_bonus:
+        qs = qs.exclude(pk=exclude_bonus.pk)
+    if qs.exists():
+        return f'A {bonustype} bonus for this exact period already exists for this employee.'
     return None
 
 
@@ -3191,12 +3411,18 @@ def add_business_entry(request, pk):
         ).order_by('dateworked')
         payable_hours, non_payable_hours, total_hours = _payable_hours_split(entries, 'businesscategoryid')
         stat_dates, stat_labels = _stat_info()
+        regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
+            entries, 'businesscategoryid', 'dateworked', stat_dates
+        )
         return render(request, 'timesheets/add_business_entry.html', {
             'header': header,
             'entries': entries,
             'total_hours': total_hours,
             'payable_hours': payable_hours,
             'non_payable_hours': non_payable_hours,
+            'regular_hours': regular_hours,
+            'stat_worked_hours': stat_worked_hours,
+            'overtime_hours': overtime_hours,
             'stat_dates': stat_dates,
             'stat_labels': stat_labels,
             'readonly': True,
@@ -3354,7 +3580,10 @@ def my_business_approved(request):
         employeeid=request.user,
         overallstatus='Completed',
     ).values('periodyear', 'periodmonth').annotate(
-        sheet_count=Count('businessheaderid'),
+        # distinct=True matters here: the Sum join against businessentry
+        # fans this query out to one row per entry, so an undistincted
+        # Count('businessheaderid') counts entries, not headers.
+        sheet_count=Count('businessheaderid', distinct=True),
         total_hours=Sum('businessentry__hoursworked'),
         paid_at=Max('paidat'),
     ).order_by('-periodyear', '-periodmonth')
@@ -3385,6 +3614,9 @@ def my_business_approved_month(request, year, month):
     )
     paid_at = headers.aggregate(Max('paidat'))['paidat__max']
     stat_dates, stat_labels = _stat_info()
+    regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
+        entries.filter(linestatus='Approved'), 'businesscategoryid', 'dateworked', stat_dates
+    )
 
     return render(request, 'timesheets/my_business_approved_month.html', {
         'year': year,
@@ -3394,6 +3626,9 @@ def my_business_approved_month(request, year, month):
         'total_hours': total_hours,
         'payable_hours': payable_hours,
         'non_payable_hours': non_payable_hours,
+        'regular_hours': regular_hours,
+        'stat_worked_hours': stat_worked_hours,
+        'overtime_hours': overtime_hours,
         'paid_at': paid_at,
         'stat_dates': stat_dates,
         'stat_labels': stat_labels,
@@ -3430,10 +3665,21 @@ def business_approval_inbox(request):
         entry_count=Count('businessentry'),
     ).distinct().order_by('employeeid__lastname', 'employeeid__firstname', '-submittedat')
 
+    # Read-only, mirroring ops_approval_inbox's pending_revision_sheets — once
+    # sent back, it's the employee's turn to fix it, but the reviewer still
+    # needs to see WHICH submission a dashboard "Sent Back" count refers to.
+    pending_revision = BusinessHeader.objects.filter(
+        Q(overallstatus='Revision Required'), ownership_filter,
+    ).select_related('employeeid__roleid').annotate(
+        entry_count=Count('businessentry'),
+        rejected_count=Count('businessentry', filter=Q(businessentry__linestatus='Rejected')),
+    ).distinct().order_by('employeeid__lastname', 'employeeid__firstname')
+
     return render(request, 'timesheets/business_approval_inbox.html', {
         'pending': pending,
         'cards_waiting': pending.count(),
         'month_names': _MONTH_NAMES,
+        'pending_revision': pending_revision,
     })
 
 
@@ -3527,6 +3773,9 @@ def review_business_timesheet(request, pk):
     has_unreviewed = entries.filter(linestatus='New').exists()
     has_rejected = entries.filter(linestatus='Rejected').exists()
     stat_dates, stat_labels = _stat_info()
+    regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
+        entries, 'businesscategoryid', 'dateworked', stat_dates
+    )
     entries = list(entries)
     has_resubmission = False
     for row in entries:
@@ -3541,6 +3790,9 @@ def review_business_timesheet(request, pk):
         'total_hours': total_hours,
         'payable_hours': payable_hours,
         'non_payable_hours': non_payable_hours,
+        'regular_hours': regular_hours,
+        'stat_worked_hours': stat_worked_hours,
+        'overtime_hours': overtime_hours,
         'hours_approved': hours_approved,
         'has_unreviewed': has_unreviewed,
         'has_rejected': has_rejected,
@@ -3599,6 +3851,9 @@ def mine_captain_approved_month(request, employee_id, year, month):
         entries.filter(linestatus='Approved'), 'businesscategoryid'
     )
     stat_dates, stat_labels = _stat_info()
+    regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
+        entries.filter(linestatus='Approved'), 'businesscategoryid', 'dateworked', stat_dates
+    )
     reviewed_header = headers.exclude(bh_approvedby_capt__isnull=True).order_by('-completedat').first()
     return render(request, 'timesheets/mine_captain_approved_month.html', {
         'employee': employee,
@@ -3606,6 +3861,9 @@ def mine_captain_approved_month(request, employee_id, year, month):
         'total_hours': total_hours,
         'payable_hours': payable_hours,
         'non_payable_hours': non_payable_hours,
+        'regular_hours': regular_hours,
+        'stat_worked_hours': stat_worked_hours,
+        'overtime_hours': overtime_hours,
         'year': year,
         'month': month,
         'month_name': _MONTH_NAMES.get(month, ''),
@@ -3644,7 +3902,10 @@ def bonus_employee_detail(request, employee_id):
             if not all([bonustype, periodstart, periodend, bonusratecode]):
                 messages.error(request, "All fields are required to assign a bonus.")
             else:
-                bonus_error = _bonus_fields_error(bonustype, periodstart, periodend, bonusratecode)
+                bonus_error = (
+                    _bonus_fields_error(bonustype, periodstart, periodend, bonusratecode)
+                    or _duplicate_bonus_error(employee, bonustype, periodstart, periodend)
+                )
                 if bonus_error:
                     messages.error(request, bonus_error)
                 else:
@@ -3660,15 +3921,21 @@ def bonus_employee_detail(request, employee_id):
                     messages.success(request, "Bonus assigned.")
 
         elif action == 'edit':
+            bonusid = request.POST.get('bonusid', '')
+            if not bonusid.isdigit():
+                raise Http404('Invalid bonus id')
             bonus = get_object_or_404(
-                EmployeeBonus, employeebonusid=request.POST.get('bonusid'),
-                employeeid=employee, appliedbypayroll__isnull=True,
+                EmployeeBonus, employeebonusid=bonusid,
+                employeeid=employee, status='Draft',
             )
             new_bonustype = request.POST.get('bonustype', '').strip() or bonus.bonustype
             new_periodstart = request.POST.get('periodstart') or str(bonus.periodstart)
             new_periodend = request.POST.get('periodend') or str(bonus.periodend)
             new_bonusratecode = request.POST.get('bonusratecode', '').strip() or bonus.bonusratecode
-            bonus_error = _bonus_fields_error(new_bonustype, new_periodstart, new_periodend, new_bonusratecode)
+            bonus_error = (
+                _bonus_fields_error(new_bonustype, new_periodstart, new_periodend, new_bonusratecode)
+                or _duplicate_bonus_error(employee, new_bonustype, new_periodstart, new_periodend, exclude_bonus=bonus)
+            )
             if bonus_error:
                 messages.error(request, bonus_error)
             else:
@@ -3681,11 +3948,25 @@ def bonus_employee_detail(request, employee_id):
                 messages.success(request, "Bonus updated.")
 
         elif action == 'delete':
-            EmployeeBonus.objects.filter(
-                employeebonusid=request.POST.get('bonusid'),
-                employeeid=employee, appliedbypayroll__isnull=True,
-            ).delete()
+            bonusid = request.POST.get('bonusid', '')
+            if bonusid.isdigit():
+                EmployeeBonus.objects.filter(
+                    employeebonusid=bonusid,
+                    employeeid=employee, status='Draft',
+                ).delete()
             messages.success(request, "Bonus removed.")
+
+        elif action == 'confirm':
+            bonusid = request.POST.get('bonusid', '')
+            if not bonusid.isdigit():
+                raise Http404('Invalid bonus id')
+            bonus = get_object_or_404(
+                EmployeeBonus, employeebonusid=bonusid,
+                employeeid=employee, status='Draft',
+            )
+            bonus.status = 'Submitted'
+            bonus.save()
+            messages.success(request, "Bonus confirmed to payroll.")
 
         return redirect('bonus_employee_detail', employee_id=employee_id)
 

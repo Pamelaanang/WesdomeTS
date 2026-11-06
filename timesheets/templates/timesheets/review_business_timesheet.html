@@ -139,12 +139,14 @@
     </div>
 
     <div class="mt-6 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
-        <p class="text-sm text-gray-700">
-            {{ header.employeeid.firstname }} {{ header.employeeid.lastname }} logged
-            <span class="font-semibold">{{ total_hours }}</span> hrs
-            (<span class="font-semibold">{{ payable_hours }}</span> payable, <span class="font-semibold">{{ non_payable_hours }}</span> non-payable).
-            You have approved <span class="font-semibold">{{ hours_approved }}</span> hrs.
-        </p>
+        <div>
+            <p class="text-sm text-gray-700 mb-1">
+                {{ header.employeeid.firstname }} {{ header.employeeid.lastname }} logged
+                <span class="font-semibold">{{ total_hours }}</span> hrs.
+                You have approved <span class="font-semibold">{{ hours_approved }}</span> hrs.
+            </p>
+            {% include 'timesheets/_hours_metrics_block.html' %}
+        </div>
         <div class="flex flex-col items-end gap-1">
             <div class="flex gap-2">
                 {% if has_unreviewed %}

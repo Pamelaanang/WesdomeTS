@@ -30,6 +30,7 @@
             <div>
                 <h2 class="text-xl font-bold">{{ header.employeeid.firstname }} {{ header.employeeid.lastname }}</h2>
                 <p class="text-sm text-gray-500 mt-1">{{ dept.departmentname }} &mdash; {{ header.submittedat|date:"M j, Y" }}</p>
+                <p class="text-xs text-gray-400 mt-0.5">Crew: {{ header.crewid.crewname|default:"—" }}</p>
             </div>
         </div>
         {% if header.paidat %}
@@ -56,6 +57,7 @@
                 <th class="px-4 py-3">Work Order</th>
                 <th class="px-4 py-3">Description</th>
                 <th class="px-4 py-3">Status</th>
+                <th class="px-4 py-3">Approved By</th>
             </tr>
         </thead>
         <tbody>
@@ -79,6 +81,9 @@
                     <span class="text-gray-400">{{ entry.linestatus }}</span>
                     {% endif %}
                 </td>
+                <td class="px-4 py-3 text-gray-500">
+                    {% if entry.approvedby %}{{ entry.approvedby.firstname }} {{ entry.approvedby.lastname }}{% else %}—{% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>
@@ -86,8 +91,8 @@
 </div>
 
 <div class="container mx-auto flex flex-wrap justify-between items-center">
-    <p class="text-sm text-gray-700">Payable: <span class="font-bold">{{ payable_hours }}</span> &bull; Non-Payable: <span class="font-bold">{{ non_payable_hours }}</span> &bull; Total Hours: <span class="font-bold">{{ total_hours }}</span></p>
-    <form method="POST">
+    {% include 'timesheets/_hours_metrics_block.html' %}
+    <form method="POST" onsubmit="return confirm('Mark this timesheet as paid? This is final and cannot be undone from here.');">
         {% csrf_token %}
         {% if header.paidat %}
         {# <input type="hidden" name="action" value="mark_as_unpaid"> #}

@@ -369,6 +369,7 @@ class Workcategory(models.Model):
     isproductive = models.IntegerField(db_column='IsProductive')  # Field name made lowercase.
     isactive = models.IntegerField(db_column='IsActive', default=1)  # Field name made lowercase.
     ispayable = models.BooleanField(db_column='IsPayable', default=True)
+    isovertime = models.BooleanField(db_column='IsOvertime', default=False)
 
     class Meta:
         managed = True
@@ -381,6 +382,7 @@ class Businesscategory(models.Model):
     isproductive = models.IntegerField(db_column='IsProductive')  # Field name made lowercase.
     isactive = models.IntegerField(db_column='IsActive', default=1)  # Field name made lowercase.
     ispayable = models.BooleanField(db_column='IsPayable', default=True)
+    isovertime = models.BooleanField(db_column='IsOvertime', default=False)
 
     class Meta:
         managed = True
@@ -393,6 +395,7 @@ class Opscategory(models.Model):
     isproductive = models.IntegerField(db_column='IsProductive')
     isactive = models.IntegerField(db_column='IsActive', default=1)
     ispayable = models.BooleanField(db_column='IsPayable', default=True)
+    isovertime = models.BooleanField(db_column='IsOvertime', default=False)
 
     class Meta:
         managed = True
@@ -635,6 +638,11 @@ class EmployeeBonus(models.Model):
     notes = models.TextField(db_column='Notes', blank=True, null=True)
     assignedby = models.ForeignKey('users.User', models.DO_NOTHING, db_column='AssignedBy', related_name='assigned_bonuses')
     assignedat = models.DateTimeField(db_column='AssignedAt', auto_now_add=True)
+    status = models.CharField(
+        db_column='Status', max_length=10,
+        choices=[('Draft', 'Draft'), ('Submitted', 'Submitted'), ('Applied', 'Applied')],
+        default='Draft',
+    )
     appliedbypayroll = models.ForeignKey('users.User', models.DO_NOTHING, db_column='AppliedByPayroll', blank=True, null=True, related_name='applied_employee_bonuses')
     appliedatpayroll = models.DateTimeField(db_column='AppliedAtPayroll', blank=True, null=True)
 

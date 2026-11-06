@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
+    <button onclick="history.back()" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline cursor-pointer mb-2">
+        <i class="fa-solid fa-arrow-left"></i> <span class="back-label">{{ month_date|date:"F Y" }}</span>
+    </button>
+    <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+    <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+    <p class="text-center text-sm text-gray-500 mt-1">
+        <span class="font-semibold text-gray-700">CREW BONUSES — {{ month_date|date:"F Y"|upper }}:</span> Confirmed by superintendents, awaiting payroll.
+    </p>
+</div>
+
+{% if messages %}
+<div class="container mx-auto mb-4">
+    {% for message in messages %}
+    <div class="flex items-center gap-3 text-sm px-4 py-3 rounded-xl {% if message.tags == 'error' %}bg-red-50 border border-red-200 text-red-800{% elif message.tags == 'warning' %}bg-amber-50 border border-amber-200 text-amber-800{% else %}bg-green-50 border border-green-200 text-green-800{% endif %}">
+        <i class="fa-solid {% if message.tags == 'error' %}fa-circle-exclamation{% elif message.tags == 'warning' %}fa-triangle-exclamation{% else %}fa-circle-check{% endif %}"></i>
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-8">
+    <div class="overflow-x-auto">
+        <table class="w-full text-xs min-w-[700px]">
+            <thead>
+                <tr class="text-black text-center border-b">
+                    <th class="p-2">Employee</th>
+                    <th class="p-2">Rate</th>
+                    <th class="p-2">Notes</th>
+                    <th class="p-2">Confirmed By</th>
+                    <th class="p-2">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in bonuses %}
+                <tr class="border-b text-center hover:bg-gray-50">
+                    <td class="p-2 font-medium">
+                        <a href="{% url 'payroll_ops_member_month' b.employeeid.employeeid year month %}" class="text-[#28348A] hover:underline">
+                            {{ b.employeeid.firstname }} {{ b.employeeid.lastname }}
+                        </a>
+                    </td>
+                    <td class="p-2 font-semibold">{{ b.bonusratecode }}</td>
+                    <td class="p-2 text-gray-500">{{ b.notes|default:"—" }}</td>
+                    <td class="p-2">{{ b.reviewedby.firstname }} {{ b.reviewedby.lastname }}</td>
+                    <td class="p-2">
+                        <form method="post" onsubmit="return confirm('Apply this bonus? This is final and cannot be undone from here.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="apply_bonus">
+                            <input type="hidden" name="bonusid" value="{{ b.opsbonusid }}">
+                            <button class="bg-[#097d45] text-white text-xs px-3 py-1 rounded hover:opacity-90">Apply Bonus</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center text-gray-400 py-6">No crew bonuses awaiting payroll for this month.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>window._pageBackLabel = '{{ month_date|date:"F Y" }}';</script>
+{% endblock content %}

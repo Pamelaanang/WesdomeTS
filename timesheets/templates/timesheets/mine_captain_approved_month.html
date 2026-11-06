@@ -70,11 +70,9 @@
             </tbody>
         </table>
     </div>
-    <div class="mt-4 pt-3 flex flex-wrap justify-between items-center gap-2 text-sm text-gray-700">
+    <div class="mt-4 pt-3 flex flex-col gap-2 text-sm text-gray-700">
         <span>Total entries: <span class="font-bold">{{ entries|length }}</span></span>
-        <span>Payable: <span class="font-bold">{{ payable_hours }}</span></span>
-        <span>Non-Payable: <span class="font-bold">{{ non_payable_hours }}</span></span>
-        <span>Approved hours: <span class="font-bold">{{ total_hours }}</span></span>
+        {% include 'timesheets/_hours_metrics_block.html' %}
     </div>
 </div>
 

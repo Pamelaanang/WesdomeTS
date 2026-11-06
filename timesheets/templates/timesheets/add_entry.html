@@ -29,6 +29,7 @@
 
         <div class="flex flex-wrap justify-between items-center mt-4 text-sm gap-y-2 px-4">
             <span>Payroll ID: {{ request.user.employeeid }}</span>
+            <span class="font-semibold">Timesheet Month: {{ header.startedat|date:"F Y" }}</span>
             {% if not revision_mode %}<span>Today: {{ today }}</span>{% endif %}
             <span>Payable: {{ payable_hours }}</span>
             <span>Non-Payable: {{ non_payable_hours }}</span>
@@ -41,11 +42,12 @@
                 {% endif %}
             </span>
             {% if not revision_mode %}
-            <span>
+            <span class="flex items-center gap-1">
+                <label for="crew-select" class="text-xs text-gray-500">Crew (optional):</label>
                 <form method="POST">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="update_crew">
-                    <select name="crewid" onchange="this.form.submit()" class="bg-gray-100 border border-gray-300 py-1 text-sm">
+                    <select name="crewid" id="crew-select" onchange="this.form.submit()" class="bg-gray-100 border border-gray-300 py-1 text-sm">
                         <option value="">-- No Crew --</option>
                         {% for crew in crews %}
                         <option value="{{ crew.crewid }}" {% if header.crewid_id == crew.crewid %}selected{% endif %}>{{ crew.crewname }}</option>
@@ -206,7 +208,7 @@
                             </select>
                         </td>
                         <td class="p-2">
-                            <input type="number" name="hoursworked" id="hours-input" step="0.5" min="0" max="24"
+                            <input type="number" name="hoursworked" id="hours-input" step="0.5" min="0.5" max="24"
                                 class="border rounded px-1 py-1 w-full text-xs">
                         </td>
                         <td class="p-2">
@@ -215,7 +217,9 @@
                         </td>
                         <td class="p-2"></td>
                         <td class="p-2">
-                            <input type="date" name="startdate" id="date-input" class="border rounded px-1 py-1 text-xs w-full">
+                            <input type="date" name="startdate" id="date-input" class="border rounded px-1 py-1 text-xs w-full"
+                                {% if date_min %}min="{{ date_min|date:'Y-m-d' }}"{% endif %}
+                                {% if date_max %}max="{{ date_max|date:'Y-m-d' }}"{% endif %}>
                         </td>
                         {% if revision_mode %}<td class="p-2"></td>{% endif %}
                         <td class="p-2">

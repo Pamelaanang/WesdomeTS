@@ -1,16 +1,38 @@
 {% extends 'base.html' %}
 {% block content %}
 
+{% if messages %}
+<div class="container mx-auto mb-4">
+    {% for message in messages %}
+    <div class="flex items-center gap-3 text-sm px-4 py-3 rounded-xl {% if message.tags == 'error' %}bg-red-50 border border-red-200 text-red-800{% elif message.tags == 'warning' %}bg-amber-50 border border-amber-200 text-amber-800{% else %}bg-green-50 border border-green-200 text-green-800{% endif %}">
+        <i class="fa-solid {% if message.tags == 'error' %}fa-circle-exclamation{% elif message.tags == 'warning' %}fa-triangle-exclamation{% else %}fa-circle-check{% endif %}"></i>
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
 <div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
     <a href="{% url 'payroll_employee_bonuses' %}" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline mb-3">
         <i class="fa-solid fa-arrow-left"></i> Employee Bonuses
     </a>
     <h2 class="text-xl font-bold">{{ dept.departmentname }}</h2>
     {% if bonuses %}
-    <p class="text-sm text-gray-500 mt-1">{{ bonuses|length }} pending bonus{{ bonuses|length|pluralize:"es" }} in this department.</p>
+    <p class="text-sm text-gray-500 mt-1">{{ bonuses|length }} {% if show_applied %}applied{% else %}pending{% endif %} bonus{{ bonuses|length|pluralize:"es" }} in this department.</p>
     {% else %}
-    <p class="text-sm text-gray-500 mt-1">No pending bonuses in this department.</p>
+    <p class="text-sm text-gray-500 mt-1">No {% if show_applied %}applied{% else %}pending{% endif %} bonuses in this department.</p>
     {% endif %}
+
+    <div class="mt-4 flex gap-2 text-sm">
+        <a href="{% url 'payroll_employee_bonuses_dept' dept.departmentid %}"
+            class="px-3 py-1 rounded-full border text-xs transition {% if not show_applied %}bg-[#28348A] text-white border-[#28348A]{% else %}border-gray-400 text-gray-600 hover:bg-gray-100{% endif %}">
+            Awaiting Payroll
+        </a>
+        <a href="{% url 'payroll_employee_bonuses_dept' dept.departmentid %}?view=applied"
+            class="px-3 py-1 rounded-full border text-xs transition {% if show_applied %}bg-[#28348A] text-white border-[#28348A]{% else %}border-gray-400 text-gray-600 hover:bg-gray-100{% endif %}">
+            Applied History
+        </a>
+    </div>
 </div>
 
 <div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-8">
@@ -25,7 +47,7 @@
                     <th class="p-2">Rate</th>
                     <th class="p-2">Notes</th>
                     <th class="p-2">Assigned By</th>
-                    <th class="p-2">Action</th>
+                    <th class="p-2">{% if show_applied %}Applied{% else %}Action{% endif %}</th>
                 </tr>
             </thead>
             <tbody>
@@ -39,17 +61,22 @@
                     <td class="p-2 text-gray-500">{{ b.notes|default:"—" }}</td>
                     <td class="p-2">{{ b.assignedby.firstname }} {{ b.assignedby.lastname }}</td>
                     <td class="p-2">
-                        <form method="post">
+                        {% if show_applied %}
+                        <p class="text-gray-500">{{ b.appliedbypayroll.firstname }} {{ b.appliedbypayroll.lastname }}</p>
+                        <p class="text-gray-400">{{ b.appliedatpayroll|date:"M j, Y" }}</p>
+                        {% else %}
+                        <form method="post" onsubmit="return confirm('Mark this bonus as applied? This is final and cannot be undone from here.');">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="apply">
                             <input type="hidden" name="bonusid" value="{{ b.employeebonusid }}">
                             <button class="bg-[#097d45] text-white text-xs px-3 py-1 rounded hover:opacity-90">Mark Applied</button>
                         </form>
+                        {% endif %}
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" class="text-center text-gray-400 py-6">No pending bonuses in this department.</td>
+                    <td colspan="8" class="text-center text-gray-400 py-6">No {% if show_applied %}applied{% else %}pending{% endif %} bonuses in this department.</td>
                 </tr>
                 {% endfor %}
             </tbody>

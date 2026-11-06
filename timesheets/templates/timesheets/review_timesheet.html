@@ -25,6 +25,7 @@
             Employee: <span class="font-medium">{{ header.employeeid.firstname }} {{ header.employeeid.lastname }}</span>
         </span>
         <span>Role: <span class="font-medium">{{ header.employeeid.roleid.rolename }}</span></span>
+        <span>Crew: <span class="font-medium">{{ header.crewid.crewname|default:"—" }}</span></span>
         <span>Submitted: <span class="font-medium">{{ empdate_submitted|date:"M j, Y" }}</span></span>
         <span>Status: <span class="font-medium {% if header.overallstatus == 'Completed' %}text-green-600{% else %}text-yellow-500{% endif %}">{{ header.overallstatus }}</span></span>
     </div>
@@ -140,12 +141,14 @@
     </div>
 
     <div class="mt-6 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
-        <p class="text-sm text-gray-700">
-            {{ header.employeeid.firstname }} {{ header.employeeid.lastname }} logged
-            <span class="font-semibold">{{ total_hours }}</span> hrs
-            (<span class="font-semibold">{{ payable_hours }}</span> payable, <span class="font-semibold">{{ non_payable_hours }}</span> non-payable).
-            You have approved <span class="font-semibold">{{ hours_approved }}</span> hrs.
-        </p>
+        <div>
+            <p class="text-sm text-gray-700 mb-1">
+                {{ header.employeeid.firstname }} {{ header.employeeid.lastname }} logged
+                <span class="font-semibold">{{ total_hours }}</span> hrs.
+                You have approved <span class="font-semibold">{{ hours_approved }}</span> hrs.
+            </p>
+            {% include 'timesheets/_hours_metrics_block.html' %}
+        </div>
         <div class="flex flex-col items-end gap-1">
             <div class="flex gap-2">
                 {% if has_unreviewed %}

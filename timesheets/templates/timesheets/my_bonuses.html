@@ -18,10 +18,12 @@
     <div class="flex flex-wrap gap-4">
         {% for b in bonuses %}
         <div class="relative bg-white rounded-xl shadow p-5 w-64 flex flex-col gap-1">
-            {% if b.appliedbypayroll %}
+            {% if b.status == 'Applied' %}
             <span class="absolute top-2 right-2 text-[10px] font-semibold uppercase bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Applied</span>
-            {% else %}
+            {% elif b.status == 'Submitted' %}
             <span class="absolute top-2 right-2 text-[10px] font-semibold uppercase bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Pending</span>
+            {% else %}
+            <span class="absolute top-2 right-2 text-[10px] font-semibold uppercase bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Draft</span>
             {% endif %}
             <p class="font-semibold text-slate-800 mt-2">{{ b.periodstart|date:"M j, Y" }} &ndash; {{ b.periodend|date:"M j, Y" }}</p>
             <p class="text-xs text-gray-500">{{ b.bonustype }} &bull; Rate {{ b.bonusratecode }}</p>

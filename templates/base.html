@@ -182,6 +182,14 @@
                 <a href="{% url 'payroll_business_unprocessed' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_business_unprocessed,payroll_business_unprocessed_dept,payroll_business_unprocessed_review' %}font-semibold{% endif %}"><i class="fa-solid fa-briefcase"></i> Business</a>
                 <a href="{% url 'payroll_ops_unprocessed' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_ops_unprocessed,payroll_ops_sheet' %}font-semibold{% endif %}"><i class="fa-solid fa-hard-hat"></i> Daily Crew</a>
             </div>
+            <button onclick="toggleAccordion('menu-bonus-inbox')" class="accordion-btn">
+                <span class="flex items-center gap-3"><i class="fa-solid fa-gift"></i> Bonus Inbox</span>
+                <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
+            </button>
+            <div id="menu-bonus-inbox" class="hidden flex flex-col">
+                <a href="{% url 'payroll_crew_bonuses' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_crew_bonuses,payroll_crew_bonuses_month' %}font-semibold{% endif %}"><i class="fa-solid fa-hard-hat"></i> Crew Bonus</a>
+                <a href="{% url 'payroll_employee_bonuses' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_employee_bonuses,payroll_employee_bonuses_dept' %}font-semibold{% endif %}"><i class="fa-solid fa-user-tie"></i> Employee Bonus</a>
+            </div>
             <button onclick="toggleAccordion('menu-processed')" class="accordion-btn {% if request.resolver_match.url_name in 'payroll_processed_maintenance,payroll_processed_maintenance_employee,payroll_processed_maintenance_month,payroll_processed_business,payroll_processed_business_dept,payroll_processed_business_employee,payroll_processed_business_month' %}active{% endif %}">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-building"></i> Processed</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
@@ -198,7 +206,6 @@
                 <a href="{% url 'payroll_ops_daily' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_ops_daily,payroll_ops_daily_month,payroll_ops_daily_day,payroll_ops_daily_shift' %}font-semibold{% endif %}"><i class="fa-solid fa-calendar-days"></i> Daily</a>
                 <a href="{% url 'payroll_ops_members' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_ops_members,payroll_ops_member_detail,payroll_ops_member_month' %}font-semibold{% endif %}"><i class="fa-solid fa-person"></i> Members</a>
             </div>
-            <a href="{% url 'payroll_employee_bonuses' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name in 'payroll_employee_bonuses,payroll_employee_bonuses_dept' %}active{% endif %}"><i class="fa-solid fa-gift"></i> Employee Bonuses</a>
             {# Reports: future work #}
             {# <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-chart-bar"></i> Reports</a> #}
             <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-magnifying-glass"></i> Search</a>
@@ -259,9 +266,9 @@
         </div>
     </nav>
 
-    <main class="main-content">
+    <main class="main-content">  
         {% block content %}
-        {% endblock content %}
+        {% endblock content %}      
 
         <div class="pt-8 mt-auto text-center text-xs text-black">
             <p>Legal and Privacy | &copy; 2026 Wesdome Gold Mines Ltd. V1.0.4 | All Rights Reserved. Powered By Inc.</p>
@@ -287,6 +294,16 @@
                     if (dest.origin !== window.location.origin) return;
                     if (dest.pathname === window.location.pathname) return;
                 } catch (_) { return; }
+                var label = (typeof window._pageBackLabel !== 'undefined' && window._pageBackLabel !== '')
+                    ? window._pageBackLabel : null;
+                if (label) sessionStorage.setItem('backLabel', label);
+            }, true);
+            // A <form> submit navigates away just like a link click, but never
+            // passes through the handler above — without this, a page reached
+            // by submitting a form (e.g. a "+ New Timesheet" button) shows
+            // whatever label was stored from an unrelated earlier click.
+            document.addEventListener('submit', function (e) {
+                if (!(e.target instanceof HTMLFormElement)) return;
                 var label = (typeof window._pageBackLabel !== 'undefined' && window._pageBackLabel !== '')
                     ? window._pageBackLabel : null;
                 if (label) sessionStorage.setItem('backLabel', label);
