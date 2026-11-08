@@ -100,23 +100,23 @@
                 <tr>
                     <th class="px-4 py-3 text-left w-[10%]">ID</th>
                     <th class="px-4 py-3 text-left w-[20%]">Name</th>
-                    <th class="px-4 py-3 text-left w-[30%]">Role</th>
+                    <th class="px-4 py-3 text-left w-[24%]">Role</th>
                     <th class="px-4 py-3 text-left w-[15%]">Status</th>
-                    <th class="px-4 py-3 text-left w-[25%]">Action</th>
+                    <th class="px-4 py-3 text-left w-[31%]">Action</th>
                 </tr>
             </thead>
             <tbody>
                 {% for user in dept.users %}
                 <tr class="border-t border-gray-100 hover:bg-gray-50">
-                    <td class="px-4 py-3">{{ user.employeeid }}</td>
-                    <td class="px-4 py-3">{{ user.firstname }} {{ user.lastname }}</td>
-                    <td class="px-4 py-3">
+                    <td class="px-4 py-4">{{ user.employeeid }}</td>
+                    <td class="px-4 py-4">{{ user.firstname }} {{ user.lastname }}</td>
+                    <td class="px-4 py-4">
                         {{ user.roleid.rolename }}
                         {% if user.employmenttype == 'Contract' %}
                         <span class="ml-1 inline-block bg-amber-100 text-amber-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full align-middle">Contract</span>
                         {% endif %}
                     </td>
-                    <td class="px-4 py-3">
+                    <td class="px-4 py-4">
                         {% if not user.isactive %}
                             <span class="text-xs text-gray-400">Inactive</span>
                         {% elif user.terminationdate %}
@@ -127,36 +127,38 @@
                             <span class="text-xs text-green-600">Active</span>
                         {% endif %}
                     </td>
-                    <td class="px-4 py-3 flex gap-2">
+                    <td class="px-4 py-4 align-middle">
+                        <div class="flex flex-wrap items-center gap-2">
                         {% if user.isactive %}
                         <button type="button" onclick="openEditModal('{{ user.employeeid }}')"
-                            class="bg-gray-100 text-gray-700 text-xs px-3 py-1 rounded hover:bg-gray-200">
+                            class="bg-gray-100 text-gray-700 text-xs px-3 py-1.5 whitespace-nowrap rounded hover:bg-gray-200">
                             Edit
                         </button>
                         {% endif %}
                         {% if user.isactive %}
                         <form method="post" action="{% url 'reset_password' user.employeeid %}">
                             {% csrf_token %}
-                            <button class="bg-[#28348A] text-white text-xs px-3 py-1 rounded hover:bg-blue-800">Reset Password</button>
+                            <button class="bg-[#28348A] text-white text-xs px-3 py-1.5 whitespace-nowrap rounded hover:bg-blue-800">Reset Password</button>
                         </form>
                         {% else %}
                         <form method="post" action="{% url 'reactivate_employee' user.employeeid %}">
                             {% csrf_token %}
-                            <button class="bg-green-600 text-white text-xs px-3 py-1 rounded hover:bg-green-700" onclick="return confirm('Reactivate {{ user.firstname|escapejs }} {{ user.lastname|escapejs }}? A new temporary password will be sent.');">Reactivate</button>
+                            <button class="bg-green-600 text-white text-xs px-3 py-1.5 whitespace-nowrap rounded hover:bg-green-700" onclick="return confirm('Reactivate {{ user.firstname|escapejs }} {{ user.lastname|escapejs }}? A new temporary password will be sent.');">Reactivate</button>
                         </form>
                         {% endif %}
                         {% if user.isactive %}
                         <a href="{% url 'replace_employee' user.employeeid %}"
-                            class="bg-red-100 text-red-700 text-xs px-3 py-1 rounded hover:bg-red-200">
+                            class="bg-red-100 text-red-700 text-xs px-3 py-1.5 whitespace-nowrap rounded hover:bg-red-200">
                             Replace
                         </a>
                         {% if not user.terminationdate and user.pk != request.user.pk %}
                         <button type="button" onclick="openLeavingModal('{{ user.employeeid|escapejs }}', '{{ user.firstname|escapejs }} {{ user.lastname|escapejs }}')"
-                            class="bg-amber-100 text-amber-800 text-xs px-3 py-1 rounded hover:bg-amber-200">
+                            class="bg-amber-100 text-amber-800 text-xs px-3 py-1.5 whitespace-nowrap rounded hover:bg-amber-200">
                             Record leaving
                         </button>
                         {% endif %}
                         {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% empty %}
@@ -622,6 +624,14 @@ function toggleDept(id) {
         panel.previousElementSibling?.querySelector('.dept-icon')?.classList.add('rotate-180');
     }
 }
+
+// Keep an open department panel tall enough for its rows if they reflow
+// (window resized, buttons wrapping), instead of clipping the last row.
+window.addEventListener('resize', () => {
+    document.querySelectorAll('[id^="dept-"]').forEach(el => {
+        if (el.style.maxHeight && el.style.maxHeight !== '0px') el.style.maxHeight = el.scrollHeight + 'px';
+    });
+});
 </script>
 
 <script>window._pageBackLabel = 'Back to Profile';</script>

@@ -1,0 +1,83 @@
+"""A seat needs a position from its basket's discipline, or it can't show on the Crew Grid."""
+from django.test import TestCase
+from django.urls import reverse
+from django.utils import timezone
+
+from timesheets.models import Crews, Discipline, UnitDiscipline
+from users.models import Accesslevel, CrewAssignment, Department, Position, Roles, User
+
+
+class SeatPositionTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        levels = {lvl: Accesslevel.objects.create(accessid=lvl, accessrole=f'L{lvl}') for lvl in (2, 5, 8)}
+        dept = Department.objects.create(departmentname='Ops')
+        role = {lvl: Roles.objects.create(rolename=f'Role {lvl}', departmentid=dept, accessid=a) for lvl, a in levels.items()}
+        cls.crew = Crews.objects.create(crewname='A')
+        cls.dev, _ = Discipline.objects.get_or_create(name='Development')
+        cls.prod, _ = Discipline.objects.get_or_create(name='Production')
+        UnitDiscipline.objects.create(crew=cls.crew, discipline=cls.dev)
+        cls.dev_pos = Position.objects.create(positionname='Jumbo Operator', shiftertype='Development')
+        cls.prod_pos = Position.objects.create(positionname='Scoop Operator', shiftertype='Production')
+
+        def mk(eid, lvl, **extra):
+            return User.objects.create(employeeid=eid, firstname=eid, lastname='T', phonenumber='0', roleid=role[lvl],
+                                       isactive=True, hasaccess=True, is_temporary=False, **extra)
+        cls.supt = mk('SUP', 2)
+        cls.miner = mk('M1', 8)
+        cls.leaving = mk('M2', 8, terminationdate=timezone.localdate())
+
+    def add_vacant(self, employee, position=None):
+        self.client.force_login(self.supt)
+        data = {'action': 'bulk_add_vacant_members', 'basket': f'{self.crew.crewid}:Development',
+                'employee_ids': [employee.employeeid], 'startdate': str(timezone.localdate())}
+        if position:
+            data[f'position_{employee.employeeid}'] = position.pk
+        return self.client.post(reverse('crew_assignments'), data, follow=True)
+
+    def test_add_without_position_is_refused(self):
+        resp = self.add_vacant(self.miner)
+        self.assertFalse(CrewAssignment.objects.exists())
+        self.assertContains(resp, 'Choose a position')
+
+    def test_position_from_another_discipline_is_refused(self):
+        self.add_vacant(self.miner, self.prod_pos)
+        self.assertFalse(CrewAssignment.objects.exists())
+
+    def test_matching_position_is_added_and_shows_on_grid(self):
+        self.add_vacant(self.miner, self.dev_pos)
+        seat = CrewAssignment.objects.get(employee=self.miner)
+        self.assertEqual(seat.positionid, self.dev_pos)
+        resp = self.client.get(reverse('crew_grid'))
+        self.assertContains(resp, 'M1')
+
+    def test_leaving_person_cannot_be_added(self):
+        resp = self.add_vacant(self.leaving, self.dev_pos)
+        self.assertEqual(resp.status_code, 404)
+        self.assertFalse(CrewAssignment.objects.exists())
+
+    def test_assign_unassigned_needs_a_matching_position(self):
+        self.client.force_login(self.supt)
+        base = {'action': 'assign_unassigned', 'employee_id': 'M1', 'basket': f'{self.crew.crewid}:Development'}
+        self.client.post(reverse('crew_management'), {**base, 'position': self.prod_pos.pk})
+        self.assertFalse(CrewAssignment.objects.exists())
+        self.client.post(reverse('crew_management'), {**base, 'position': self.dev_pos.pk})
+        self.assertTrue(CrewAssignment.objects.filter(employee=self.miner, positionid=self.dev_pos).exists())
+
+    def test_eight_in_one_position_all_render(self):
+        for i in range(8):
+            m = User.objects.create(employeeid=f'X{i}', firstname=f'Crewman{i}', lastname='T', phonenumber='0',
+                                    roleid=self.miner.roleid, isactive=True, hasaccess=True, is_temporary=False)
+            self.add_vacant(m, self.dev_pos)
+        self.assertEqual(CrewAssignment.objects.filter(positionid=self.dev_pos, enddate__isnull=True).count(), 8)
+        resp = self.client.get(reverse('crew_grid'))
+        for i in range(8):
+            self.assertContains(resp, f'Crewman{i}')
+
+    def test_position_label_shows_head_count(self):
+        for i in range(5):
+            m = User.objects.create(employeeid=f'J{i}', firstname=f'J{i}', lastname='T', phonenumber='0',
+                                    roleid=self.miner.roleid, isactive=True, hasaccess=True, is_temporary=False)
+            self.add_vacant(m, self.dev_pos)
+        resp = self.client.get(reverse('crew_grid'))
+        self.assertContains(resp, 'Jumbo Operator <span class="text-gray-400 font-normal" title="People currently in this position across all crews">(5)</span>', html=False)

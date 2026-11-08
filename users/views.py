@@ -1368,6 +1368,8 @@ def crew_assignments(request):
         dest_basket = basket_for(crew, shiftertype) if crew and shiftertype else None
         if not crew or not shiftertype:
             messages.error(request, 'Select a basket to move this member into.')
+        elif pos_error := _seat_position_error(dest_position_id, shiftertype):
+            messages.error(request, pos_error)
         elif not _basket_leaderless(crew, shiftertype):
             messages.error(request, 'That basket has a leader now. Move the member onto its own shifter\'s position instead.')
         elif source.basket_id == getattr(dest_basket, 'pk', None) and source.positionid_id == dest_position_id:
@@ -1598,6 +1600,8 @@ def crew_assignments(request):
             messages.error(request, 'Select a crew and discipline.')
         elif not _basket_leaderless(crew, shiftertype):
             messages.error(request, 'This basket has a leader now. Add members from its shifter instead.')
+        elif employee_ids and (pos_error := _first_position_error(request, employee_ids, shiftertype)):
+            messages.error(request, pos_error)
         else:
             added = []
             basket = basket_for(crew, shiftertype)
@@ -1607,7 +1611,7 @@ def crew_assignments(request):
                 # a leadership role elsewhere, not a member seat here.
                 employee = get_object_or_404(
                     User, Q(roleid__accessid__accessid=8) | Q(roleid__rolename='Spare Shifter'),
-                    employeeid=employee_id, isactive=True,
+                    employeeid=employee_id, isactive=True, terminationdate__isnull=True,
                 )
                 position_id = request.POST.get(f'position_{employee_id}') or None
                 primary = basket_for(crew, shiftertype)
@@ -1794,12 +1798,37 @@ def management_sections():
     return dict(sorted(sections.items(), key=lambda item: (len(item[0]) > 1, item[0])))
 
 
+def _seat_position_error(position_id, discipline_name):
+    """A seat needs a position from its basket's own discipline. The Crew Grid
+    draws one row per position of the discipline, so a seat without one (or
+    with another discipline's position) would be in the basket but invisible
+    on the grid. Returns an error message, or None when the position is fine."""
+    if not discipline_name:
+        return 'Select a basket first.'
+    raw = str(position_id or '').strip()
+    if not raw.isdigit():
+        return f'Choose a position for everyone you add to {discipline_name}.'
+    if not Position.objects.filter(pk=int(raw), isactive=1, discipline__name=discipline_name).exists():
+        return f'That position isn\'t one of the {discipline_name} positions. Choose a {discipline_name} position.'
+    return None
+
+
+def _first_position_error(request, employee_ids, discipline_name):
+    """Checks every person's position before anyone is added, so a bad pick
+    doesn't leave the basket half-filled."""
+    for employee_id in employee_ids:
+        error = _seat_position_error(request.POST.get(f'position_{employee_id}'), discipline_name)
+        if error:
+            return error
+    return None
+
+
 def _assign_unassigned(request):
     # Places one unplaced person from the Crew Management overview. A Miner joins the
     # basket with a position (led baskets through their leader, leaderless ones unattached,
     # as the vacant-basket add does). A Shift Coordinator becomes the basket's leader, only
     # if the basket has none.
-    person = get_object_or_404(User, employeeid=request.POST.get('employee_id', '').strip(), isactive=True)
+    person = get_object_or_404(User, employeeid=request.POST.get('employee_id', '').strip(), isactive=True, terminationdate__isnull=True)
     name = f'{person.firstname} {person.lastname}'
     crew, section = _parse_basket(request.POST.get('basket'))
     if not crew or section not in management_sections().get(crew.crewname, []):
@@ -1835,7 +1864,7 @@ def _assign_unassigned(request):
     position_id = request.POST.get('position', '').strip()
     position = Position.objects.filter(
         pk=int(position_id) if position_id.isdigit() else None, isactive=1,
-    ).filter(Q(discipline__name=section) | Q(discipline__isnull=True)).first()
+    ).filter(discipline__name=section).first()
     if position is None:
         messages.error(request, f'Choose a position for {section}.')
         return redirect('crew_management')
@@ -2291,13 +2320,18 @@ def crew_assignment_detail(request, shifter_id):
             start_date = request.POST.get('startdate')
             employee_ids = request.POST.getlist('employee_ids')
             added = []
+            pos_error = employee_ids and _first_position_error(
+                request, employee_ids, active_basket[1] if active_basket else None)
+            if pos_error:
+                messages.error(request, pos_error)
+                employee_ids = []
             for employee_id in employee_ids:
                 # Matches available_employees above: a Miner, or a Spare
                 # Shifter currently covering a different basket — covering is
                 # a leadership role elsewhere, not a member seat here.
                 employee = get_object_or_404(
                     User, Q(roleid__accessid__accessid=8) | Q(roleid__rolename='Spare Shifter'),
-                    employeeid=employee_id, isactive=True,
+                    employeeid=employee_id, isactive=True, terminationdate__isnull=True,
                 )
                 position_id = request.POST.get(f'position_{employee_id}') or None
                 also, also_error = _also_covers_basket(request, employee_id, active_row)
@@ -2316,7 +2350,7 @@ def crew_assignment_detail(request, shifter_id):
                 added.append(f'{employee.firstname} {employee.lastname}')
             if added:
                 messages.success(request, f'Added {len(added)} member{"s" if len(added) != 1 else ""} to crew: {", ".join(added)}.')
-            else:
+            elif not pos_error:
                 messages.warning(request, 'No members selected.')
 
         elif action == 'bulk_remove_members':
@@ -2577,7 +2611,10 @@ def crew_assignment_detail(request, shifter_id):
                 )
                 dest_position_id = request.POST.get('dest_position_id') or None
                 dest_position_id = int(dest_position_id) if dest_position_id else None
-                if source.basket_id == getattr(active_row, 'pk', None) and source.positionid_id == dest_position_id:
+                pos_error = _seat_position_error(dest_position_id, active_basket[1])
+                if pos_error:
+                    messages.error(request, pos_error)
+                elif source.basket_id == getattr(active_row, 'pk', None) and source.positionid_id == dest_position_id:
                     messages.warning(request, f'{source.employee.firstname} {source.employee.lastname} is already there.')
                 else:
                     today = timezone.now().date()
@@ -3030,7 +3067,10 @@ def crew_grid(request):
             # A row is shared when any seat on it covers a partner crew. Seats in a shared row
             # that don't cover one read "<crew> only", so the row says who belongs where.
             row_shared = any(a.also_covers_basket_id for occupants in per_col for a in occupants)
+            # People currently seated in this position across every crew in the band.
+            people_count = sum(len(o) for o in per_col)
             for idx, entry in enumerate(entries):
+                entry['people_count'] = people_count
                 entry['shared'] = row_shared
                 entry['is_first'] = idx == 0
                 entry['rowspan'] = len(entries)

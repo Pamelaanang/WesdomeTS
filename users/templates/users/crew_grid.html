@@ -102,7 +102,7 @@
             {% for row in band.position_rows %}
             <tr class="hover:bg-amber-50 {% cycle 'bg-white' 'bg-gray-50' %}">
                 {% if row.is_first %}
-                <td rowspan="{{ row.rowspan }}" class="px-4 py-2.5 text-sm font-medium text-gray-700 border-b border-r border-gray-200 align-top">{{ row.position.positionname }}</td>
+                <td rowspan="{{ row.rowspan }}" class="px-4 py-2.5 text-sm font-medium text-gray-700 border-b border-r border-gray-200 align-top">{{ row.position.positionname }} <span class="text-gray-400 font-normal" title="People currently in this position across all crews">({{ row.people_count }})</span></td>
                 {% endif %}
                 {% for cell in row.cells %}
                 {# grid-drop-target dropped: drag-and-drop move is disabled, see _grid_action_scripts.html #}
