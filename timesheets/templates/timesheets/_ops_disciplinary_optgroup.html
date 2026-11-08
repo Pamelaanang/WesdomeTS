@@ -1,0 +1,10 @@
+{% if disciplinary_categories or disciplinary_leavetypes %}
+<optgroup label="Disciplinary">
+    {% for oc in disciplinary_categories %}
+    <option value="oc_{{ oc.opscategoryid }}" {% if entry and oc.opscategoryid == entry.opscategoryid_id %}selected{% endif %}>{{ oc.categoryname }} (paid, no bonus)</option>
+    {% endfor %}
+    {% for lt in disciplinary_leavetypes %}
+    <option value="lt_{{ lt.leavetypeid }}" {% if entry and lt.leavetypeid == entry.leavetypeid_id %}selected{% endif %}>{{ lt.leavetypename }} (no pay)</option>
+    {% endfor %}
+</optgroup>
+{% endif %}

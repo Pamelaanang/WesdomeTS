@@ -1,0 +1,131 @@
+{% comment %}Everything about one contract: used in the contract modal and on the contract page. Needs return_url (where each form comes back to).{% endcomment %}
+<div class="p-4 bg-white rounded-2xl shadow mb-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="text-lg font-bold text-gray-800">{{ contract.contractcode }} <span class="font-normal text-gray-500">— {{ contract.contracttitle }}</span></h2>
+        <div class="flex items-center gap-2">
+            {% if not contract.isactive %}<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Deactivated</span>{% endif %}
+            <form method="POST" {% if contract.isactive %}onsubmit="return confirm('Deactivate {{ contract.contractcode|escapejs }}? It disappears from every picker but stays on past crew sheets. You can reactivate it later.');"{% endif %}>
+                {% csrf_token %}<input type="hidden" name="next" value="{{ return_url }}">
+                <input type="hidden" name="action" value="set_contract_active">
+                <input type="hidden" name="rowid" value="{{ contract.contractid }}">
+                <input type="hidden" name="active" value="{% if contract.isactive %}0{% else %}1{% endif %}">
+                <button type="submit" class="text-xs px-3 py-1.5 rounded-lg {% if contract.isactive %}bg-red-50 text-red-600 hover:bg-red-100{% else %}bg-green-600 text-white hover:opacity-90{% endif %}">{% if contract.isactive %}Deactivate{% else %}Reactivate{% endif %}</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+<div class="grid lg:grid-cols-2 gap-4">
+    <!-- Details -->
+    <form method="POST" class="bg-white rounded-2xl shadow p-5 flex flex-col gap-3">
+        {% csrf_token %}<input type="hidden" name="next" value="{{ return_url }}">
+        <input type="hidden" name="action" value="edit_contract">
+        <input type="hidden" name="contractid" value="{{ contract.contractid }}">
+        <p class="text-sm font-semibold text-gray-700">Details</p>
+        <div class="flex flex-wrap gap-3">
+            <label class="flex flex-col gap-1 text-xs text-gray-500">Code
+                <input name="contractcode" value="{{ contract.contractcode }}" required maxlength="20" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-32">
+            </label>
+            <label class="flex flex-col gap-1 text-xs text-gray-500 grow">Title
+                <input name="contracttitle" value="{{ contract.contracttitle }}" required maxlength="255" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+            </label>
+        </div>
+        <label class="flex flex-col gap-1 text-xs text-gray-500">Description (optional)
+            <textarea name="contractdescription" rows="2" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">{{ contract.contractdescription|default:'' }}</textarea>
+        </label>
+        <button type="submit" class="self-start bg-[#28348A] text-white text-sm px-4 py-1.5 rounded-lg hover:opacity-90">Save details</button>
+    </form>
+
+    <!-- Levels -->
+    <div class="bg-white rounded-2xl shadow p-5 flex flex-col gap-3">
+        <p class="text-sm font-semibold text-gray-700">Miner levels <span class="text-xs font-normal text-gray-400">· which Miners can be given this contract</span></p>
+        <div class="flex flex-wrap gap-2">
+            {% for lvl in levels %}
+            <form method="POST" class="flex items-center gap-1 bg-purple-50 border border-purple-200 text-purple-700 rounded-full pl-3 pr-2 py-0.5 text-xs">
+                {% csrf_token %}<input type="hidden" name="next" value="{{ return_url }}">
+                <input type="hidden" name="action" value="remove_level">
+                <input type="hidden" name="contractid" value="{{ contract.contractid }}">
+                <input type="hidden" name="levelid" value="{{ lvl.levelid }}">
+                {{ lvl.levelcode }} <button type="submit" title="Remove" class="text-purple-400 hover:text-purple-700">&times;</button>
+            </form>
+            {% empty %}
+            <p class="text-xs text-amber-700"><i class="fa-solid fa-triangle-exclamation mr-1"></i>No level yet: not offered to any Miner until a level is added.</p>
+            {% endfor %}
+        </div>
+        {% if other_levels %}
+        <form method="POST" class="flex items-center gap-2">
+            {% csrf_token %}<input type="hidden" name="next" value="{{ return_url }}">
+            <input type="hidden" name="action" value="add_level">
+            <input type="hidden" name="contractid" value="{{ contract.contractid }}">
+            <select name="levelid" required class="border border-gray-300 rounded-lg px-2 py-1 text-sm">
+                <option value="">Add a level…</option>
+                {% for lvl in other_levels %}<option value="{{ lvl.levelid }}">{{ lvl.levelcode }}</option>{% endfor %}
+            </select>
+            <button type="submit" class="text-xs text-[#28348A] hover:underline">Add</button>
+        </form>
+        {% endif %}
+    </div>
+
+    <!-- Cost centers/accounts -->
+    <div class="bg-white rounded-2xl shadow p-5 flex flex-col gap-3">
+        <p class="text-sm font-semibold text-gray-700">Cost Centers/Accounts <span class="text-xs font-normal text-gray-400">· offered on crew sheets for this contract</span></p>
+        <div class="flex flex-wrap gap-2">
+            {% for link in linked %}
+            <form method="POST" class="flex items-center gap-1 bg-white border border-gray-200 rounded-full pl-3 pr-2 py-0.5 text-xs" onsubmit="return confirm('Unlink {{ link.accountid.accountcode|escapejs }} from {{ contract.contractcode|escapejs }}?');">
+                {% csrf_token %}<input type="hidden" name="next" value="{{ return_url }}">
+                <input type="hidden" name="action" value="unlink_account">
+                <input type="hidden" name="contractid" value="{{ contract.contractid }}">
+                <input type="hidden" name="accountid" value="{{ link.accountid_id }}">
+                {{ link.accountid.accountcode }} — {{ link.accountid.accounttitle }}{% if not link.accountid.isactive %} <span class="text-gray-400">(inactive)</span>{% endif %}
+                <button type="submit" title="Unlink" class="text-red-400 hover:text-red-600 ml-1">&times;</button>
+            </form>
+            {% empty %}
+            <p class="text-xs text-amber-700"><i class="fa-solid fa-triangle-exclamation mr-1"></i>No cost center/account linked yet.</p>
+            {% endfor %}
+        </div>
+        {% if other_accounts %}
+        <form method="POST" class="flex items-center gap-2">
+            {% csrf_token %}<input type="hidden" name="next" value="{{ return_url }}">
+            <input type="hidden" name="action" value="link_account">
+            <input type="hidden" name="contractid" value="{{ contract.contractid }}">
+            <select name="accountid" required class="border border-gray-300 rounded-lg px-2 py-1 text-sm max-w-xs">
+                <option value="">Link a cost center/account…</option>
+                {% for a in other_accounts %}<option value="{{ a.accountid }}">{{ a.accountcode }} — {{ a.accounttitle }}</option>{% endfor %}
+            </select>
+            <button type="submit" class="text-xs text-[#28348A] hover:underline">Link</button>
+        </form>
+        {% endif %}
+    </div>
+
+    <!-- Series -->
+    <div class="bg-white rounded-2xl shadow p-5 flex flex-col gap-3">
+        <p class="text-sm font-semibold text-gray-700">Series <span class="text-xs font-normal text-gray-400">· a contract can be in more than one</span></p>
+        <div class="flex flex-wrap gap-2">
+            {% for s in series_in %}
+            <form method="POST" class="flex items-center gap-1 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-full pl-3 pr-2 py-0.5 text-xs">
+                {% csrf_token %}<input type="hidden" name="next" value="{{ return_url }}">
+                <input type="hidden" name="action" value="remove_series">
+                <input type="hidden" name="contractid" value="{{ contract.contractid }}">
+                <input type="hidden" name="target_series_id" value="{{ s.seriesid }}">
+                <a href="{% url 'contract_series' s.seriesid %}" class="hover:underline">{{ s.seriesname }}</a>
+                <button type="submit" title="Remove from series" class="text-indigo-400 hover:text-indigo-700">&times;</button>
+            </form>
+            {% empty %}
+            <p class="text-xs text-gray-400">Not in a series.</p>
+            {% endfor %}
+        </div>
+        {% if series_other %}
+        <form method="POST" class="flex items-center gap-2">
+            {% csrf_token %}<input type="hidden" name="next" value="{{ return_url }}">
+            <input type="hidden" name="action" value="add_series">
+            <input type="hidden" name="contractid" value="{{ contract.contractid }}">
+            <select name="target_series_id" required class="border border-gray-300 rounded-lg px-2 py-1 text-sm">
+                <option value="">Add to a series…</option>
+                {% for s in series_other %}<option value="{{ s.seriesid }}">{{ s.seriesname }}</option>{% endfor %}
+            </select>
+            <button type="submit" class="text-xs text-[#28348A] hover:underline">Add</button>
+        </form>
+        {% endif %}
+    </div>
+</div>

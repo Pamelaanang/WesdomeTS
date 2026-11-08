@@ -81,3 +81,48 @@ class SeatPositionTests(TestCase):
             self.add_vacant(m, self.dev_pos)
         resp = self.client.get(reverse('crew_grid'))
         self.assertContains(resp, 'Jumbo Operator <span class="text-gray-400 font-normal" title="People currently in this position across all crews">(5)</span>', html=False)
+
+
+class SpareShifterLevelTests(TestCase):
+    """Lead, 1, 2 and 3 Miners can step up as a temporary Spare Shifter; Level 4 can't."""
+    @classmethod
+    def setUpTestData(cls):
+        from timesheets.models import MinerLevel
+        levels = {lvl: Accesslevel.objects.get_or_create(accessid=lvl, defaults={'accessrole': f'L{lvl}'})[0] for lvl in (2, 5, 8)}
+        dept = Department.objects.create(departmentname='Ops')
+        cls.miner_role = Roles.objects.create(rolename='Underground Mine Operator', departmentid=dept, accessid=levels[8])
+        Roles.objects.get_or_create(rolename='Spare Shifter', defaults={'departmentid': dept, 'accessid': levels[5]})
+        sup_role = Roles.objects.create(rolename='Superintendent', departmentid=dept, accessid=levels[2])
+        cls.supt = User.objects.create(employeeid='SUP', firstname='S', lastname='T', phonenumber='0', roleid=sup_role,
+                                       isactive=True, hasaccess=True, is_temporary=False)
+        cls.crew = Crews.objects.create(crewname='A')
+        dev, _ = Discipline.objects.get_or_create(name='Development')
+        UnitDiscipline.objects.create(crew=cls.crew, discipline=dev)
+        cls.lvl = {code: MinerLevel.objects.get_or_create(levelcode=code, defaults={'sortorder': i})[0]
+                   for i, code in enumerate(['Lead', '1', '2', '3', '4'])}
+
+    def promote(self, code):
+        m = User.objects.create(employeeid=f'M{code}', firstname=code, lastname='Miner', phonenumber='0',
+                                roleid=self.miner_role, minerlevel=self.lvl[code], isactive=True, hasaccess=True, is_temporary=False)
+        self.client.force_login(self.supt)
+        resp = self.client.post(reverse('crew_assignments'), {
+            'action': 'promote_and_assign_basket_temporary', 'employee_id': m.employeeid,
+            'crewid': self.crew.crewid, 'shiftertype': 'Development'})
+        m.refresh_from_db()
+        return resp, m
+
+    def test_level_3_can_cover(self):
+        resp, m = self.promote('3')
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(m.roleid.rolename, 'Spare Shifter')
+
+    def test_level_4_cannot(self):
+        resp, m = self.promote('4')
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(m.roleid.rolename, 'Underground Mine Operator')
+
+    def test_grid_picker_gets_the_same_levels(self):
+        self.client.force_login(self.supt)
+        resp = self.client.get(reverse('crew_grid'))
+        self.assertEqual(resp.context['spare_shifter_levels'], ['Lead', '1', '2', '3'])
+        self.assertContains(resp, 'A Lead, 1, 2 or 3 Miner covers')

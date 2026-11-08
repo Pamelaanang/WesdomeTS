@@ -56,6 +56,12 @@ class EmployeeManager(BaseUserManager):
         return self.create_user(employeeid, password, **extra_fields)
 
 
+# Miner levels that can step up as a (temporary) Spare Shifter. Every picker,
+# server check and hint reads this, so the rule lives in one place.
+SPARE_SHIFTER_LEVELS = ('Lead', '1', '2', '3')
+SPARE_SHIFTER_LEVELS_TEXT = 'Lead, 1, 2 or 3'
+
+
 class User(AbstractBaseUser, PermissionsMixin):
     #Surrogate primary key — EmployeeID stays a stable, human-editable business
     #identifier (unique, not the PK), so renaming it never has to touch every
@@ -124,8 +130,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     crewid = models.ForeignKey('timesheets.Crews', models.SET_NULL, db_column='CrewID', blank=True, null=True, related_name='shifters')
 
     #Full Miner (al=8) seniority scale, independent of Spare Shifter eligibility —
-    #only Lead/1/2 are ever offered as Spare Shifter candidates (see crew_coverage
-    #view); Levels 3/4 are recorded here but never promoted. Null means unclassified.
+    #only the levels in SPARE_SHIFTER_LEVELS (Lead/1/2/3) are ever offered as Spare
+    #Shifter candidates; Level 4 is recorded here but never promoted. Null means unclassified.
     #Foreign key to the MinerLevel table (rows: Staff, Lead, 1, 2, 3, 4). Use
     #minerlevel.levelcode when the text is needed.
     minerlevel = models.ForeignKey('timesheets.MinerLevel', db_column='MinerLevelID', on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
@@ -183,6 +189,20 @@ class User(AbstractBaseUser, PermissionsMixin):
         from timesheets.models import BasketShifter
         row = BasketShifter.objects.filter(shifter=self, is_home=True, enddate__isnull=True).select_related('basket__crew', 'basket__group', 'basket__discipline').first()
         return row.basket if row else None
+
+    @property
+    def mine_captains(self):
+        """The Mine Captains shown as a Shifter's supervisors. Any captain can
+        approve any Shifter (personal sheets by claim, crew sheets first come
+        first served), so this is every captain who can still approve: active,
+        and not past a recorded last day. Display only; approvals never read it."""
+        from django.db.models import Q
+        from django.utils import timezone
+        today = timezone.localdate()
+        return User.objects.filter(
+            Q(terminationdate__isnull=True) | Q(terminationdate__gte=today),
+            roleid__accessid__accessid=4, isactive=True,
+        ).order_by('lastname', 'firstname')
 
     @property
     def has_maintenance_reports(self):

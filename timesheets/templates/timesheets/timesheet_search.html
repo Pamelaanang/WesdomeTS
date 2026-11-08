@@ -24,86 +24,102 @@
     </p>
 </div>
 
-<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
-    <form method="GET" class="flex flex-col gap-3">
-        <div class="flex flex-wrap items-end gap-3">
-            <div class="flex flex-col gap-1 grow min-w-[14rem]">
-                <label class="text-xs text-gray-500">Person</label>
-                <input type="search" name="q" value="{{ f.q }}" placeholder="Name or payroll ID" autofocus
-                    class="border rounded px-2 py-1.5 text-sm">
+<div class="container mx-auto mb-6">
+    <form method="GET" id="search-form" class="bg-white rounded-2xl shadow p-4 flex flex-col gap-3">
+        {# Always visible: person and period #}
+        <div class="flex flex-wrap items-center gap-2">
+            <div class="relative grow min-w-[16rem]">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                <input type="search" name="q" value="{{ f.q }}" placeholder="Search a person by name or payroll ID" autofocus
+                    class="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#28348A]/30">
             </div>
-            <div class="flex flex-col gap-1">
-                <label class="text-xs text-gray-500">From</label>
-                <input type="date" name="date_from" value="{{ f.date_from|date:'Y-m-d' }}" class="border rounded px-2 py-1.5 text-sm">
+            <div class="flex items-center gap-1 border border-gray-200 rounded-xl bg-gray-50 px-3 py-1.5 text-sm">
+                <i class="fa-regular fa-calendar text-gray-400 mr-1"></i>
+                <input type="date" name="date_from" value="{{ f.date_from|date:'Y-m-d' }}" title="From" class="bg-transparent py-1 focus:outline-none">
+                <span class="text-gray-400 px-1">to</span>
+                <input type="date" name="date_to" value="{{ f.date_to|date:'Y-m-d' }}" title="To" class="bg-transparent py-1 focus:outline-none">
             </div>
-            <div class="flex flex-col gap-1">
-                <label class="text-xs text-gray-500">To</label>
-                <input type="date" name="date_to" value="{{ f.date_to|date:'Y-m-d' }}" class="border rounded px-2 py-1.5 text-sm">
-            </div>
-            <div class="flex flex-col gap-1">
-                <label class="text-xs text-gray-500">Crew</label>
-                <select name="crew" class="border rounded px-2 py-1.5 text-sm min-w-[7rem]">
-                    <option value="">All crews</option>
-                    {% for c in crews %}
-                    <option value="{{ c.crewid }}" {% if c.crewid == f.crew %}selected{% endif %}>{{ c.crewname }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+            <button type="button" id="filters-toggle" aria-expanded="{% if active_filters %}true{% else %}false{% endif %}" aria-controls="filters-panel"
+                class="relative flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
+                <i class="fa-solid fa-sliders"></i> Filters
+                {% if active_filters %}<span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-[#28348A] text-white text-[11px] font-semibold">{{ active_filters|length }}</span>{% endif %}
+            </button>
+            <button type="submit" class="bg-[#28348A] text-white text-sm px-5 py-2.5 rounded-xl hover:opacity-90">Search</button>
+            {% if any_filter %}
+            <a href="{% url 'timesheet_search' %}" class="text-sm text-gray-500 hover:underline px-1">Clear all</a>
+            {% endif %}
         </div>
-        <div class="flex flex-wrap items-end gap-3">
-            <div class="flex flex-col gap-1">
-                <label class="text-xs text-gray-500">Workflow</label>
-                <select name="workflow" class="border rounded px-2 py-1.5 text-sm min-w-[10rem]">
+
+        {# Optional filters, hidden until asked for (open if any is in use) #}
+        <div id="filters-panel" class="{% if not active_filters %}hidden{% endif %} border-t border-gray-100 pt-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
+            <label class="flex flex-col gap-1 text-xs text-gray-500">Crew
+                <select name="crew" class="border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-800 bg-white">
+                    <option value="">All crews</option>
+                    {% for c in crews %}<option value="{{ c.crewid }}" {% if c.crewid == f.crew %}selected{% endif %}>{{ c.crewname }}</option>{% endfor %}
+                </select>
+            </label>
+            <label class="flex flex-col gap-1 text-xs text-gray-500">Workflow
+                <select name="workflow" class="border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-800 bg-white">
                     <option value="">All workflows</option>
-                    {% for value, label in workflow_choices %}
-                    <option value="{{ value }}" {% if value in f.workflows %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
+                    {% for value, label in workflow_choices %}<option value="{{ value }}" {% if value in f.workflows %}selected{% endif %}>{{ label }}</option>{% endfor %}
                 </select>
-            </div>
-            <div class="flex flex-col gap-1">
-                <label class="text-xs text-gray-500">Department</label>
-                <select name="dept" class="border rounded px-2 py-1.5 text-sm min-w-[10rem]">
+            </label>
+            <label class="flex flex-col gap-1 text-xs text-gray-500">Department
+                <select name="dept" class="border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-800 bg-white">
                     <option value="">All departments</option>
-                    {% for d in departments %}
-                    <option value="{{ d.departmentid }}" {% if d.departmentid == f.dept %}selected{% endif %}>{{ d.departmentname }}</option>
-                    {% endfor %}
+                    {% for d in departments %}<option value="{{ d.departmentid }}" {% if d.departmentid == f.dept %}selected{% endif %}>{{ d.departmentname }}</option>{% endfor %}
                 </select>
-            </div>
-            <div class="flex flex-col gap-1">
-                <label class="text-xs text-gray-500">Status</label>
-                <select name="status" class="border rounded px-2 py-1.5 text-sm min-w-[10rem]">
+            </label>
+            <label class="flex flex-col gap-1 text-xs text-gray-500">Status
+                <select name="status" class="border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-800 bg-white">
                     <option value="">All statuses</option>
-                    {% for value, label in status_choices %}
-                    <option value="{{ value }}" {% if value in selected_statuses %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
+                    {% for value, label in status_choices %}<option value="{{ value }}" {% if value in selected_statuses %}selected{% endif %}>{{ label }}</option>{% endfor %}
                 </select>
-            </div>
-            <div class="flex flex-col gap-1">
-                <label class="text-xs text-gray-500">Shift <span class="text-gray-400">(Daily Crew only)</span></label>
-                <select name="shift" class="border rounded px-2 py-1.5 text-sm">
+            </label>
+            <label class="flex flex-col gap-1 text-xs text-gray-500"><span class="whitespace-nowrap">Shift <span class="text-[10px] text-gray-400">· Daily Crew only</span></span>
+                <select name="shift" class="border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-800 bg-white">
                     <option value="">Any</option>
                     <option value="Day" {% if f.shift == 'Day' %}selected{% endif %}>Day</option>
                     <option value="Night" {% if f.shift == 'Night' %}selected{% endif %}>Night</option>
                 </select>
-            </div>
-            <div class="flex flex-col gap-1">
-                <label class="text-xs text-gray-500">Contract <span class="text-gray-400">(Daily Crew only)</span></label>
-                <select name="contract" class="border rounded px-2 py-1.5 text-sm min-w-[8rem]">
+            </label>
+            <label class="flex flex-col gap-1 text-xs text-gray-500"><span class="whitespace-nowrap">Contract <span class="text-[10px] text-gray-400">· Daily Crew only</span></span>
+                <select name="contract" class="border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-800 bg-white">
                     <option value="">Any</option>
-                    {% for c in contracts %}
-                    <option value="{{ c.contractid }}" {% if c.contractid == f.contract %}selected{% endif %}>{{ c.contractcode }}</option>
-                    {% endfor %}
+                    {% for c in contracts %}<option value="{{ c.contractid }}" {% if c.contractid == f.contract %}selected{% endif %}>{{ c.contractcode }}</option>{% endfor %}
                 </select>
-            </div>
-            <button type="submit" class="bg-[#28348A] text-white text-sm px-4 py-1.5 rounded-xl hover:opacity-90">
-                <i class="fa-solid fa-magnifying-glass mr-1"></i> Search
-            </button>
-            {% if any_filter %}
-            <a href="{% url 'timesheet_search' %}" class="text-sm text-gray-500 hover:underline px-2 py-1.5">Clear</a>
-            {% endif %}
+            </label>
         </div>
+
+        {# What's applied, each removable on its own #}
+        {% if active_filters %}
+        <div class="flex flex-wrap items-center gap-2">
+            {% for af in active_filters %}
+            <a href="{{ af.remove_url }}" title="Remove this filter"
+                class="inline-flex items-center gap-1.5 text-xs bg-[#E9F4FB] text-[#28348A] rounded-full pl-3 pr-2 py-1 hover:bg-[#d6eaf7]">
+                <span class="text-gray-500">{{ af.label }}:</span> {{ af.value }} <i class="fa-solid fa-xmark text-[10px]"></i>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
     </form>
 </div>
+
+<script>
+    // Show/hide the optional filters. Picking a value submits straight away,
+    // so filters apply with one click rather than needing Search as well.
+    (function () {
+        const toggle = document.getElementById('filters-toggle');
+        const panel = document.getElementById('filters-panel');
+        toggle.addEventListener('click', function () {
+            const open = panel.classList.toggle('hidden') === false;
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+        panel.querySelectorAll('select').forEach(function (sel) {
+            sel.addEventListener('change', function () { document.getElementById('search-form').submit(); });
+        });
+    })();
+</script>
 
 <div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
     <p class="text-sm text-gray-500 mb-3">

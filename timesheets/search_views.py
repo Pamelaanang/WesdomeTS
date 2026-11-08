@@ -445,6 +445,30 @@ def timesheet_search(request):
     querystring = request.GET.copy()
     querystring.pop('page', None)
 
+    departments = Department.objects.filter(isactive=1).order_by('departmentname')
+    crews = Crews.objects.filter(isactive=1).order_by('crewname')
+    contracts = Contract.objects.order_by('contractcode')
+
+    # The optional filters (everything except person and dates), as removable
+    # tags. Each tag's link is the current search without that one filter.
+    def without(*params):
+        qs = request.GET.copy()
+        for p in params + ('page',):
+            qs.pop(p, None)
+        return '?' + qs.urlencode() if qs else '?'
+    labels = {
+        'crew': ('Crew', {c.crewid: c.crewname for c in crews}.get(f['crew'])),
+        'workflow': ('Workflow', ', '.join(dict(WORKFLOW_CHOICES)[w] for w in f['workflows'])),
+        'dept': ('Department', {d.departmentid: d.departmentname for d in departments}.get(f['dept'])),
+        'status': ('Status', ', '.join(dict(STATUS_CHOICES)[s] for s in f['statuses']) if status_given else ''),
+        'shift': ('Shift', f['shift']),
+        'contract': ('Contract', {c.contractid: c.contractcode for c in contracts}.get(f['contract'])),
+    }
+    active_filters = [
+        {'label': label, 'value': value, 'remove_url': without(param)}
+        for param, (label, value) in labels.items() if value
+    ]
+
     return render(request, 'timesheets/timesheet_search.html', {
         'is_admin': is_admin,
         'page_obj': page_obj,
@@ -452,11 +476,11 @@ def timesheet_search(request):
         'selected_statuses': f['statuses'] if status_given else [],
         'workflow_choices': WORKFLOW_CHOICES,
         'status_choices': status_choices,
-        'departments': Department.objects.filter(isactive=1).order_by('departmentname'),
-        'crews': Crews.objects.filter(isactive=1).order_by('crewname'),
-        'contracts': Contract.objects.order_by('contractcode'),
-        'any_filter': any([f['q'], f['date_from'], f['date_to'], f['crew'], f['workflows'],
-                           f['dept'], status_given, f['shift'], f['contract']]),
+        'departments': departments,
+        'crews': crews,
+        'contracts': contracts,
+        'active_filters': active_filters,
+        'any_filter': bool(f['q'] or f['date_from'] or f['date_to'] or active_filters),
         'querystring': querystring.urlencode(),
     })
 

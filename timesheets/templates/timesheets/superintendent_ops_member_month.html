@@ -50,7 +50,7 @@
                     <td class="p-2">{{ entry.opsheaderid.crewid.crewname }}</td>
                     <td class="p-2">{{ entry.contractid.contractcode }}</td>
                     <td class="p-2">{{ entry.accountid.accountcode|default:"—" }}</td>
-                    <td class="p-2">{{ entry.opscategoryid.categoryname|default:"—" }}</td>
+                    <td class="p-2">{% include 'timesheets/_ops_category_cell.html' %}</td>
                     <td class="p-2">{{ entry.hoursworked }}</td>
                     <td class="p-2">{{ entry.remarks|default:"—" }}</td>
                 </tr>
@@ -73,6 +73,7 @@
     <h3 class="font-semibold text-sm mb-4 flex items-center gap-2">
         <i class="fa-solid fa-star text-yellow-500"></i> Monthly Bonus
     </h3>
+    {% include 'timesheets/_disciplinary_bonus_note.html' %}
 
     {% if bonus and bonus.status == 'Applied' %}
     {# Locked — applied by payroll #}

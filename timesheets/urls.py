@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 from . import search_views
 from . import inactive_views
+from . import contract_views
 
 urlpatterns = [
     path('timesheet/new/', views.new_timesheet, name='new_timesheet'),
@@ -63,7 +64,10 @@ urlpatterns = [
     path('operations/<int:pk>/', views.ops_sheet, name='ops_sheet'),
     path('operations/<int:pk>/delete/', views.delete_ops_draft, name='delete_ops_draft'),
     path('api/accounts/', views.accounts_for_contract, name='accounts_for_contract'),
-    path('superintendent/contract-accounts/', views.contract_account_management, name='contract_account_management'),
+    path('superintendent/contract-accounts/', contract_views.contract_account_management, name='contract_account_management'),
+    path('superintendent/contract-accounts/series/<str:key>/', contract_views.contract_series, name='contract_series'),
+    path('superintendent/contract-accounts/contract/<int:pk>/', contract_views.contract_detail, name='contract_detail'),
+    path('superintendent/contract-accounts/cost-centers/', contract_views.contract_accounts, name='contract_accounts'),
     path('superintendent/approved/', views.superintendent_approved, name='superintendent_approved'),
     path('superintendent/approved/<str:employee_id>/', views.superintendent_approved_employee, name='superintendent_approved_employee'),
     path('superintendent/approved/<str:employee_id>/<int:year>/<int:month>/', views.superintendent_approved_month, name='superintendent_approved_month'),

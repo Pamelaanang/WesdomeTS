@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
+    <a href="{% url 'contract_account_management' %}" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline mb-2">
+        <i class="fa-solid fa-arrow-left"></i> Contracts &amp; Cost Centers/Accounts
+    </a>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="text-lg font-bold text-gray-800">{{ title }} <span class="text-sm font-normal text-gray-400">· {{ totals.all }} contract{{ totals.all|pluralize }}</span></h2>
+        {% if series %}
+        <div class="flex flex-wrap gap-2">
+            <button type="button" onclick="toggleBox('rename-box')" class="text-xs border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50"><i class="fa-solid fa-pen mr-1"></i> Rename</button>
+            <button type="button" onclick="toggleBox('bulk-box')" class="text-xs border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50"><i class="fa-solid fa-link mr-1"></i> Link cost centers/accounts to all</button>
+            <button type="button" onclick="toggleBox('assign-box')" class="text-xs border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50"><i class="fa-solid fa-plus mr-1"></i> Add existing contracts</button>
+            <button type="button" onclick="openNewForm('new-contract-panel')" class="text-xs bg-[#28348A] text-white px-3 py-1.5 rounded-lg hover:opacity-90"><i class="fa-solid fa-plus mr-1"></i> New contract here</button>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if series %}
+    <div id="rename-box" class="hidden mt-4 bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-wrap items-end gap-3">
+        <form method="POST" class="flex items-end gap-2">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="rename_series">
+            <input type="hidden" name="seriesid" value="{{ series.seriesid }}">
+            <label class="flex flex-col gap-1 text-xs text-gray-500">Series name
+                <input name="seriesname" value="{{ series.seriesname }}" required maxlength="100" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+            </label>
+            <button type="submit" class="bg-[#28348A] text-white text-xs px-3 py-2 rounded-lg hover:opacity-90">Rename</button>
+            <button type="button" onclick="toggleBox('rename-box')" class="text-xs text-gray-500 hover:underline px-1">Cancel</button>
+        </form>
+        {% if not series.contracts.exists %}
+        <form method="POST" action="{% url 'contract_account_management' %}" onsubmit="return confirm('Delete the empty series {{ series.seriesname|escapejs }}?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_series">
+            <input type="hidden" name="seriesid" value="{{ series.seriesid }}">
+            <button type="submit" class="text-xs text-red-500 hover:underline">Delete this series</button>
+        </form>
+        {% else %}
+        <span class="text-xs text-gray-400">A series can only be deleted once it has no contracts (including deactivated ones).</span>
+        {% endif %}
+    </div>
+
+    <form id="bulk-box" method="POST" class="hidden mt-4 bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col gap-2"
+        onsubmit="return confirmBulk('{{ series.seriesname|escapejs }}');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="bulk_assign_account">
+        <input type="hidden" name="seriesid" value="{{ series.seriesid }}">
+        <label class="flex flex-col gap-1 text-xs text-gray-500">Pick the cost centers/accounts to link to every active contract in this series
+            <select id="bulk-picker" onchange="addBulkTag(this)" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white max-w-md">
+                <option value="">-- Select to add --</option>
+                {% for a in accounts %}<option value="{{ a.accountid }}" data-code="{{ a.accountcode }}">{{ a.accountcode }} — {{ a.accounttitle }}</option>{% endfor %}
+            </select>
+        </label>
+        <div id="bulk-tags" class="flex flex-wrap gap-1.5 min-h-[1.75rem] items-center">
+            <span id="bulk-empty" class="text-xs text-gray-400">Nothing selected yet.</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <button type="submit" id="bulk-apply" disabled class="bg-[#28348A] text-white text-xs px-3 py-2 rounded-lg hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Apply to all</button>
+            <button type="button" onclick="toggleBox('bulk-box')" class="text-xs text-gray-500 hover:underline px-1">Cancel</button>
+        </div>
+    </form>
+
+    <form id="assign-box" method="POST" class="hidden mt-4 bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col gap-2">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_series">
+        <input type="hidden" name="target_series_id" value="{{ series.seriesid }}">
+        <p class="text-xs text-gray-500">Tick the contracts to add to {{ series.seriesname }}. A contract can be in more than one series.</p>
+        {% if addable %}
+        <div class="max-h-56 overflow-y-auto grid sm:grid-cols-2 lg:grid-cols-3 gap-1 bg-white border border-gray-200 rounded-lg p-2">
+            {% for c in addable %}<label class="flex items-center gap-2 text-sm text-gray-700 px-1"><input type="checkbox" name="contractid" value="{{ c.contractid }}"> <span class="font-semibold">{{ c.contractcode }}</span> <span class="text-gray-500 truncate">{{ c.contracttitle }}</span></label>{% endfor %}
+        </div>
+        <div class="flex items-center gap-2">
+            <button type="submit" class="bg-[#28348A] text-white text-xs px-3 py-2 rounded-lg hover:opacity-90">Add to series</button>
+            <button type="button" onclick="toggleBox('assign-box')" class="text-xs text-gray-500 hover:underline px-1">Cancel</button>
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-400">Every active contract is already in this series.</p>
+        {% endif %}
+    </form>
+
+    {% include 'timesheets/_contract_new_forms.html' with contract_only=True %}
+    {% endif %}
+</div>
+
+{% include 'timesheets/_contract_messages.html' %}
+
+<div class="container mx-auto mb-8 bg-white rounded-2xl shadow p-4">
+    {% if key != 'inactive' %}
+    <div class="flex flex-wrap gap-2 mb-3 text-xs">
+        <a href="?" class="px-3 py-1 rounded-full border {% if not show %}bg-[#28348A] text-white border-[#28348A]{% else %}border-gray-300 text-gray-600 hover:bg-gray-50{% endif %}">All ({{ totals.all }})</a>
+        <a href="?show=needs_account" class="px-3 py-1 rounded-full border {% if show == 'needs_account' %}bg-[#28348A] text-white border-[#28348A]{% else %}border-gray-300 text-gray-600 hover:bg-gray-50{% endif %}">Needs cost center/account ({{ totals.needs_account }})</a>
+        <a href="?show=no_level" class="px-3 py-1 rounded-full border {% if show == 'no_level' %}bg-[#28348A] text-white border-[#28348A]{% else %}border-gray-300 text-gray-600 hover:bg-gray-50{% endif %}">No level ({{ totals.no_level }})</a>
+    </div>
+    {% else %}
+    <p class="text-xs text-gray-500 mb-3">Deactivated contracts don't appear in any picker but stay on past crew sheets. Open one to reactivate it.</p>
+    {% endif %}
+    {% include 'timesheets/_contract_rows.html' %}
+</div>
+
+<script>
+    function toggleBox(id) {
+        ['rename-box', 'bulk-box', 'assign-box'].forEach(function (other) {
+            if (other !== id) document.getElementById(other)?.classList.add('hidden');
+        });
+        document.getElementById(id).classList.toggle('hidden');
+    }
+
+    // Bulk link: each pick becomes a removable tag (with a hidden accountid
+    // input) and leaves the dropdown, so nothing can be picked twice.
+    function refreshBulk() {
+        const count = document.querySelectorAll('#bulk-tags [data-tag]').length;
+        document.getElementById('bulk-empty').classList.toggle('hidden', count > 0);
+        document.getElementById('bulk-apply').disabled = count === 0;
+    }
+    function addBulkTag(select) {
+        const opt = select.selectedOptions[0];
+        if (!opt || !opt.value) return;
+        const tag = document.createElement('span');
+        tag.dataset.tag = opt.value;
+        tag.className = 'inline-flex items-center gap-1 bg-[#28348A]/10 text-[#28348A] text-xs font-semibold rounded-full pl-2.5 pr-1 py-0.5';
+        tag.title = opt.textContent;
+        tag.append(opt.dataset.code);
+        const input = document.createElement('input');
+        input.type = 'hidden'; input.name = 'accountid'; input.value = opt.value;
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.className = 'w-4 h-4 rounded-full hover:bg-[#28348A]/20 leading-none';
+        x.setAttribute('aria-label', 'Remove ' + opt.dataset.code);
+        x.innerHTML = '<i class="fa-solid fa-xmark text-[10px]"></i>';
+        x.onclick = function () { opt.hidden = false; opt.disabled = false; tag.remove(); refreshBulk(); };
+        tag.append(input, x);
+        document.getElementById('bulk-tags').append(tag);
+        opt.hidden = true; opt.disabled = true;
+        select.value = '';
+        refreshBulk();
+    }
+    function confirmBulk(seriesName) {
+        const codes = Array.from(document.querySelectorAll('#bulk-tags [data-tag]')).map(t => t.textContent.trim());
+        if (!codes.length) return false;
+        return confirm('Link ' + codes.join(', ') + ' to every active contract in ' + seriesName + '?');
+    }
+</script>
+
+{% include 'timesheets/_contract_modal.html' %}
+{% endblock content %}

@@ -1,0 +1,33 @@
+{% comment %}Compact contract table: one row per contract; clicking a row opens it in the contract modal
+(include _contract_modal.html on the page). Pass contracts (annotated with has_account / has_level).{% endcomment %}
+<div class="overflow-x-auto">
+<table class="w-full text-sm min-w-[640px]">
+    <thead>
+        <tr class="text-left text-xs text-gray-500 border-b">
+            <th class="py-2 pr-4">Code</th>
+            <th class="py-2 pr-4">Title</th>
+            <th class="py-2 pr-4">Levels</th>
+            <th class="py-2 pr-4">Cost Centers/Accounts</th>
+            <th class="py-2 pr-4">Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for c in contracts %}
+        <tr class="border-b border-gray-100 hover:bg-[#E9F4FB] cursor-pointer" onclick="openContract({{ c.contractid }})">
+            <td class="py-2 pr-4 font-semibold whitespace-nowrap">{{ c.contractcode }}</td>
+            <td class="py-2 pr-4">{{ c.contracttitle }}</td>
+            <td class="py-2 pr-4 whitespace-nowrap">{% for l in c.levels.all %}<span class="inline-block bg-purple-50 text-purple-700 text-[11px] px-1.5 rounded mr-1">{{ l.levelcode }}</span>{% empty %}<span class="text-gray-400">—</span>{% endfor %}</td>
+            <td class="py-2 pr-4 text-gray-600">{% for link in c.contractaccount_set.all %}{{ link.accountid.accountcode }}{% if not forloop.last %}, {% endif %}{% empty %}<span class="text-gray-400">—</span>{% endfor %}</td>
+            <td class="py-2 pr-4 whitespace-nowrap">
+                {% if not c.isactive %}<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Deactivated</span>
+                {% elif not c.has_account %}<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Needs cost center/account</span>
+                {% elif not c.has_level %}<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">No level</span>
+                {% else %}<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">✓ Ready</span>{% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="py-6 text-center text-gray-400">No contracts here.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>

@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mx-auto mb-4">
+    <a href="{{ back_url }}" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline"><i class="fa-solid fa-arrow-left"></i> Back</a>
+</div>
+{% include 'timesheets/_contract_messages.html' %}
+<div class="container mx-auto mb-8">
+{% include 'timesheets/_contract_panel.html' %}
+</div>
+{% endblock content %}

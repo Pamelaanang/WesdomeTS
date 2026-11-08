@@ -1,0 +1,7 @@
+{% if count %}
+{% if needs_account %}<p class="text-xs text-amber-700"><i class="fa-solid fa-triangle-exclamation mr-1"></i>{{ needs_account }} need{{ needs_account|pluralize:"s," }} a cost center/account</p>{% endif %}
+{% if no_level %}<p class="text-xs text-amber-700"><i class="fa-solid fa-triangle-exclamation mr-1"></i>{{ no_level }} {{ no_level|pluralize:"has,have" }} no level</p>{% endif %}
+{% if not needs_account and not no_level %}<p class="text-xs text-green-700"><i class="fa-solid fa-circle-check mr-1"></i>All set</p>{% endif %}
+{% else %}
+<p class="text-xs text-gray-400">Empty</p>
+{% endif %}

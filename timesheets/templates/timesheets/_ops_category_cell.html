@@ -1,0 +1,2 @@
+{% if entry.opscategoryid %}{{ entry.opscategoryid.categoryname }}{% elif entry.leavetypeid %}{{ entry.leavetypeid.leavetypename }}{% else %}—{% endif %}{% if entry.opscategoryid.isdisciplinary or entry.leavetypeid.isdisciplinary %}
+<span class="ml-1 inline-block rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700" title="{% if entry.opscategoryid %}Paid shift, no bonus{% else %}No pay{% endif %}">Disciplinary</span>{% endif %}

@@ -45,7 +45,7 @@
                     <td class="p-2">{{ entry.opsheaderid.shifterid.firstname }} {{ entry.opsheaderid.shifterid.lastname }}</td>
                     <td class="p-2">{{ entry.contractid.contractcode }}</td>
                     <td class="p-2">{{ entry.accountid.accountcode|default:"—" }}</td>
-                    <td class="p-2">{% if entry.opscategoryid %}{{ entry.opscategoryid.categoryname }}{% elif entry.leavetypeid %}{{ entry.leavetypeid.leavetypename }}{% else %}—{% endif %}</td>
+                    <td class="p-2">{% include 'timesheets/_ops_category_cell.html' %}</td>
                     <td class="p-2 font-semibold">{{ entry.hoursworked }}</td>
                     <td class="p-2">
                         {% if entry.linestatus == 'Rejected' %}

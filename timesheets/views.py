@@ -101,6 +101,18 @@ def _worked_hours_breakdown(entries, category_field, date_field, stat_dates):
     return regular, stat_worked, overtime
 
 
+def _is_disciplinary(entry):
+    return bool(entry.opscategoryid_id and entry.opscategoryid.isdisciplinary)
+
+
+def _disciplinary_hours(entries):
+    """Ops entries' disciplinary hours for the bonus panels' note:
+    (paid Disciplinary Action hours with no bonus, no-pay suspension hours)."""
+    action = entries.filter(opscategoryid__isdisciplinary=True).aggregate(Sum('hoursworked'))['hoursworked__sum'] or 0
+    suspension = entries.filter(leavetypeid__isdisciplinary=True).aggregate(Sum('hoursworked'))['hoursworked__sum'] or 0
+    return action, suspension
+
+
 def _last_entry_prefill(entries, category_field, category_prefix):
     """Given one employee's entries queryset (any header/month), return
     (category_selection, shifttype, hours) from their most recently created
@@ -284,7 +296,7 @@ def add_entry(request, pk):
     entries = MainEntry.objects.filter(mainheaderid=header).select_related('workcategoryid', 'leavetypeid')
     workcategories = Workcategory.objects.filter(isactive=1)
     # Maintenance Crew (al=9) is hourly — never lieu-eligible, so Lieu Day never appears here.
-    leavetypes = LeaveType.objects.filter(isactive=1).exclude(leavetypename=leave_rules.LIEU_DAY_TYPE_NAME)
+    leavetypes = LeaveType.objects.filter(isactive=1, isdisciplinary=False).exclude(leavetypename=leave_rules.LIEU_DAY_TYPE_NAME)
     payable_hours, non_payable_hours, hours = _payable_hours_split(entries, 'workcategoryid')
     stat_dates, stat_labels = _stat_info()
     this_year = timezone.now().year
@@ -1157,6 +1169,7 @@ def payroll_ops_member_month(request, employee_id, year, month):
 
     payable_hours, non_payable_hours, total_hours = _payable_hours_split(entries, 'opscategoryid')
     bonus = OperationsBonus.objects.filter(employeeid=member, bonusmonth=month_date).first()
+    disciplinary_action_hours, suspension_hours = _disciplinary_hours(entries)
 
     stat_dates, stat_labels = _stat_info()
     regular_hours, stat_worked_hours, overtime_hours = _worked_hours_breakdown(
@@ -1164,6 +1177,8 @@ def payroll_ops_member_month(request, employee_id, year, month):
     )
     return render(request, 'timesheets/payroll_ops_member_month.html', {
         'member': member,
+        'disciplinary_action_hours': disciplinary_action_hours,
+        'suspension_hours': suspension_hours,
         'entries': entries,
         'total_hours': total_hours,
         'payable_hours': payable_hours,
@@ -1541,6 +1556,7 @@ def superintendent_ops_member_month(request, employee_id, year, month):
     )
     bonus = OperationsBonus.objects.filter(employeeid=member, bonusmonth=month_date).first()
     error = None
+    disciplinary_action_hours, suspension_hours = _disciplinary_hours(entries)
 
     if request.method == 'POST':
         # Submitted is locked from this side the same as Applied — the template's
@@ -1576,6 +1592,8 @@ def superintendent_ops_member_month(request, employee_id, year, month):
 
     return render(request, 'timesheets/superintendent_ops_member_month.html', {
         'member': member,
+        'disciplinary_action_hours': disciplinary_action_hours,
+        'suspension_hours': suspension_hours,
         'entries': entries,
         'total_hours': total_hours,
         'payable_hours': payable_hours,
@@ -2034,7 +2052,11 @@ def _category_error(sel, category_model=None, prefix='oc_'):
         if not category_model.objects.filter(pk=sel[len(prefix):], isactive=1).exists():
             return 'That work category no longer exists. Pick another.'
     elif sel.startswith('lt_'):
-        if not LeaveType.objects.filter(pk=sel[3:], isactive=1).exists():
+        leave_types = LeaveType.objects.filter(pk=sel[3:], isactive=1)
+        if category_model is not Opscategory:
+            # Disciplinary leave (a no-pay suspension) only exists on the ops sheet.
+            leave_types = leave_types.exclude(isdisciplinary=True)
+        if not leave_types.exists():
             return 'That leave type no longer exists. Pick another.'
     else:
         return 'Pick a work category or leave type for this entry.'
@@ -2618,9 +2640,13 @@ def ops_sheet(request, pk):
     )
 
     contracts = Contract.objects.filter(isactive=1)
-    opscategories = Opscategory.objects.filter(isactive=1)
+    opscategories = Opscategory.objects.filter(isactive=1, isdisciplinary=False)
+    # Paid disciplinary shift (category) and no-pay suspension (leave): their
+    # own "Disciplinary" group in the Category dropdown.
+    disciplinary_categories = Opscategory.objects.filter(isactive=1, isdisciplinary=True)
+    disciplinary_leavetypes = LeaveType.objects.filter(isactive=1, isdisciplinary=True)
     # Every crew member logged here is al=8 (hourly) — never lieu-eligible, so Lieu Day never appears.
-    leavetypes = LeaveType.objects.filter(isactive=1).exclude(leavetypename=leave_rules.LIEU_DAY_TYPE_NAME)
+    leavetypes = LeaveType.objects.filter(isactive=1, isdisciplinary=False).exclude(leavetypename=leave_rules.LIEU_DAY_TYPE_NAME)
     vacation_type = leave_rules.get_leave_type(leave_rules.VACATION_TYPE_NAME)
     floater_type = leave_rules.get_leave_type(leave_rules.FLOATER_TYPE_NAME)
 
@@ -2646,7 +2672,8 @@ def ops_sheet(request, pk):
             'level_id': member.minerlevel_id,
             'level_code': member.minerlevel.levelcode if member.minerlevel_id else None,
             'accountid': last.accountid_id if last else None,
-            'opscategoryid': last.opscategoryid_id if last else None,
+            # A disciplinary line is a one-off: never carry it forward.
+            'opscategoryid': last.opscategoryid_id if last and not _is_disciplinary(last) else None,
         }
         remaining = leave_rules.get_vacation_remaining(member, header.shiftdate.year)
         vacation_balances[member.eid] = {
@@ -2671,7 +2698,7 @@ def ops_sheet(request, pk):
     sheet_default = {
         'contractid': last_on_sheet.contractid_id if last_on_sheet else None,
         'accountid': last_on_sheet.accountid_id if last_on_sheet else None,
-        'opscategoryid': last_on_sheet.opscategoryid_id if last_on_sheet else None,
+        'opscategoryid': last_on_sheet.opscategoryid_id if last_on_sheet and not _is_disciplinary(last_on_sheet) else None,
     }
 
     stat_dates, stat_labels = _stat_info()
@@ -2683,6 +2710,8 @@ def ops_sheet(request, pk):
         'guest_employees': guest_employees,
         'contracts': contracts,
         'opscategories': opscategories,
+        'disciplinary_categories': disciplinary_categories,
+        'disciplinary_leavetypes': disciplinary_leavetypes,
         'leavetypes': leavetypes,
         'vacation_leavetype_id': vacation_type.leavetypeid if vacation_type else None,
         'floater_leavetype_id': floater_type.leavetypeid if floater_type else None,
@@ -3153,78 +3182,7 @@ def _valid_pk(model, raw):
     return model.objects.filter(pk=raw).first()
 
 
-@login_required(login_url='login')
-def contract_account_management(request):
-    if request.user.access_level != 2:
-        return redirect('profile')
 
-    if request.method == 'POST':
-        action = request.POST.get('action')
-
-        if action == 'add':
-            contract = _valid_pk(Contract, request.POST.get('contractid'))
-            account = _valid_pk(Account, request.POST.get('accountid'))
-            if contract and account:
-                ContractAccount.objects.get_or_create(contractid=contract, accountid=account)
-
-        elif action == 'remove':
-            link = _valid_pk(ContractAccount, request.POST.get('contractaccountid'))
-            if link:
-                link.delete()
-
-        elif action == 'add_series':
-            contract = _valid_pk(Contract, request.POST.get('contractid'))
-            series = _valid_pk(ContractSeries, request.POST.get('new_series_id'))
-            if contract and series:
-                contract.series.add(series)
-
-        elif action == 'remove_series':
-            contract = _valid_pk(Contract, request.POST.get('contractid'))
-            series = _valid_pk(ContractSeries, request.POST.get('remove_series_id'))
-            if contract and series:
-                contract.series.remove(series)
-
-        elif action == 'add_level':
-            contract = _valid_pk(Contract, request.POST.get('contractid'))
-            level = _valid_pk(MinerLevel, request.POST.get('new_level_id'))
-            if contract and level:
-                contract.levels.add(level)
-
-        elif action == 'remove_level':
-            contract = _valid_pk(Contract, request.POST.get('contractid'))
-            level = _valid_pk(MinerLevel, request.POST.get('remove_level_id'))
-            if contract and level:
-                contract.levels.remove(level)
-
-        elif action == 'bulk_assign_account':
-            series = _valid_pk(ContractSeries, request.POST.get('bulk_series_id'))
-            account = _valid_pk(Account, request.POST.get('bulk_account_id'))
-            if series and account:
-                for contract in series.contracts.filter(isactive=1):
-                    ContractAccount.objects.get_or_create(contractid=contract, accountid=account)
-
-        series_id = request.POST.get('series_id', '')
-        base_url = reverse('contract_account_management')
-        return redirect(f'{base_url}?open={series_id}' if series_id else base_url)
-
-    # Every active series is shown as a container, even if it currently has no
-    # contracts in it — the Superintendent assigns contracts into these from
-    # the page itself now, so an empty series still needs to be visible.
-    all_series = ContractSeries.objects.prefetch_related('contracts__contractaccount_set__accountid', 'contracts__series')
-
-    unassigned = Contract.objects.filter(isactive=1).exclude(series__isnull=False).prefetch_related('contractaccount_set__accountid', 'series', 'levels')
-    all_accounts = Account.objects.filter(isactive=1)
-    all_contracts = Contract.objects.filter(isactive=1).prefetch_related('series', 'levels').order_by('contractcode')
-    all_levels = MinerLevel.objects.all()
-
-    return render(request, 'timesheets/contract_account_management.html', {
-        'series_list': all_series,
-        'all_contracts': all_contracts,
-        'all_series': all_series,
-        'unassigned': unassigned,
-        'all_accounts': all_accounts,
-        'all_levels': all_levels,
-    })
 
 
 @login_required(login_url='login')
@@ -3395,7 +3353,7 @@ def add_business_entry(request, pk):
             'header': header,
             'entries': entries,
             'business_categories': Businesscategory.objects.filter(isactive=1),
-            'leavetypes': LeaveType.objects.filter(isactive=1),
+            'leavetypes': LeaveType.objects.filter(isactive=1, isdisciplinary=False),
             'total_hours': total_hours,
             'payable_hours': payable_hours,
             'non_payable_hours': non_payable_hours,
@@ -3528,7 +3486,7 @@ def add_business_entry(request, pk):
         'header': header,
         'entries': entries,
         'business_categories': Businesscategory.objects.filter(isactive=1),
-        'leavetypes': LeaveType.objects.filter(isactive=1),
+        'leavetypes': LeaveType.objects.filter(isactive=1, isdisciplinary=False),
         'total_hours': total_hours,
         'payable_hours': payable_hours,
         'non_payable_hours': non_payable_hours,

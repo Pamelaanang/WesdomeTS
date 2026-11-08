@@ -243,7 +243,7 @@
                             {% if entry.accountid.accounttitle %}<div class="text-gray-400 text-xs">{{ entry.accountid.accounttitle }}</div>{% endif %}
                             {% else %}&mdash;{% endif %}
                         </td>
-                        <td class="p-2">{% if entry.opscategoryid %}{{ entry.opscategoryid.categoryname }}{% elif entry.leavetypeid %}{{ entry.leavetypeid.leavetypename }}{% else %}—{% endif %}</td>
+                        <td class="p-2">{% include 'timesheets/_ops_category_cell.html' %}</td>
                         <td class="p-2">{{ entry.hoursworked }}</td>
                         <td class="p-2 text-gray-500">
                             {% if entry.hauledto %}To: {{ entry.hauledto }} &nbsp;{% endif %}
@@ -331,6 +331,7 @@
                                     <option value="lt_{{ lt.leavetypeid }}" {% if lt.leavetypeid == entry.leavetypeid_id %}selected{% endif %}>{{ lt.leavetypename }}</option>
                                     {% endfor %}
                                 </optgroup>
+                                {% include 'timesheets/_ops_disciplinary_optgroup.html' %}
                             </select>
                             <p id="leave-info-edit-{{ entry.opsentryid }}" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
                         </td>
@@ -407,6 +408,7 @@
                                     <option value="lt_{{ lt.leavetypeid }}" {% if lt.leavetypeid == entry.leavetypeid_id %}selected{% endif %}>{{ lt.leavetypename }}</option>
                                     {% endfor %}
                                 </optgroup>
+                                {% include 'timesheets/_ops_disciplinary_optgroup.html' %}
                             </select>
                             <p id="leave-info-edit-{{ entry.opsentryid }}" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
                         </td>
@@ -517,6 +519,7 @@
                                     <option value="lt_{{ lt.leavetypeid }}">{{ lt.leavetypename }}</option>
                                     {% endfor %}
                                 </optgroup>
+                                {% include 'timesheets/_ops_disciplinary_optgroup.html' with entry=None %}
                             </select>
                             <p id="leave-info" class="text-xs text-[#28348A] mt-0.5 leading-tight"></p>
                         </td>

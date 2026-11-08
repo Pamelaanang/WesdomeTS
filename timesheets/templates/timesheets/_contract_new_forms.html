@@ -1,0 +1,119 @@
+{% comment %}"+ New" buttons and their forms, shared by the overview and series pages.
+Pass preselect_series to tick that series on the New Contract form, and
+contract_only=True to include just the New Contract form (the series page).{% endcomment %}
+{% if not contract_only %}
+<div class="flex flex-wrap gap-2">
+    <button type="button" onclick="openNewForm('new-series-panel')" class="text-xs bg-[#28348A] text-white px-3 py-1.5 rounded-lg hover:opacity-90"><i class="fa-solid fa-plus mr-1"></i> New Series</button>
+    <button type="button" onclick="openNewForm('new-contract-panel')" class="text-xs bg-[#28348A] text-white px-3 py-1.5 rounded-lg hover:opacity-90"><i class="fa-solid fa-plus mr-1"></i> New Contract</button>
+    <button type="button" onclick="openNewForm('new-account-panel')" class="text-xs bg-[#28348A] text-white px-3 py-1.5 rounded-lg hover:opacity-90"><i class="fa-solid fa-plus mr-1"></i> New Cost Center/Account</button>
+</div>
+
+{% endif %}
+
+{% if not contract_only %}
+<form id="new-series-panel" method="POST" class="hidden mt-4 bg-gray-50 border border-gray-200 rounded-xl p-4 flex flex-wrap items-end gap-3">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="create_series">
+    <p class="w-full text-sm font-semibold text-gray-700">New series</p>
+    <label class="flex flex-col gap-1 text-xs text-gray-500 grow">Series name
+        <input name="seriesname" required maxlength="100" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+    </label>
+    <div class="flex items-center gap-1">
+        <button type="submit" class="bg-[#28348A] text-white text-sm px-4 py-1.5 rounded-lg hover:opacity-90">Create series</button>
+        <button type="button" onclick="closeNewForm('new-series-panel')" class="text-sm text-gray-500 hover:underline px-2 py-1.5">Cancel</button>
+    </div>
+</form>
+{% endif %}
+
+<form id="new-contract-panel" method="POST" class="hidden mt-4 bg-gray-50 border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="create_contract">
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <p class="text-sm font-semibold text-gray-700">New contract</p>
+    <div class="flex flex-wrap gap-3">
+        <label class="flex flex-col gap-1 text-xs text-gray-500">Code
+            <input name="contractcode" required maxlength="20" placeholder="e.g. C-104" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-32 bg-white">
+        </label>
+        <label class="flex flex-col gap-1 text-xs text-gray-500 grow">Title
+            <input name="contracttitle" required maxlength="255" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+        </label>
+    </div>
+    <label class="flex flex-col gap-1 text-xs text-gray-500">Description (optional)
+        <input name="contractdescription" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+    </label>
+    <div class="flex flex-wrap gap-6">
+        <fieldset class="text-xs text-gray-500">
+            <legend class="mb-1">Miner levels <span class="text-gray-400">(which Miners can be given this contract)</span></legend>
+            <div class="flex flex-wrap gap-3">
+                {% for lvl in all_levels %}<label class="flex items-center gap-1 text-gray-700"><input type="checkbox" name="level_ids" value="{{ lvl.levelid }}"> {{ lvl.levelcode }}</label>{% endfor %}
+            </div>
+        </fieldset>
+        {% if all_series %}
+        <fieldset class="text-xs text-gray-500">
+            <legend class="mb-1">Series <span class="text-gray-400">(optional)</span></legend>
+            <div class="flex flex-wrap gap-3">
+                {% for s in all_series %}<label class="flex items-center gap-1 text-gray-700"><input type="checkbox" name="series_ids" value="{{ s.seriesid }}" {% if preselect_series and s.pk == preselect_series.pk %}checked{% endif %}> {{ s.seriesname }}</label>{% endfor %}
+            </div>
+        </fieldset>
+        {% endif %}
+    </div>
+    <fieldset class="text-xs text-gray-500">
+        <legend class="mb-1">Cost Centers/Accounts <span class="text-gray-400">(offered on crew sheets for this contract)</span></legend>
+        {% if all_accounts %}
+        <div class="max-h-36 overflow-y-auto grid sm:grid-cols-2 lg:grid-cols-3 gap-1 bg-white border border-gray-200 rounded-lg p-2">
+            {% for a in all_accounts %}<label class="flex items-center gap-2 text-gray-700"><input type="checkbox" name="account_ids" value="{{ a.accountid }}"> <span class="font-semibold">{{ a.accountcode }}</span> <span class="text-gray-500 truncate">{{ a.accounttitle }}</span></label>{% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-400">No cost centers/accounts yet. Create one first with "New Cost Center/Account", or link it later.</p>
+        {% endif %}
+    </fieldset>
+    <div class="flex items-center gap-1">
+        <button type="submit" class="bg-[#28348A] text-white text-sm px-4 py-1.5 rounded-lg hover:opacity-90">Create contract</button>
+        <button type="button" onclick="closeNewForm('new-contract-panel')" class="text-sm text-gray-500 hover:underline px-2 py-1.5">Cancel</button>
+    </div>
+</form>
+
+{% if not contract_only %}
+<form id="new-account-panel" method="POST" class="hidden mt-4 bg-gray-50 border border-gray-200 rounded-xl p-4 flex flex-wrap items-end gap-3">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="create_account">
+    <p class="w-full text-sm font-semibold text-gray-700">New cost center/account</p>
+    <label class="flex flex-col gap-1 text-xs text-gray-500">Code
+        <input name="accountcode" required maxlength="20" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-32 bg-white">
+    </label>
+    <label class="flex flex-col gap-1 text-xs text-gray-500 grow">Title
+        <input name="accounttitle" required maxlength="255" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+    </label>
+    <label class="flex flex-col gap-1 text-xs text-gray-500 w-full">Description (optional)
+        <input name="accountdescription" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+    </label>
+    <div class="flex items-center gap-1">
+        <button type="submit" class="bg-[#28348A] text-white text-sm px-4 py-1.5 rounded-lg hover:opacity-90">Create cost center/account</button>
+        <button type="button" onclick="closeNewForm('new-account-panel')" class="text-sm text-gray-500 hover:underline px-2 py-1.5">Cancel</button>
+    </div>
+</form>
+{% endif %}
+
+<script>
+    // One "New" form open at a time. Cancel (or Escape) clears and closes.
+    const NEW_FORMS = ['new-series-panel', 'new-contract-panel', 'new-account-panel'].filter(function (id) { return document.getElementById(id); });
+    function closeNewForm(id) {
+        const form = document.getElementById(id);
+        form.reset();
+        form.classList.add('hidden');
+    }
+    function openNewForm(id) {
+        const form = document.getElementById(id);
+        const wasOpen = !form.classList.contains('hidden');
+        NEW_FORMS.forEach(closeNewForm);
+        if (!wasOpen) {
+            form.classList.remove('hidden');
+            form.querySelector('input:not([type=hidden])')?.focus();
+        }
+    }
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') NEW_FORMS.forEach(function (id) {
+            if (!document.getElementById(id).classList.contains('hidden')) closeNewForm(id);
+        });
+    });
+</script>

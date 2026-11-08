@@ -46,20 +46,32 @@ class ContractSeriesAdmin(admin.ModelAdmin):
         return obj.contracts.count()
     contract_count.short_description = 'Contracts'
 
+    def has_delete_permission(self, request, obj=None):
+        # Same rule as the Contract-Cost Centre page: only an empty series can be deleted.
+        return obj is None or not obj.contracts.exists()
+
 
 @admin.register(Contract)
 class ContractAdmin(admin.ModelAdmin):
     list_display = ('contractcode', 'contracttitle', 'isactive')
     list_filter = ('series', 'isactive')
     search_fields = ('contractcode', 'contracttitle')
-    filter_horizontal = ('series',)
+    filter_horizontal = ('series', 'levels')
     ordering = ('contractcode',)
+
+    def has_delete_permission(self, request, obj=None):
+        # Crew sheets point at contracts: untick "Is active" instead of deleting.
+        return False
 
 
 @admin.register(Account)
 class AccountAdmin(admin.ModelAdmin):
     list_display = ('accountcode', 'accounttitle', 'isactive')
     search_fields = ('accountcode', 'accounttitle')
+
+    def has_delete_permission(self, request, obj=None):
+        # Crew sheets point at cost centres: untick "Is active" instead of deleting.
+        return False
 
 
 @admin.register(EmployeeBonus)
@@ -71,8 +83,8 @@ class EmployeeBonusAdmin(admin.ModelAdmin):
 
 @admin.register(LeaveType)
 class LeaveTypeAdmin(admin.ModelAdmin):
-    list_display = ('leavetypename', 'isactive', 'ispayable')
-    list_editable = ('isactive', 'ispayable')
+    list_display = ('leavetypename', 'isactive', 'ispayable', 'isdisciplinary')
+    list_editable = ('isactive', 'ispayable', 'isdisciplinary')
 
 
 @admin.register(Workcategory)
@@ -91,8 +103,8 @@ class BusinesscategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Opscategory)
 class OpscategoryAdmin(admin.ModelAdmin):
-    list_display = ('categoryname', 'isproductive', 'isactive', 'ispayable')
-    list_editable = ('isproductive', 'isactive', 'ispayable')
+    list_display = ('categoryname', 'isproductive', 'isactive', 'ispayable', 'isdisciplinary')
+    list_editable = ('isproductive', 'isactive', 'ispayable', 'isdisciplinary')
     search_fields = ('categoryname',)
 
 

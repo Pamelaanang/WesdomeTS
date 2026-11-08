@@ -239,6 +239,10 @@ class LeaveType(models.Model):
     leavetypename = models.CharField(db_column='LeaveTypeName', max_length=255)  # Field name made lowercase.
     isactive = models.IntegerField(db_column='IsActive', default=1)  # Field name made lowercase.
     ispayable = models.BooleanField(db_column='IsPayable', default=True)
+    # Disciplinary leave (e.g. a no-pay suspension) is an Ops-sheet-only option:
+    # it shows in the ops sheet's Disciplinary group and never on the
+    # Maintenance/Business timesheets.
+    isdisciplinary = models.BooleanField(db_column='IsDisciplinary', default=False)
 
     class Meta:
         managed = True
@@ -396,6 +400,10 @@ class Opscategory(models.Model):
     isactive = models.IntegerField(db_column='IsActive', default=1)
     ispayable = models.BooleanField(db_column='IsPayable', default=True)
     isovertime = models.BooleanField(db_column='IsOvertime', default=False)
+    # A paid disciplinary shift: counts as worked/paid time but earns no crew
+    # bonus. Shows in the ops sheet's Disciplinary group and is noted on the
+    # monthly bonus panels.
+    isdisciplinary = models.BooleanField(db_column='IsDisciplinary', default=False)
 
     class Meta:
         managed = True
@@ -475,6 +483,16 @@ class ContractSeries(models.Model):
     def __str__(self):
         return self.seriesname
 
+    def clean(self):
+        # No two series with the same name, ignoring case and spacing.
+        from django.core.exceptions import ValidationError
+        self.seriesname = (self.seriesname or '').strip()
+        if ContractSeries.objects.filter(seriesname__iexact=self.seriesname).exclude(pk=self.pk).exists():
+            raise ValidationError({'seriesname': f'A series named "{self.seriesname}" already exists.'})
+
+    def __str__(self):
+        return self.seriesname
+
 
 class MinerLevel(models.Model):
     """Real rows for the same Lead/1/2/3/4 scale as users.User.minerlevel —
@@ -508,6 +526,20 @@ class Contract(models.Model):
         managed = True
         db_table = 'Contract'
 
+    def __str__(self):
+        return f'{self.contractcode} — {self.contracttitle}'
+
+    def clean(self):
+        # Contract codes are unique, ignoring case and spacing, active or not:
+        # a deactivated contract keeps its code so old crew sheets stay readable.
+        from django.core.exceptions import ValidationError
+        self.contractcode = (self.contractcode or '').strip()
+        self.contracttitle = (self.contracttitle or '').strip()
+        clash = Contract.objects.filter(contractcode__iexact=self.contractcode).exclude(pk=self.pk).first()
+        if clash:
+            state = '' if clash.isactive else ' (inactive; reactivate it instead)'
+            raise ValidationError({'contractcode': f'Contract code "{self.contractcode}" is already used by {clash.contracttitle}{state}.'})
+
 
 def contracts_by_miner_level():
     # Contract choices keyed by MinerLevel id. A contract with no Level is
@@ -531,6 +563,19 @@ class Account(models.Model):
     class Meta:
         managed = True
         db_table = 'Account'
+
+    def __str__(self):
+        return f'{self.accountcode} — {self.accounttitle}'
+
+    def clean(self):
+        # Cost Center/Account codes are unique, ignoring case and spacing, active or not.
+        from django.core.exceptions import ValidationError
+        self.accountcode = (self.accountcode or '').strip()
+        self.accounttitle = (self.accounttitle or '').strip()
+        clash = Account.objects.filter(accountcode__iexact=self.accountcode).exclude(pk=self.pk).first()
+        if clash:
+            state = '' if clash.isactive else ' (inactive; reactivate it instead)'
+            raise ValidationError({'accountcode': f'Cost Center/Account code "{self.accountcode}" is already used by {clash.accounttitle}{state}.'})
 
 
 class ContractAccount(models.Model):

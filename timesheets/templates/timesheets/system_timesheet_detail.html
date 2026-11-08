@@ -74,7 +74,7 @@
                     <td class="px-4 py-3">{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</td>
                     <td class="px-4 py-3">{{ entry.contractid.contractcode }}</td>
                     <td class="px-4 py-3">{{ entry.accountid.accountcode|default:"—" }}</td>
-                    <td class="px-4 py-3">{% if entry.opscategoryid %}{{ entry.opscategoryid.categoryname }}{% elif entry.leavetypeid %}{{ entry.leavetypeid.leavetypename }}{% else %}—{% endif %}</td>
+                    <td class="px-4 py-3">{% include 'timesheets/_ops_category_cell.html' %}</td>
                     <td class="px-4 py-3 font-medium">{{ entry.hoursworked }}</td>
                     <td class="px-4 py-3 text-gray-500">
                         {% if entry.tonnesorehauled %}Ore: {{ entry.tonnesorehauled }}t &nbsp;{% endif %}

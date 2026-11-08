@@ -28,15 +28,21 @@
             and your session refreshed in the background.
         </p>
         <p class="text-sm text-gray-600 mb-6">
-            Nothing was saved from this attempt — go back and re-enter it on a fresh page.
+            Nothing was saved from this attempt. The button below reloads the page fresh. Re-enter it there.
         </p>
         <div class="flex flex-col gap-2">
-            <button onclick="history.length > 1 ? history.back() : window.location.assign('/profile/')"
+            <button onclick="window.location.replace(document.referrer && new URL(document.referrer).origin === location.origin ? document.referrer : '/profile/')"
                 class="w-full bg-[#28348A] text-white py-3 rounded-lg font-medium hover:opacity-90 transition-colors cursor-pointer">
-                Go back and try again
+                Reload the page and try again
             </button>
             <a href="/profile/" class="text-sm text-blue-500 hover:underline mt-2">Return to My Profile</a>
         </div>
+        {% if details %}
+        <div class="mt-6 text-left text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-3 break-all">
+            <p class="font-semibold text-gray-700 mb-1">Development details (only shown while DEBUG is on)</p>
+            {% for key, value in details.items %}<p><span class="text-gray-700">{{ key }}:</span> {{ value }}</p>{% endfor %}
+        </div>
+        {% endif %}
     </div>
 </body>
 

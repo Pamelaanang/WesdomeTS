@@ -36,8 +36,8 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-users" class="hidden flex flex-col">
-                <a href="{% url 'user_list' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'user_list' %}font-semibold{% endif %}"><i class="fa-solid fa-users"></i> User Management</a>
-                <a href="{% url 'pending_onboarding' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'pending_onboarding' %}font-semibold{% endif %}"><i class="fa-solid fa-user-clock"></i> IT Onboarding</a>
+                <a href="{% url 'user_list' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'user_list,user_department,user_leaving' %}font-semibold{% endif %}"><i class="fa-solid fa-users"></i> User Management</a>
+                <a href="{% url 'pending_onboarding' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name == 'pending_onboarding' %}font-semibold{% endif %}"><i class="fa-solid fa-user-clock"></i> IT Onboarding</a>
             </div>
             {% endif %}
 
@@ -50,20 +50,20 @@
             <div id="menu-employees" class="hidden flex flex-col">
                 {% if al == 3 %}
                 {% if request.user.has_maintenance_reports %}
-                <a href="{% url 'approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'approval_inbox,review_timesheet' %}font-semibold{% endif %}"><i class="fa-solid fa-clock-rotate-left"></i> Pending (Maintenance)</a>
+                <a href="{% url 'approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'approval_inbox,review_timesheet' %}font-semibold{% endif %}"><i class="fa-solid fa-clock-rotate-left"></i> Pending (Maintenance)</a>
                 {% endif %}
                 {% if request.user.has_business_reports %}
-                <a href="{% url 'business_approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'business_approval_inbox,review_business_timesheet' %}font-semibold{% endif %}"><i class="fa-solid fa-clock-rotate-left"></i> Pending (Business)</a>
+                <a href="{% url 'business_approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'business_approval_inbox,review_business_timesheet' %}font-semibold{% endif %}"><i class="fa-solid fa-clock-rotate-left"></i> Pending (Business)</a>
                 {% endif %}
                 {% else %}
-                <a href="{% url 'business_approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'business_approval_inbox,review_business_timesheet' %}font-semibold{% endif %}"><i class="fa-solid fa-clock-rotate-left"></i> Pending</a>
+                <a href="{% url 'business_approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'business_approval_inbox,review_business_timesheet' %}font-semibold{% endif %}"><i class="fa-solid fa-clock-rotate-left"></i> Pending</a>
                 {% endif %}
                 {% if al == 3 %}
-                <a href="{% url 'supervisor_approved' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'supervisor_approved,supervisor_approved_employee,supervisor_approved_month' %}font-semibold{% endif %}"><i class="fa-solid fa-people-line"></i> My People</a>
+                <a href="{% url 'supervisor_approved' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'supervisor_approved,supervisor_approved_employee,supervisor_approved_month' %}font-semibold{% endif %}"><i class="fa-solid fa-people-line"></i> My People</a>
                 {% else %}
-                <a href="{% url 'superintendent_approved' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'superintendent_approved,superintendent_approved_employee,superintendent_approved_month' %}font-semibold{% endif %}"><i class="fa-solid fa-people-line"></i> My People</a>
+                <a href="{% url 'superintendent_approved' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'superintendent_approved,superintendent_approved_employee,superintendent_approved_month' %}font-semibold{% endif %}"><i class="fa-solid fa-people-line"></i> My People</a>
                 {% endif %}
-                <a href="{% url 'bonus_members' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'bonus_members,bonus_employee_detail' %}font-semibold{% endif %}"><i class="fa-solid fa-gift"></i> Bonuses</a>
+                <a href="{% url 'bonus_members' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'bonus_members,bonus_employee_detail' %}font-semibold{% endif %}"><i class="fa-solid fa-gift"></i> Bonuses</a>
             </div>
             {% endif %}
 
@@ -74,14 +74,14 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-daily" class="hidden flex flex-col">
-                <!-- <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i
+                <!-- <a href="#" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700"><i
                         class="fa-solid fa-clock-rotate-left"></i> Pending</a> -->
-                <a href="{% url 'superintendent_ops_daily' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'superintendent_ops_daily,superintendent_ops_daily_month,superintendent_ops_daily_day,superintendent_ops_daily_shift' %}font-semibold{% endif %}"><i
+                <a href="{% url 'superintendent_ops_daily' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'superintendent_ops_daily,superintendent_ops_daily_month,superintendent_ops_daily_day,superintendent_ops_daily_shift' %}font-semibold{% endif %}"><i
                     class="fa-solid fa-calendar-days"></i> Daily Approved Sheets</a>
                 <!-- Individual Approved Sheets: not needed as a separate page — Crew Bonuses below already
                      shows the same employee -> month -> entries drill-down, with entries always visible and
                      the bonus panel freezing into a read-only summary once Submitted/Applied. -->
-                <a href="{% url 'superintendent_ops_members' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'superintendent_ops_members,superintendent_ops_member_detail,superintendent_ops_member_month' %}font-semibold{% endif %}">
+                <a href="{% url 'superintendent_ops_members' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'superintendent_ops_members,superintendent_ops_member_detail,superintendent_ops_member_month' %}font-semibold{% endif %}">
                     <i class="fa-solid fa-star"></i> Crew History & Bonuses</a>
             </div>
             {% endif %}
@@ -93,12 +93,10 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-management" class="hidden flex flex-col">
-                <a href="{% url 'crew_management' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'crew_management' or request.resolver_match.url_name == 'crew_management_crew' or request.resolver_match.url_name == 'crew_management_basket' %}font-semibold{% endif %}"><i class="fa-solid fa-sitemap"></i> Crew Management</a>
-                <a href="{% url 'crew_grid' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'crew_grid' %}font-semibold{% endif %}"><i class="fa-solid fa-table-cells"></i> Crew Grid</a>
-                <a href="{% url 'position_catalog' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'position_catalog' %}font-semibold{% endif %}"><i class="fa-solid fa-list-check"></i> Position Management</a>
-                {% if al == 2 %}
-                <a href="{% url 'contract_account_management' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-link"></i> Contract-Cost Center</a>
-                {% endif %}
+                <a href="{% url 'crew_management' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name == 'crew_management' or request.resolver_match.url_name == 'crew_management_crew' or request.resolver_match.url_name == 'crew_management_basket' %}font-semibold{% endif %}"><i class="fa-solid fa-sitemap"></i> Crew Management</a>
+                <a href="{% url 'crew_grid' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name == 'crew_grid' %}font-semibold{% endif %}"><i class="fa-solid fa-table-cells"></i> Crew Grid</a>
+                <a href="{% url 'position_catalog' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name == 'position_catalog' %}font-semibold{% endif %}"><i class="fa-solid fa-list-check"></i> Position Management</a>
+                <a href="{% url 'contract_account_management' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name == 'contract_account_management' %}font-semibold{% endif %}"><i class="fa-solid fa-link"></i> Contract-Cost Center</a>
             </div>
             {% endif %}
 
@@ -109,10 +107,10 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-trail" class="hidden flex flex-col">
-                <a href="{% url 'timesheet_search' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'timesheet_search,system_timesheet_detail' %}font-semibold{% endif %}"><i class="fa-solid fa-file-lines"></i> All Timesheets</a>
+                <a href="{% url 'timesheet_search' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'timesheet_search,system_timesheet_detail' %}font-semibold{% endif %}"><i class="fa-solid fa-file-lines"></i> All Timesheets</a>
                 {# Reports: future work #}
-                {# <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-chart-bar"></i> Reports</a> #}
-                <a href="{% url 'audit_log' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'audit_log' %}font-semibold{% endif %}"><i class="fa-solid fa-clipboard-list"></i> Audit Log</a>
+                {# <a href="#" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700"><i class="fa-solid fa-chart-bar"></i> Reports</a> #}
+                <a href="{% url 'audit_log' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name == 'audit_log' %}font-semibold{% endif %}"><i class="fa-solid fa-clipboard-list"></i> Audit Log</a>
             </div>
             <a href="{% url 'settings_page' %}"
                 class="flex items-center gap-3 {% if request.resolver_match.url_name == 'settings_page' %}active{% endif %}"><i
@@ -126,20 +124,20 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-shifter" class="hidden flex flex-col">
-                <a href="{% url 'business_approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'business_approval_inbox,review_business_timesheet' %}font-semibold{% endif %}"><i
+                <a href="{% url 'business_approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'business_approval_inbox,review_business_timesheet' %}font-semibold{% endif %}"><i
                         class="fa-solid fa-clock-rotate-left"></i> Pending</a>
-                <a href="{% url 'mine_captain_approved' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'mine_captain_approved,mine_captain_approved_employee,mine_captain_approved_month' %}font-semibold{% endif %}"><i
+                <a href="{% url 'mine_captain_approved' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'mine_captain_approved,mine_captain_approved_employee,mine_captain_approved_month' %}font-semibold{% endif %}"><i
                         class="fa-solid fa-circle-check"></i> Approved</a>
-                <a href="{% url 'bonus_members' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'bonus_members,bonus_employee_detail' %}font-semibold{% endif %}"><i class="fa-solid fa-gift"></i> Bonuses</a>
+                <a href="{% url 'bonus_members' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'bonus_members,bonus_employee_detail' %}font-semibold{% endif %}"><i class="fa-solid fa-gift"></i> Bonuses</a>
             </div>
             <button onclick="toggleAccordion('menu-daily-captain')" class="accordion-btn">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-calendar-days"></i> Crew Timesheets</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-daily-captain" class="hidden flex flex-col">
-                <a href="{% url 'ops_approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'ops_approval_inbox,ops_approval_inbox_date,ops_approval_inbox_shift,review_ops_sheet' %}font-semibold{% endif %}">
+                <a href="{% url 'ops_approval_inbox' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'ops_approval_inbox,ops_approval_inbox_date,ops_approval_inbox_shift,review_ops_sheet' %}font-semibold{% endif %}">
                     <i class="fa-solid fa-inbox"></i> Approval Inbox</a>
-                <a href="{% url 'my_ops_completed' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_ops_completed,my_ops_completed_month,my_ops_completed_day,my_ops_completed_shift' %}font-semibold{% endif %}">
+                <a href="{% url 'my_ops_completed' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'my_ops_completed,my_ops_completed_month,my_ops_completed_day,my_ops_completed_shift' %}font-semibold{% endif %}">
                     <i class="fa-solid fa-circle-check"></i> Completed Sheets</a>
             </div>
             {% endif %}
@@ -152,8 +150,8 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-daily-sheets" class="hidden flex flex-col">
-                <a href="{% url 'my_ops_sheets' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_ops_sheets,ops_sheet,new_ops_sheet' %}font-semibold{% endif %}"><i class="fa-solid fa-pen-to-square"></i> Draft Crew Sheets</a>
-                <a href="{% url 'my_ops_approvals' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_ops_approvals,my_ops_approvals_month' %}font-semibold{% endif %}"><i class="fa-solid fa-circle-check"></i> Daily Crew Approvals</a>
+                <a href="{% url 'my_ops_sheets' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'my_ops_sheets,ops_sheet,new_ops_sheet' %}font-semibold{% endif %}"><i class="fa-solid fa-pen-to-square"></i> Draft Crew Sheets</a>
+                <a href="{% url 'my_ops_approvals' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'my_ops_approvals,my_ops_approvals_month' %}font-semibold{% endif %}"><i class="fa-solid fa-circle-check"></i> Daily Crew Approvals</a>
             </div>
             {% if request.user.employmenttype == 'Contract' %}
             <a href="{% url 'my_pay_history' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name in 'my_pay_history,my_pay_history_month' %}font-semibold{% endif %}"><i class="fa-solid fa-file-invoice-dollar"></i> My Pay History</a>
@@ -164,9 +162,9 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-personal-shifter" class="hidden flex flex-col">
-                <a href="{% url 'my_business_drafts' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_business_drafts,add_business_entry,new_business_timesheet' %}font-semibold{% endif %}"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
-                <a href="{% url 'my_business_approved' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_business_approved,my_business_approved_month' %}font-semibold{% endif %}"><i class="fa-solid fa-circle-check"></i> Approved and Paid</a>
-                <a href="{% url 'my_bonuses' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'my_bonuses' %}font-semibold{% endif %}"><i class="fa-solid fa-gift"></i> My Bonuses</a>
+                <a href="{% url 'my_business_drafts' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'my_business_drafts,add_business_entry,new_business_timesheet' %}font-semibold{% endif %}"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
+                <a href="{% url 'my_business_approved' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'my_business_approved,my_business_approved_month' %}font-semibold{% endif %}"><i class="fa-solid fa-circle-check"></i> Approved and Paid</a>
+                <a href="{% url 'my_bonuses' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name == 'my_bonuses' %}font-semibold{% endif %}"><i class="fa-solid fa-gift"></i> My Bonuses</a>
             </div>
             {% endif %}
             {% endif %}
@@ -178,38 +176,38 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-unprocessed" class="hidden flex flex-col">
-                <a href="{% url 'payroll_unprocessed' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_unprocessed,payroll_unprocessed_dept,payroll_unprocessed_review' %}font-semibold{% endif %}"><i class="fa-solid fa-building-user"></i> Maintenance</a>
-                <a href="{% url 'payroll_business_unprocessed' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_business_unprocessed,payroll_business_unprocessed_dept,payroll_business_unprocessed_review' %}font-semibold{% endif %}"><i class="fa-solid fa-briefcase"></i> Business</a>
-                <a href="{% url 'payroll_ops_unprocessed' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_ops_unprocessed,payroll_ops_sheet' %}font-semibold{% endif %}"><i class="fa-solid fa-hard-hat"></i> Daily Crew</a>
+                <a href="{% url 'payroll_unprocessed' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'payroll_unprocessed,payroll_unprocessed_dept,payroll_unprocessed_review' %}font-semibold{% endif %}"><i class="fa-solid fa-building-user"></i> Maintenance</a>
+                <a href="{% url 'payroll_business_unprocessed' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'payroll_business_unprocessed,payroll_business_unprocessed_dept,payroll_business_unprocessed_review' %}font-semibold{% endif %}"><i class="fa-solid fa-briefcase"></i> Business</a>
+                <a href="{% url 'payroll_ops_unprocessed' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'payroll_ops_unprocessed,payroll_ops_sheet' %}font-semibold{% endif %}"><i class="fa-solid fa-hard-hat"></i> Daily Crew</a>
             </div>
             <button onclick="toggleAccordion('menu-bonus-inbox')" class="accordion-btn">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-gift"></i> Bonus Inbox</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-bonus-inbox" class="hidden flex flex-col">
-                <a href="{% url 'payroll_crew_bonuses' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_crew_bonuses,payroll_crew_bonuses_month' %}font-semibold{% endif %}"><i class="fa-solid fa-hard-hat"></i> Crew Bonus</a>
-                <a href="{% url 'payroll_employee_bonuses' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_employee_bonuses,payroll_employee_bonuses_dept' %}font-semibold{% endif %}"><i class="fa-solid fa-user-tie"></i> Employee Bonus</a>
+                <a href="{% url 'payroll_crew_bonuses' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'payroll_crew_bonuses,payroll_crew_bonuses_month' %}font-semibold{% endif %}"><i class="fa-solid fa-hard-hat"></i> Crew Bonus</a>
+                <a href="{% url 'payroll_employee_bonuses' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'payroll_employee_bonuses,payroll_employee_bonuses_dept' %}font-semibold{% endif %}"><i class="fa-solid fa-user-tie"></i> Employee Bonus</a>
             </div>
             <button onclick="toggleAccordion('menu-processed')" class="accordion-btn {% if request.resolver_match.url_name in 'payroll_processed_maintenance,payroll_processed_maintenance_employee,payroll_processed_maintenance_month,payroll_processed_business,payroll_processed_business_dept,payroll_processed_business_employee,payroll_processed_business_month' %}active{% endif %}">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-building"></i> Processed</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-processed" class="hidden flex flex-col">
-                <a href="{% url 'payroll_processed_maintenance' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_processed_maintenance,payroll_processed_maintenance_employee,payroll_processed_maintenance_month' %}font-semibold{% endif %}"><i class="fa-solid fa-building-user"></i> Maintenance</a>
-                <a href="{% url 'payroll_processed_business' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_processed_business,payroll_processed_business_dept,payroll_processed_business_employee,payroll_processed_business_month' %}font-semibold{% endif %}"><i class="fa-solid fa-briefcase"></i> Business Unit</a>
+                <a href="{% url 'payroll_processed_maintenance' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'payroll_processed_maintenance,payroll_processed_maintenance_employee,payroll_processed_maintenance_month' %}font-semibold{% endif %}"><i class="fa-solid fa-building-user"></i> Maintenance</a>
+                <a href="{% url 'payroll_processed_business' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'payroll_processed_business,payroll_processed_business_dept,payroll_processed_business_employee,payroll_processed_business_month' %}font-semibold{% endif %}"><i class="fa-solid fa-briefcase"></i> Business Unit</a>
             </div>
             <button onclick="toggleAccordion('menu-crew')" class="accordion-btn">
                 <span class="flex items-center gap-3"><i class="fa-solid fa-hard-hat"></i> Crew</span>
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-crew" class="hidden flex flex-col">
-                <a href="{% url 'payroll_ops_daily' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_ops_daily,payroll_ops_daily_month,payroll_ops_daily_day,payroll_ops_daily_shift' %}font-semibold{% endif %}"><i class="fa-solid fa-calendar-days"></i> Daily</a>
-                <a href="{% url 'payroll_ops_members' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'payroll_ops_members,payroll_ops_member_detail,payroll_ops_member_month' %}font-semibold{% endif %}"><i class="fa-solid fa-person"></i> Members</a>
+                <a href="{% url 'payroll_ops_daily' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'payroll_ops_daily,payroll_ops_daily_month,payroll_ops_daily_day,payroll_ops_daily_shift' %}font-semibold{% endif %}"><i class="fa-solid fa-calendar-days"></i> Daily</a>
+                <a href="{% url 'payroll_ops_members' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'payroll_ops_members,payroll_ops_member_detail,payroll_ops_member_month' %}font-semibold{% endif %}"><i class="fa-solid fa-person"></i> Members</a>
             </div>
             {# Reports: future work #}
             {# <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-chart-bar"></i> Reports</a> #}
-            <a href="{% url 'timesheet_search' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'timesheet_search' %}active{% endif %}"><i class="fa-solid fa-magnifying-glass"></i> Search</a>
             <a href="{% url 'payroll_inactive' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name in 'payroll_inactive,payroll_inactive_dept' %}active{% endif %}"><i class="fa-solid fa-user-slash"></i> Inactive Employees</a>
+            <a href="{% url 'timesheet_search' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'timesheet_search' %}active{% endif %}"><i class="fa-solid fa-magnifying-glass"></i> Search</a>
             {% endif %}
             
             <!-- Personal timesheets accordion: Mine Captain (4) -->
@@ -219,9 +217,9 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-personal" class="hidden flex flex-col">
-                <a href="{% url 'my_business_drafts' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_business_drafts,add_business_entry,new_business_timesheet' %}font-semibold{% endif %}"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
-                <a href="{% url 'my_business_approved' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'my_business_approved,my_business_approved_month' %}font-semibold{% endif %}"><i class="fa-solid fa-circle-check"></i> Approved and Paid</a>
-                <a href="{% url 'my_bonuses' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'my_bonuses' %}font-semibold{% endif %}"><i class="fa-solid fa-gift"></i> My Bonuses</a>
+                <a href="{% url 'my_business_drafts' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'my_business_drafts,add_business_entry,new_business_timesheet' %}font-semibold{% endif %}"><i class="fa-solid fa-file-pen"></i> My Drafts</a>
+                <a href="{% url 'my_business_approved' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name in 'my_business_approved,my_business_approved_month' %}font-semibold{% endif %}"><i class="fa-solid fa-circle-check"></i> Approved and Paid</a>
+                <a href="{% url 'my_bonuses' %}" class="flex items-center gap-3 pl-10 py-2 text-[13px] text-gray-700 {% if request.resolver_match.url_name == 'my_bonuses' %}font-semibold{% endif %}"><i class="fa-solid fa-gift"></i> My Bonuses</a>
             </div>
             {% endif %}
 
@@ -245,18 +243,18 @@
 
 
             <div class="py-4 flex justify-center">
-               <a href="{% url 'profile' %}" class="hover:bg-transparent -mt-9"><div class="w-25 h-25 rounded-full bg-black overflow-hidden border-4 border-white flex items-center justify-center -mt-10">
+               <a href="{% url 'profile' %}" class="hover:bg-transparent -mt-9"><div class="w-20 h-20 rounded-full bg-black overflow-hidden border-4 border-white flex items-center justify-center -mt-10">
                  {% if request.user.profilepic %}
                     <img src="/media/{{ request.user.profilepic }}" class="w-full h-full object-cover"
                         alt="Profile Photo">
                     {% else %}
-                    <span class="text-white font-bold text-[3rem]">{{ request.user.firstname|slice:":1" }}{{ request.user.lastname|slice:":1" }}</span>
+                    <span class="text-white font-bold text-[2.4rem]">{{ request.user.firstname|slice:":1" }}{{ request.user.lastname|slice:":1" }}</span>
                     {% endif %}
                 </div></a> 
             </div>
             <div class="py-4 flex justify-center">
-               <a href="{% url 'profile' %}"  class="hover:bg-transparent -mt-9" ><p class="text-base font-semibold">{{ request.user.firstname }} {{ request.user.lastname }}</p>
-            </div></a> 
+               <a href="{% url 'profile' %}"  class="hover:bg-transparent -mt-9" ><p class="text-sm font-semibold">{{ request.user.firstname }} {{ request.user.lastname }}</p></a>
+            </div>
 
 
         <!-- Pinned Sign Out -->

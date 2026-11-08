@@ -1,0 +1,468 @@
+{% comment %}User Management forms (Add, Edit, Record leaving) and their data. Needs the context from users.views._user_page_context.{% endcomment %}
+<!-- Add Employee Modal -->
+<div id="addModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-5xl mx-4 p-6 max-h-[90vh] overflow-y-auto">
+
+        <div class="flex items-center justify-between mb-5">
+            <div>
+                <p class="font-bold text-gray-900 text-lg">New Member</p>
+                <p id="modalDeptName" class="text-sm text-gray-500"></p>
+            </div>
+            <button onclick="closeAddModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <form method="post" action="{% url 'add_employee' %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="grid grid-cols-3 gap-4">
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Employee ID <span class="text-red-500">*</span></label>
+                    <input type="text" name="employeeid" id="modalEmpId" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]"
+                        placeholder="e.g. EMP-0050">
+                    <p id="empIdError" class="text-xs text-red-500 mt-1 hidden">This Employee ID already exists.</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">First Name <span class="text-red-500">*</span></label>
+                    <input type="text" name="firstname" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Last Name <span class="text-red-500">*</span></label>
+                    <input type="text" name="lastname" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Phone Number <span class="text-red-500">*</span></label>
+                    <input type="text" name="phonenumber" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]"
+                        placeholder="+1 (555) 000-0000">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Role <span class="text-red-500">*</span></label>
+                    <select name="roleid" id="modalRoleSelect" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— Select a role —</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Supervisor <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <select name="supervisorid"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— None —</option>
+                        {% for sup in active_supervisors %}
+                        <option value="{{ sup.eid }}">{{ sup.lastname }}, {{ sup.firstname }} — {{ sup.roleid.rolename }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Shifter Type <span class="text-gray-400 font-normal">(Shifters only)</span></label>
+                    <select name="shiftertype"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for value, label in shifter_type_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Home Crew <span class="text-gray-400 font-normal">(Shifters only)</span></label>
+                    <select name="crewid"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for crew in crews %}
+                        <option value="{{ crew.crewid }}">{{ crew.crewname }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Miner Level <span class="text-gray-400 font-normal">(Miners only — {{ spare_shifter_levels_text }} can be Spare Shifters)</span></label>
+                    <select name="minerlevel" id="addMinerlevel" onchange="fillUserContracts('addMinerlevel', 'addContractid', '')"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for value, label in minerlevel_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Employment Type</label>
+                    <select name="employmenttype"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        {% for value, label in employment_type_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Hire Date <span class="text-gray-400 font-normal">(needed for vacation accrual)</span></label>
+                    <input type="date" name="hiredate"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Charged to Contract <span class="text-gray-400 font-normal">(Contract labor only)</span></label>
+                    <select name="contractid" id="addContractid" disabled
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— Choose a level first —</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Charged to Account <span class="text-gray-400 font-normal">(Contract labor only)</span></label>
+                    <select name="accountid"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for a in accounts %}
+                        <option value="{{ a.accountid }}">{{ a.accountcode }} — {{ a.accounttitle }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" name="hasaccess" checked class="w-4 h-4 accent-[#28348A]">
+                        <span class="text-sm text-gray-800">Grant application access <span class="text-gray-400 font-normal text-xs">(uncheck for crew-only records)</span></span>
+                    </label>
+                </div>
+
+            </div>
+
+            <div class="mt-6 flex justify-center gap-4">
+                <button type="submit"
+                    class="bg-[#28348A] hover:bg-blue-900 text-white text-sm font-semibold px-8 py-2.5 rounded-lg transition">
+                    Add Employee
+                </button>
+                <button type="button" onclick="closeAddModal()"
+                    class="bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold px-8 py-2.5 rounded-lg transition">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- Edit Employee Modal -->
+<div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-5xl mx-4 p-6 max-h-[90vh] overflow-y-auto">
+
+        <div class="flex items-center justify-between mb-5">
+            <div>
+                <p class="font-bold text-gray-900 text-lg">Edit Employee</p>
+                <p id="editModalEmpId" class="text-sm text-gray-500"></p>
+            </div>
+            <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <form method="post" id="editForm">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="grid grid-cols-3 gap-4">
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Employee ID <span class="text-red-500">*</span></label>
+                    <input type="text" name="employeeid" id="editEmployeeid" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">First Name <span class="text-red-500">*</span></label>
+                    <input type="text" name="firstname" id="editFirstname" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Last Name <span class="text-red-500">*</span></label>
+                    <input type="text" name="lastname" id="editLastname" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Phone Number <span class="text-red-500">*</span></label>
+                    <input type="text" name="phonenumber" id="editPhonenumber" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Email <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <input type="email" name="email" id="editEmail"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Role <span class="text-red-500">*</span></label>
+                    <select name="roleid" id="editRoleSelect" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        {% for role in roles %}
+                        <option value="{{ role.roleid }}">{{ role.departmentid.departmentname }} — {{ role.rolename }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Supervisor <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <select name="supervisorid" id="editSupervisorSelect"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— None —</option>
+                        {% for sup in active_supervisors %}
+                        <option value="{{ sup.eid }}">{{ sup.lastname }}, {{ sup.firstname }} — {{ sup.roleid.rolename }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <p class="col-span-3 -mt-2 text-xs text-gray-400">Changing role changes system access immediately — use this for temporary reassignments (e.g. a crew member acting as Shifter).</p>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Shifter Type <span class="text-gray-400 font-normal">(Shifters only)</span></label>
+                    <select name="shiftertype" id="editShiftertype"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for value, label in shifter_type_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Home Crew <span class="text-gray-400 font-normal">(Shifters only)</span></label>
+                    <select name="crewid" id="editCrewid"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for crew in crews %}
+                        <option value="{{ crew.crewid }}">{{ crew.crewname }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Miner Level <span class="text-gray-400 font-normal">(Miners only — {{ spare_shifter_levels_text }} can be Spare Shifters)</span></label>
+                    <select name="minerlevel" id="editMinerlevel" onchange="fillUserContracts('editMinerlevel', 'editContractid', '')"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for value, label in minerlevel_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Employment Type</label>
+                    <select name="employmenttype" id="editEmploymenttype"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        {% for value, label in employment_type_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Hire Date <span class="text-gray-400 font-normal">(needed for vacation accrual)</span></label>
+                    <input type="date" name="hiredate" id="editHiredate"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Termination Date <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <input type="date" name="terminationdate" id="editTerminationdate"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Charged to Contract <span class="text-gray-400 font-normal">(Contract labor only)</span></label>
+                    <select name="contractid" id="editContractid" disabled
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— Choose a level first —</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Charged to Account <span class="text-gray-400 font-normal">(Contract labor only)</span></label>
+                    <select name="accountid" id="editAccountid"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#28348A]">
+                        <option value="">— N/A —</option>
+                        {% for a in accounts %}
+                        <option value="{{ a.accountid }}">{{ a.accountcode }} — {{ a.accounttitle }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" name="hasaccess" id="editHasaccess" class="w-4 h-4 accent-[#28348A]">
+                        <span class="text-sm text-gray-800">Grant application access <span class="text-gray-400 font-normal text-xs">(uncheck to revoke login without deactivating the record)</span></span>
+                    </label>
+                </div>
+
+            </div>
+
+            <div class="mt-6 flex justify-center gap-4">
+                <button type="submit"
+                    class="bg-[#28348A] hover:bg-blue-900 text-white text-sm font-semibold px-8 py-2.5 rounded-lg transition">
+                    Save Changes
+                </button>
+                <button type="button" onclick="closeEditModal()"
+                    class="bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold px-8 py-2.5 rounded-lg transition">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- Roles data for JS filtering -->
+{{ contracts_for_modal|json_script:"user-contracts-by-level" }}
+<script>
+const allRoles = [
+    {% for role in roles %}
+    { id: {{ role.roleid }}, name: "{{ role.rolename|escapejs }}", deptId: {{ role.departmentid.departmentid }} },
+    {% endfor %}
+];
+
+const existingIds = new Set([
+    {% for user in users %}"{{ user.employeeid|escapejs }}",{% endfor %}
+]);
+
+// Employee data for the Edit modal
+const employeeData = {
+    {% for user in users %}
+    "{{ user.employeeid }}": {
+        firstname: "{{ user.firstname|escapejs }}",
+        lastname: "{{ user.lastname|escapejs }}",
+        phonenumber: "{{ user.phonenumber|escapejs }}",
+        email: "{{ user.email|default:''|escapejs }}",
+        roleid: "{{ user.roleid_id|default:'' }}",
+        supervisorid: "{{ user.supervisorid_id|default:'' }}",
+        shiftertype: "{{ user.home_basket.discipline.name|default:'' }}",
+        crewid: "{{ user.home_basket.crew_row.crewid|default:'' }}",
+        minerlevel: "{{ user.minerlevel_id|default_if_none:'' }}",
+        hasaccess: {{ user.hasaccess|yesno:"true,false" }},
+        employmenttype: "{{ user.employmenttype|default:'Staff' }}",
+        contractid: "{{ user.contractid_id|default:'' }}",
+        accountid: "{{ user.accountid_id|default:'' }}",
+        hiredate: "{{ user.hiredate|date:'Y-m-d'|default:'' }}",
+        terminationdate: "{{ user.terminationdate|date:'Y-m-d'|default:'' }}",
+    },
+    {% endfor %}
+};
+const editUrlTemplate = "{% url 'edit_employee' 'PLACEHOLDER' %}";
+
+// Contract choices follow the Level: pick a Level, then only its contracts show.
+// With no Level the Contract box is disabled, so nothing posts (the server then stores none).
+const contractsByLevel = JSON.parse(document.getElementById('user-contracts-by-level').textContent);
+
+function fillUserContracts(levelSelectId, contractSelectId, selectedId) {
+    const levelId = document.getElementById(levelSelectId).value;
+    const select = document.getElementById(contractSelectId);
+    const items = levelId ? (contractsByLevel[levelId] || []) : [];
+    select.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = levelId ? '— N/A —' : '— Choose a level first —';
+    select.appendChild(placeholder);
+    items.forEach(function (c) {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.label;
+        select.appendChild(opt);
+    });
+    select.disabled = !levelId;
+    select.value = (selectedId && items.some(function (c) { return String(c.id) === String(selectedId); })) ? String(selectedId) : '';
+}
+
+function openEditModal(employeeid) {
+    const emp = employeeData[employeeid];
+    if (!emp) return;
+
+    document.getElementById('editModalEmpId').textContent = employeeid;
+    document.getElementById('editForm').action = editUrlTemplate.replace('PLACEHOLDER', employeeid);
+    document.getElementById('editEmployeeid').value = employeeid;
+    document.getElementById('editFirstname').value = emp.firstname;
+    document.getElementById('editLastname').value = emp.lastname;
+    document.getElementById('editPhonenumber').value = emp.phonenumber;
+    document.getElementById('editEmail').value = emp.email;
+    document.getElementById('editRoleSelect').value = emp.roleid;
+    document.getElementById('editSupervisorSelect').value = emp.supervisorid;
+    document.getElementById('editShiftertype').value = emp.shiftertype;
+    document.getElementById('editCrewid').value = emp.crewid;
+    document.getElementById('editMinerlevel').value = emp.minerlevel;
+    document.getElementById('editHasaccess').checked = emp.hasaccess;
+    document.getElementById('editEmploymenttype').value = emp.employmenttype;
+    fillUserContracts('editMinerlevel', 'editContractid', emp.contractid);
+    document.getElementById('editAccountid').value = emp.accountid;
+    document.getElementById('editHiredate').value = emp.hiredate;
+    document.getElementById('editTerminationdate').value = emp.terminationdate;
+
+    document.getElementById('editModal').classList.remove('hidden');
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.add('hidden');
+}
+
+document.getElementById('editModal').addEventListener('click', function(e) {
+    if (e.target === this) closeEditModal();
+});
+
+function openAddModal(deptId, deptName) {
+    document.getElementById('modalDeptName').textContent = deptName;
+    document.getElementById('modalEmpId').value = '';
+    document.getElementById('empIdError').classList.add('hidden');
+
+    const select = document.getElementById('modalRoleSelect');
+    select.innerHTML = '<option value="">— Select a role —</option>';
+    allRoles
+        .filter(r => r.deptId == deptId)
+        .forEach(r => {
+            const opt = document.createElement('option');
+            opt.value = r.id;
+            opt.textContent = r.name;
+            select.appendChild(opt);
+        });
+
+    document.getElementById('addModal').classList.remove('hidden');
+}
+
+function closeAddModal() {
+    document.getElementById('addModal').classList.add('hidden');
+}
+
+
+// Client-side duplicate ID check
+document.getElementById('modalEmpId').addEventListener('blur', function() {
+    const err = document.getElementById('empIdError');
+    if (existingIds.has(this.value.trim())) {
+        err.classList.remove('hidden');
+        this.classList.add('border-red-400');
+    } else {
+        err.classList.add('hidden');
+        this.classList.remove('border-red-400');
+    }
+});
+</script>
+
+<!-- Record leaving modal -->
+<div id="leavingModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-5">
+        <div class="flex items-center justify-between mb-3">
+            <p class="font-semibold text-gray-800 text-sm">Record leaving: <span id="leavingName"></span></p>
+            <button type="button" onclick="document.getElementById('leavingModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" id="leavingForm" class="flex flex-col gap-3">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <label class="flex flex-col gap-1 text-xs text-gray-500">Last day of work
+                <input type="date" name="last_day" value="{% now 'Y-m-d' %}" max="{% now 'Y-m-d' %}" class="border rounded px-2 py-1.5 text-sm w-44">
+            </label>
+            <p class="text-[11px] leading-snug text-gray-500 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
+                <i class="fa-solid fa-circle-info text-amber-500 mr-1"></i>Use this when someone quits or leaves. Shifters and Miners have their crew seat freed now.
+                Their account stays active so they can submit their final timesheet and be paid. After their last day they can only see their own timesheets and profile.
+                They then appear under <strong>Leaving: pending deactivation</strong> at the top of this page. Deactivate them there once the first pay period after their last day is processed.
+            </p>
+            <button type="submit" class="self-end bg-amber-600 text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Record leaving</button>
+        </form>
+    </div>
+</div>
+<script>
+    const leavingUrlTemplate = "{% url 'record_leaving' 'PLACEHOLDER' %}";
+    function openLeavingModal(employeeid, name) {
+        document.getElementById('leavingForm').action = leavingUrlTemplate.replace('PLACEHOLDER', encodeURIComponent(employeeid));
+        document.getElementById('leavingName').textContent = name;
+        document.getElementById('leavingModal').classList.remove('hidden');
+    }
+</script>

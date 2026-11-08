@@ -3,6 +3,7 @@
 {{ all_miners_for_modal|json_script:"all-miners-data" }}
 {{ all_shifters_for_modal|json_script:"all-shifters-data" }}
 {{ contracts_for_modal|json_script:"contracts-for-modal-data" }}
+{{ spare_shifter_levels|json_script:"spare-shifter-levels-data" }}
 {{ person_panels|json_script:"person-panels-data" }}
 {{ crew_pair_map|json_script:"crew-pair-map-data" }}
 {{ also_covers_options|json_script:"also-covers-options-data" }}
@@ -149,7 +150,8 @@
     // ---- Fill This Basket modal (vacant basket -> existing shifter, or a
     // Miner promoted temporarily or permanently) ----
     const crewCoverageUrl = '{% url "crew_coverage" %}';
-    const spareEligibleMiners = allMiners.filter(function (m) { return ['Lead', '1', '2'].indexOf(m.minerlevel) !== -1; });
+    const spareShifterLevels = JSON.parse(document.getElementById('spare-shifter-levels-data').textContent);
+    const spareEligibleMiners = allMiners.filter(function (m) { return spareShifterLevels.indexOf(m.minerlevel) !== -1; });
 
     // Takes the trigger (or any object with the same dataset), so the basket page can open it too.
     function openAssign(btn) {
@@ -231,7 +233,7 @@
             const coverageSelect = document.getElementById('grid-manage-coverage-select');
             fillGroupedSelect(coverageSelect, [
                 { label: 'Existing Shifters', items: freeToCover, prefix: 'shifter' },
-                { label: 'Promote a Miner (Temporary — Lead/1/2 only)', items: spareEligibleMiners, prefix: 'promote' },
+                { label: 'Promote a Miner (Temporary — {{ spare_shifter_levels_text }} only)', items: spareEligibleMiners, prefix: 'promote' },
             ]);
 
             // Reset to "Transfer" each time the modal reopens.

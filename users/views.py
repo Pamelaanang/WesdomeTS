@@ -3,7 +3,7 @@ from django.http import Http404
 from django.contrib.auth import login, logout
 from django.conf import settings
 from users.forms import UserLoginForm
-from users.models import User, CrewAssignment, Roles, Position, CrewCoverage, Department, BasketLead
+from users.models import User, CrewAssignment, Roles, Position, CrewCoverage, Department, BasketLead, SPARE_SHIFTER_LEVELS, SPARE_SHIFTER_LEVELS_TEXT
 from django.contrib.auth.decorators import login_required
 import random
 import string
@@ -91,8 +91,23 @@ def csrf_failure(request, reason=""):
     in another — the open tab's token no longer matches. There's nothing to
     recover (the browser's already left the form by the time this renders),
     so this just explains it in plain terms and sends them back to retry,
-    rather than a raw technical error page."""
-    return render(request, 'csrf_failure.html', status=403)
+    rather than a raw technical error page.
+
+    In development (DEBUG) the real reason is also shown on the page and
+    printed to the server console, so repeated failures can be diagnosed."""
+    details = None
+    if settings.DEBUG:
+        details = {
+            'reason': reason,
+            'path': request.path,
+            'origin': request.META.get('HTTP_ORIGIN', '(none sent)'),
+            'referer': request.META.get('HTTP_REFERER', '(none sent)'),
+            'host': request.get_host(),
+            'csrf_cookie': 'present' if settings.CSRF_COOKIE_NAME in request.COOKIES else 'MISSING',
+            'session_cookie': 'present' if settings.SESSION_COOKIE_NAME in request.COOKIES else 'MISSING',
+        }
+        print('CSRF failure: ' + ' | '.join(f'{k}={v}' for k, v in details.items()), flush=True)
+    return render(request, 'csrf_failure.html', {'details': details}, status=403)
 
 
 def _miner_level_choices():
@@ -112,48 +127,121 @@ def _level_code(level):
     return level.levelcode if level else None
 
 
-@login_required(login_url='login')
-def user_list_view(request):
-    if request.user.access_level != 1:
-        return redirect('profile')
-    users = User.objects.select_related('roleid__departmentid').order_by('roleid__departmentid__departmentname', 'lastname')
-    roles = Roles.objects.select_related('departmentid').order_by('departmentid__departmentname', 'rolename')
-    active_supervisors = User.objects.filter(isactive=True).select_related('roleid').order_by('lastname', 'firstname')
-    crews = Crews.objects.filter(isactive=1)
-    contracts_for_modal = contracts_by_miner_level()
-    accounts = Account.objects.filter(isactive=1)
+def _back_to_users(request):
+    """After a User Management action, return to the page it came from
+    (overview, a department, search results or the leaving list)."""
+    nxt = request.POST.get('next', '')
+    if nxt.startswith('/') and url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        return redirect(nxt)
+    return redirect('user_list')
 
-    # Show every active department, not just ones that already have a member —
-    # otherwise a brand-new department's first employee could never be added.
-    users_by_dept = {}
-    for u in users:
-        dept_id = u.roleid.departmentid_id if u.roleid else None
-        users_by_dept.setdefault(dept_id, []).append(u)
-    department_list = [
-        {'department': d, 'users': users_by_dept.get(d.departmentid, [])}
-        for d in Department.objects.filter(isactive=1).order_by('departmentname')
-    ]
 
-    # Step 2 of leaving: people with a last day recorded, still active.
-    leaving_list = [
+def _user_page_context():
+    """What the Add / Edit / Record leaving forms need, on every User Management page."""
+    return {
+        'users': User.objects.select_related('roleid__departmentid', 'minerlevel', 'contractid', 'accountid', 'crewid'),
+        'roles': Roles.objects.select_related('departmentid').order_by('departmentid__departmentname', 'rolename'),
+        'active_supervisors': User.objects.filter(isactive=True).select_related('roleid').order_by('lastname', 'firstname'),
+        'crews': Crews.objects.filter(isactive=1),
+        'contracts_for_modal': contracts_by_miner_level(),
+        'accounts': Account.objects.filter(isactive=1),
+        'employment_type_choices': User.EMPLOYMENT_TYPE_CHOICES,
+        'shifter_type_choices': User.SHIFTER_TYPE_CHOICES,
+        'minerlevel_choices': _miner_level_choices(),
+        'spare_shifter_levels_text': SPARE_SHIFTER_LEVELS_TEXT,
+        'today': timezone.localdate(),
+    }
+
+
+def _leaving_rows():
+    return [
         {'user': u, 'outstanding': outstanding_items(u)}
         for u in User.objects.filter(isactive=True, terminationdate__isnull=False)
         .select_related('roleid__departmentid').order_by('terminationdate', 'lastname')
     ]
 
+
+@login_required(login_url='login')
+def user_list_view(request):
+    """User Management overview: a card per department, a Leaving card, and a
+    search across every department."""
+    if request.user.access_level != 1:
+        return redirect('profile')
+    leaving = Q(roles__user__isactive=True, roles__user__terminationdate__isnull=False)
+    departments = Department.objects.filter(isactive=1).annotate(
+        active_count=Count('roles__user', filter=Q(roles__user__isactive=True, roles__user__terminationdate__isnull=True), distinct=True),
+        leaving_count=Count('roles__user', filter=leaving, distinct=True),
+        inactive_count=Count('roles__user', filter=Q(roles__user__isactive=False), distinct=True),
+    ).order_by('departmentname')
+
+    q = request.GET.get('q', '').strip()
+    results = None
+    if q:
+        cond = Q()
+        for word in q.split():
+            cond &= Q(firstname__icontains=word) | Q(lastname__icontains=word) | Q(employeeid__icontains=word)
+        results = User.objects.filter(cond).select_related('roleid__departmentid').order_by('-isactive', 'lastname', 'firstname')
+
+    leaving_rows = _leaving_rows()
     return render(request, 'user_list.html', {
-        'users': users,
-        'leaving_list': leaving_list,
+        **_user_page_context(),
+        'departments': departments,
+        'totals': {'all': User.objects.count()},
+        'leaving_count': len(leaving_rows),
+        'leaving_ready': sum(1 for r in leaving_rows if not r['outstanding']),
+        'q': q,
+        'results': results,
+    })
+
+
+USER_TABS = [
+    ('active', 'Active'),
+    ('leaving', 'Leaving'),
+    ('inactive', 'Inactive'),
+    ('temporary', 'Temporary password'),
+    ('all', 'All'),
+]
+
+
+@login_required(login_url='login')
+def user_department(request, dept_id):
+    """One department's people, filtered by tab."""
+    if request.user.access_level != 1:
+        return redirect('profile')
+    department = get_object_or_404(Department, departmentid=dept_id)
+    members = User.objects.filter(roleid__departmentid=department).select_related('roleid__departmentid').order_by('lastname', 'firstname')
+    filters = {
+        'active': Q(isactive=True, terminationdate__isnull=True),
+        'leaving': Q(isactive=True, terminationdate__isnull=False),
+        'inactive': Q(isactive=False),
+        'temporary': Q(isactive=True, is_temporary=True),
+        'all': Q(),
+    }
+    tab = request.GET.get('tab', 'active')
+    if tab not in filters:
+        tab = 'active'
+    tabs = [(value, label, members.filter(filters[value]).count()) for value, label in USER_TABS]
+    empty = {'active': 'No active members.', 'leaving': 'Nobody in this department is leaving.',
+             'inactive': 'No inactive members.', 'temporary': 'Nobody is on a temporary password.',
+             'all': 'No members in this department yet.'}[tab]
+    return render(request, 'user_department.html', {
+        **_user_page_context(),
+        'department': department,
+        'tab': tab,
+        'tabs': tabs,
+        'people': members.filter(filters[tab]),
+        'empty_text': empty,
+    })
+
+
+@login_required(login_url='login')
+def user_leaving(request):
+    """Leaving: pending deactivation."""
+    if request.user.access_level != 1:
+        return redirect('profile')
+    return render(request, 'user_leaving.html', {
+        'leaving_list': _leaving_rows(),
         'today': timezone.localdate(),
-        'department_list': department_list,
-        'roles': roles,
-        'active_supervisors': active_supervisors,
-        'crews': crews,
-        'contracts_for_modal': contracts_for_modal,
-        'accounts': accounts,
-        'employment_type_choices': User.EMPLOYMENT_TYPE_CHOICES,
-        'shifter_type_choices': User.SHIFTER_TYPE_CHOICES,
-        'minerlevel_choices': _miner_level_choices(),
     })
 
 
@@ -172,7 +260,7 @@ def generate_password(request, employeeid):
     # TODO: replace with real SNS via Twilio
 
     print(f"SMS to {user.phonenumber}: The temporary password for {user.firstname} {user.lastname} is {temp_password}")   
-    return redirect('user_list')
+    return _back_to_users(request)
 
 @login_required(login_url='login')
 def reactivate_employee(request, employeeid):
@@ -182,7 +270,7 @@ def reactivate_employee(request, employeeid):
     user = get_object_or_404(User, employeeid=employeeid, isactive=False)
     if user.onboarding_status == 'pending':
         messages.error(request, f'{user.firstname} {user.lastname} is awaiting IT onboarding. IT activates them from IT Onboarding.')
-        return redirect('user_list')
+        return _back_to_users(request)
 
     # Quitting (_retire_shifter) clears crewid/shiftertype and ends the basket seat,
     # and reactivating can't guess which crew/discipline they should come back to —
@@ -207,7 +295,7 @@ def reactivate_employee(request, employeeid):
         )
     else:
         messages.success(request, f'{user.firstname} {user.lastname} reactivated. Temporary password sent.')
-    return redirect('user_list')
+    return _back_to_users(request)
 
 
 @login_required(login_url='login')
@@ -659,7 +747,7 @@ def add_employee(request):
             print(f"SMS to {phonenumber}: Temp password for {firstname} {lastname} is {temp_password}")
             messages.success(request, f"{firstname} {lastname} added successfully.")
 
-    return redirect('user_list')
+    return _back_to_users(request)
 
 
 @login_required(login_url='login')
@@ -740,7 +828,7 @@ def edit_employee(request, employeeid):
             employee.save()
             messages.success(request, f"{firstname} {lastname} updated successfully.")
 
-    return redirect('user_list')
+    return _back_to_users(request)
 
 
 @login_required(login_url='login')
@@ -752,17 +840,17 @@ def record_leaving(request, employeeid):
     target = get_object_or_404(User, employeeid=employeeid, isactive=True)
     if target.pk == request.user.pk:
         messages.error(request, "You can't record yourself as leaving.")
-        return redirect('user_list')
+        return _back_to_users(request)
     if target.terminationdate:
         messages.error(request, f'{target.firstname} {target.lastname} is already recorded as leaving.')
-        return redirect('user_list')
+        return _back_to_users(request)
     last_day, error = _read_last_day(request, target)
     if not error and target.access_level == 5 and _exit_fill_required(target):
         error = (f'{target.firstname} {target.lastname} leads a basket with members. Record this from Crew Management, '
                  f'where you choose who runs the basket next.')
     if error:
         messages.error(request, error)
-        return redirect('user_list')
+        return _back_to_users(request)
 
     if target.access_level in (5, 8):
         _retire_shifter(request.user, target, None, timezone.now().date(), quitting=True, last_day=last_day)
@@ -775,7 +863,7 @@ def record_leaving(request, employeeid):
         messages.warning(request, f'{target.firstname} {target.lastname} still supervises {reports} '
                                   f'{"person" if reports == 1 else "people"}. Change their supervisor in Edit, '
                                   f'since {target.firstname} loses approval access after their last day.')
-    return redirect('user_list')
+    return _back_to_users(request)
 
 
 @login_required(login_url='login')
@@ -793,7 +881,7 @@ def deactivate_employee(request, employeeid):
                                   + '; '.join(outstanding) + '. This was recorded in the Audit Log.')
     else:
         messages.success(request, f'{target.firstname} {target.lastname} deactivated.')
-    return redirect('user_list')
+    return _back_to_users(request)
 
 
 @login_required(login_url='login')
@@ -871,7 +959,7 @@ def replace_employee(request, employeeid):
             messages.success(request, f'{new_hire.firstname} {new_hire.lastname} added and temporary password sent. '
                                       f'{leaving.firstname} {leaving.lastname} recorded as leaving, last day {fmt_day(last_day)}: '
                                       f'deactivate them below once their last pay is processed.')
-            return redirect('user_list')
+            return _back_to_users(request)
 
     return render(request, 'replace_employee.html', {
         'leaving': leaving,
@@ -1107,9 +1195,9 @@ def _read_exit_fill(request, target):
     fill = {'kind': kind, 'crew': crew, 'shiftertype': shiftertype, 'cov': cov}
     employeeid = request.POST.get('fill_employee_id', '').strip()
     if kind == 'cover_temp':
-        person = User.objects.filter(employeeid=employeeid, roleid__accessid__accessid=8, minerlevel__levelcode__in=['Lead', '1', '2'], isactive=True, terminationdate__isnull=True).first()
+        person = User.objects.filter(employeeid=employeeid, roleid__accessid__accessid=8, minerlevel__levelcode__in=SPARE_SHIFTER_LEVELS, isactive=True, terminationdate__isnull=True).first()
         if not person:
-            return None, 'Pick a Lead, 1, or 2 Miner for temporary cover.'
+            return None, f'Pick a {SPARE_SHIFTER_LEVELS_TEXT} Miner for temporary cover.'
     elif kind == 'promote':
         person = User.objects.filter(employeeid=employeeid, roleid__accessid__accessid=8, isactive=True, terminationdate__isnull=True).first()
         if not person:
@@ -1564,7 +1652,7 @@ def crew_assignments(request):
         else:
             target = get_object_or_404(
                 User, employeeid=employee_id,
-                roleid__accessid__accessid=8, minerlevel__levelcode__in=['Lead', '1', '2'], isactive=True, terminationdate__isnull=True,
+                roleid__accessid__accessid=8, minerlevel__levelcode__in=SPARE_SHIFTER_LEVELS, isactive=True, terminationdate__isnull=True,
             )
             _apply_exit_fill(request.user, {'kind': 'cover_temp', 'crew': crew, 'shiftertype': shiftertype, 'employee': target}, timezone.now().date())
             messages.success(request, f'{target.firstname} {target.lastname} is covering Crew {crew.crewname} — {shiftertype} temporarily.')
@@ -1688,7 +1776,7 @@ def crew_assignments(request):
         # so it lives here as its own explicit action rather than on the
         # Grid's drag/assign gestures, which stay scoped to fast, reversible
         # temporary coverage. Open to any Miner — unlike Spare Shifter
-        # coverage, this isn't an emergency fill, so no Lead/1/2 floor.
+        # coverage, this isn't an emergency fill, so no SPARE_SHIFTER_LEVELS floor.
         target = get_object_or_404(User, employeeid=request.POST.get('employee_id', '').strip(), roleid__accessid__accessid=8, isactive=True, terminationdate__isnull=True)
         shifter_role = get_object_or_404(Roles, rolename='Shift Coordinator')
         old_values = {'roleid': target.roleid_id, 'minerlevel': _level_code(target.minerlevel)}
@@ -2550,11 +2638,11 @@ def crew_assignment_detail(request, shifter_id):
                 # Only a temporary (Spare Shifter) promotion fits Coverage —
                 # a permanent one belongs to Transfer, which actually ends
                 # this shifter's hold on the basket instead of handing it
-                # back later. Same Lead/1/2 floor as every other Spare
+                # back later. Same SPARE_SHIFTER_LEVELS floor as every other Spare
                 # Shifter promotion in the app.
                 miner = get_object_or_404(
                     User, employeeid=promote_employee_id, roleid__accessid__accessid=8,
-                    minerlevel__levelcode__in=['Lead', '1', '2'], isactive=True,
+                    minerlevel__levelcode__in=SPARE_SHIFTER_LEVELS, isactive=True, terminationdate__isnull=True,
                 )
                 spare_role = get_object_or_404(Roles, rolename='Spare Shifter')
                 old_role_values = {'roleid': miner.roleid_id}
@@ -2860,7 +2948,7 @@ def grid_action_data():
     for m in User.objects.filter(roleid__accessid__accessid=8, isactive=True, terminationdate__isnull=True).order_by('lastname', 'firstname'):
         current = active_by_employee.get(m.eid)
         current_label = _basket_label(current.basket) if current and current.basket_id else None
-        # minerlevel travels along so the JS can filter to Lead/1/2 for the
+        # minerlevel travels along so the JS can filter to SPARE_SHIFTER_LEVELS for the
         # Spare Shifter (temporary) picker without a second near-duplicate
         # server-side list — the permanent-promotion pickers use the full set.
         all_miners_for_modal.append({
@@ -2972,6 +3060,8 @@ def grid_action_data():
         'all_shifters_for_modal': all_shifters_for_modal,
         'contracts_for_modal': contracts_for_modal,
         'person_panels': person_panels,
+        'spare_shifter_levels': list(SPARE_SHIFTER_LEVELS),
+        'spare_shifter_levels_text': SPARE_SHIFTER_LEVELS_TEXT,
     }
 
 

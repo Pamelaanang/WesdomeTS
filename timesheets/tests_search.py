@@ -198,3 +198,21 @@ class FilterTests(SearchTestBase):
         self.assertEqual({r['workflow'] for r in rows}, {'Maintenance'})
         _, rows = self.search(self.admin, dept=self.other_dept.pk)
         self.assertEqual({r['person']['employeeid'] for r in rows}, {'B200'})
+
+
+class FilterTagTests(SearchTestBase):
+    def test_optional_filters_show_as_removable_tags(self):
+        resp, _ = self.search(self.admin, q='jane', crew=self.crew_b.pk, shift='Night')
+        tags = {t['label']: t for t in resp.context['active_filters']}
+        self.assertEqual(set(tags), {'Crew', 'Shift'})
+        self.assertEqual(tags['Crew']['value'], 'B')
+        # Removing one tag keeps the person search and the other filter.
+        self.assertIn('q=jane', tags['Crew']['remove_url'])
+        self.assertIn('shift=Night', tags['Crew']['remove_url'])
+        self.assertNotIn('crew=', tags['Crew']['remove_url'])
+        self.assertContains(resp, 'id="filters-panel" class=" border-t')  # open when filters are set
+
+    def test_filters_panel_hidden_without_optional_filters(self):
+        resp, _ = self.search(self.admin, q='jane')
+        self.assertEqual(resp.context['active_filters'], [])
+        self.assertContains(resp, 'id="filters-panel" class="hidden')

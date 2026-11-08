@@ -140,7 +140,7 @@
                 <input type="radio" name="grid_fill_mode" class="mt-0.5"
                     onchange="['grid-fill-existing','grid-fill-temporary','grid-fill-permanent','grid-fill-hire'].forEach(function(id){document.getElementById(id).classList.toggle('hidden', id !== 'grid-fill-temporary');})">
                 <span><span class="font-semibold text-gray-700">Temporary cover (Spare Shifter)</span><br>
-                <span class="text-gray-400">A Lead, 1, or 2 Miner covers this basket. Recorded as coverage, so hours can be logged. End it later to hand the basket back.</span></span>
+                <span class="text-gray-400">A {{ spare_shifter_levels_text }} Miner covers this basket. Recorded as coverage, so hours can be logged. End it later to hand the basket back.</span></span>
             </label>
             <label class="flex items-start gap-2 cursor-pointer">
                 <input type="radio" name="grid_fill_mode" class="mt-0.5"
@@ -344,7 +344,7 @@
             <div id="grid-exit-fill-wrap" class="flex flex-col gap-2 text-xs">
                 <label class="grid-exit-option flex items-start gap-2 cursor-pointer" data-kind="cover_temp">
                     <input type="radio" name="fill_kind" value="cover_temp" class="mt-0.5">
-                    <span><span class="font-semibold text-gray-700">Temporary cover</span><br><span class="text-gray-400">A Lead, 1, or 2 Miner covers as Spare Shifter. Coverage is recorded, so hours can be logged.</span></span>
+                    <span><span class="font-semibold text-gray-700">Temporary cover</span><br><span class="text-gray-400">A {{ spare_shifter_levels_text }} Miner covers as Spare Shifter. Coverage is recorded, so hours can be logged.</span></span>
                 </label>
                 <label class="grid-exit-option flex items-start gap-2 cursor-pointer" data-kind="promote">
                     <input type="radio" name="fill_kind" value="promote" class="mt-0.5">

@@ -1,0 +1,56 @@
+{% comment %}Modal that shows one contract (loaded from its page with ?partial=1).
+Rows call openContract(id). After a change the page reloads with ?open=<id> and
+the modal opens again on the same contract.{% endcomment %}
+<div id="contract-modal" class="hidden fixed inset-0 z-50 bg-black/40 p-4 overflow-y-auto" onclick="if (event.target === this) closeContract()">
+    <div class="max-w-5xl mx-auto my-8 bg-gray-100 rounded-2xl shadow-xl p-4">
+        <div class="flex items-center justify-between mb-3 px-1">
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Contract</p>
+            <button type="button" onclick="closeContract()" class="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 px-2 py-1 rounded-lg hover:bg-gray-200" title="Close (Esc)">
+                Close <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div id="contract-modal-body"><p class="text-sm text-gray-500 p-6 text-center">Loading…</p></div>
+    </div>
+</div>
+<script>
+    const CONTRACT_URL = "{% url 'contract_detail' 0 %}";
+    function pageWithout(param) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete(param);
+        return url.pathname + (url.search || '');
+    }
+    function openContract(id) {
+        const modal = document.getElementById('contract-modal');
+        const body = document.getElementById('contract-modal-body');
+        body.innerHTML = '<p class="text-sm text-gray-500 p-6 text-center">Loading…</p>';
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        const url = CONTRACT_URL.replace('/0/', '/' + id + '/') + '?partial=1&back=' + encodeURIComponent(pageWithout('open'));
+        fetch(url, {credentials: 'same-origin'})
+            .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+            .then(function (html) {
+                body.innerHTML = html;
+                // Show the result of the last change ("Contract updated", errors) inside the modal too.
+                const msgs = document.getElementById('contract-messages');
+                if (msgs && new URLSearchParams(window.location.search).get('open') === String(id)) {
+                    const copy = msgs.cloneNode(true);
+                    copy.id = '';
+                    copy.className = 'mb-4 space-y-2';
+                    body.prepend(copy);
+                }
+            })
+            .catch(function () { body.innerHTML = '<p class="text-sm text-red-600 p-6 text-center">Couldn\'t load this contract. Refresh the page and try again.</p>'; });
+    }
+    function closeContract() {
+        document.getElementById('contract-modal').classList.add('hidden');
+        document.body.style.overflow = '';
+        history.replaceState(null, '', pageWithout('open'));
+    }
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !document.getElementById('contract-modal').classList.contains('hidden')) closeContract();
+    });
+    (function () {
+        const id = new URLSearchParams(window.location.search).get('open');
+        if (id && /^\d+$/.test(id)) openContract(id);
+    })();
+</script>

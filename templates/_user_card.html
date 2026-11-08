@@ -1,0 +1,45 @@
+{% comment %}One person in User Management as a card, with their actions. Pass user; show_department adds the department.{% endcomment %}
+<div class="bg-white rounded-2xl shadow p-4 flex flex-col gap-3 {% if not user.isactive %}opacity-75{% endif %}">
+    <div class="flex items-start gap-3">
+        <div class="w-11 h-11 rounded-full {% if user.isactive %}bg-[#28348A]{% else %}bg-gray-400{% endif %} flex items-center justify-center overflow-hidden shrink-0">
+            {% if user.profilepic %}<img src="/media/{{ user.profilepic }}" class="w-full h-full object-cover" alt="">
+            {% else %}<span class="text-white font-bold text-sm">{{ user.firstname|slice:":1" }}{{ user.lastname|slice:":1" }}</span>{% endif %}
+        </div>
+        <div class="min-w-0 grow">
+            <p class="font-semibold text-sm text-gray-800 truncate">{{ user.firstname }} {{ user.lastname }}</p>
+            <p class="text-xs text-gray-500 truncate">{{ user.roleid.rolename }}{% if user.employmenttype == 'Contract' %} <span class="inline-block bg-amber-100 text-amber-700 text-[10px] font-semibold px-1.5 rounded-full align-middle">Contract</span>{% endif %}</p>
+            <p class="text-[11px] text-gray-400">{{ user.employeeid }}{% if show_department %} · {{ user.roleid.departmentid.departmentname }}{% endif %}</p>
+        </div>
+        <div class="shrink-0">
+            {% if not user.isactive %}<span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Inactive</span>
+            {% elif user.terminationdate %}<span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700" title="Last day {{ user.terminationdate|date:'M j, Y' }}">Leaving</span>
+            {% elif user.is_temporary %}<span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">Temporary</span>
+            {% else %}<span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700">Active</span>{% endif %}
+        </div>
+    </div>
+    {% if user.isactive and user.terminationdate %}<p class="text-[11px] text-amber-700 -mt-1">Last day {{ user.terminationdate|date:"M j, Y" }}</p>{% endif %}
+
+    <div class="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100 mt-auto">
+        {% if user.isactive %}
+        <button type="button" onclick="openEditModal('{{ user.employeeid }}')"
+            class="bg-gray-100 text-gray-700 text-xs px-3 py-1.5 whitespace-nowrap rounded-lg hover:bg-gray-200">Edit</button>
+        <form method="post" action="{% url 'reset_password' user.employeeid %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button class="bg-[#28348A] text-white text-xs px-3 py-1.5 whitespace-nowrap rounded-lg hover:bg-blue-800">Reset Password</button>
+        </form>
+        <a href="{% url 'replace_employee' user.employeeid %}"
+            class="bg-red-100 text-red-700 text-xs px-3 py-1.5 whitespace-nowrap rounded-lg hover:bg-red-200">Replace</a>
+        {% if not user.terminationdate and user.pk != request.user.pk %}
+        <button type="button" onclick="openLeavingModal('{{ user.employeeid|escapejs }}', '{{ user.firstname|escapejs }} {{ user.lastname|escapejs }}')"
+            class="bg-amber-100 text-amber-800 text-xs px-3 py-1.5 whitespace-nowrap rounded-lg hover:bg-amber-200">Record leaving</button>
+        {% endif %}
+        {% else %}
+        <form method="post" action="{% url 'reactivate_employee' user.employeeid %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button class="bg-green-600 text-white text-xs px-3 py-1.5 whitespace-nowrap rounded-lg hover:bg-green-700" onclick="return confirm('Reactivate {{ user.firstname|escapejs }} {{ user.lastname|escapejs }}? A new temporary password will be sent.');">Reactivate</button>
+        </form>
+        {% endif %}
+    </div>
+</div>

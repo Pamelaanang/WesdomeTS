@@ -230,3 +230,25 @@ class ChangedPagesRenderTests(LeavingBase):
         self.assertContains(resp, 'last day of work')
         resp = self.client.get(reverse('user_list'))
         self.assertContains(resp, 'Record leaving')
+
+
+class ShifterProfileCaptainsTests(LeavingBase):
+    def test_shifter_profile_lists_every_captain_who_can_approve(self):
+        Accesslevel.objects.create(accessid=4, accessrole='Mine Captain')
+        cap_role = Roles.objects.create(rolename='Mine Captain', departmentid=self.dept, accessid_id=4)
+        User.objects.create(employeeid='C1', firstname='Ada', lastname='One', phonenumber='0', roleid=cap_role,
+                            isactive=True, hasaccess=True, is_temporary=False)
+        User.objects.create(employeeid='C2', firstname='Bo', lastname='Two', phonenumber='0', roleid=cap_role,
+                            isactive=True, hasaccess=True, is_temporary=False)
+        User.objects.create(employeeid='C3', firstname='Gone', lastname='Three', phonenumber='0', roleid=cap_role,
+                            isactive=True, hasaccess=True, is_temporary=False, terminationdate=self.yesterday)
+        self.client.force_login(self.shifter)
+        resp = self.client.get(reverse('profile'))
+        self.assertContains(resp, 'Mine Captains: Ada One, Bo Two')
+        self.assertNotContains(resp, 'Gone Three')
+
+    def test_other_roles_still_show_their_supervisor(self):
+        self.employee.supervisorid = self.supervisor
+        self.employee.save()
+        self.client.force_login(self.employee)
+        self.assertContains(self.client.get(reverse('profile')), 'Supervisor: SV1 Test')

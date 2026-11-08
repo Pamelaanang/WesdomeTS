@@ -1,0 +1,47 @@
+{% comment %}"Leaving: pending deactivation" table. Pass leaving_list.{% endcomment %}
+<div class="mb-6 bg-white rounded-2xl shadow overflow-hidden">
+    <div class="px-5 py-3 bg-amber-50 border-b border-amber-200">
+        <p class="font-semibold text-sm text-gray-800"><i class="fa-solid fa-person-walking-arrow-right mr-1 text-amber-600"></i> Leaving: pending deactivation ({{ leaving_list|length }})</p>
+        <p class="text-xs text-gray-500 mt-0.5">Deactivate once the first pay period after their last day is processed. <strong>Ready</strong> means nothing up to their last day is left to pay. You can still deactivate someone who isn't ready, after a warning.</p>
+    </div>
+    <div class="overflow-x-auto">
+    <table class="w-full min-w-[640px] text-sm">
+        <thead class="bg-gray-50 text-gray-600 uppercase text-xs">
+            <tr>
+                <th class="px-4 py-2 text-left">Employee</th>
+                <th class="px-4 py-2 text-left">Department / Role</th>
+                <th class="px-4 py-2 text-left">Last day</th>
+                <th class="px-4 py-2 text-left">Pay status</th>
+                <th class="px-4 py-2 text-left"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in leaving_list %}
+            {% with u=row.user %}
+            <tr class="border-t border-gray-100 align-top">
+                <td class="px-4 py-3">{{ u.firstname }} {{ u.lastname }}<div class="text-xs text-gray-400">{{ u.employeeid }}</div></td>
+                <td class="px-4 py-3">{{ u.roleid.departmentid.departmentname }}<div class="text-xs text-gray-400">{{ u.roleid.rolename }}</div></td>
+                <td class="px-4 py-3 whitespace-nowrap">{{ u.terminationdate|date:"M j, Y" }}{% if u.terminationdate >= today %}<div class="text-xs text-gray-400">still working today</div>{% endif %}</td>
+                <td class="px-4 py-3">
+                    {% if row.outstanding %}
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">Waiting on</span>
+                    <ul class="mt-1 text-xs text-gray-600 list-disc pl-4">{% for item in row.outstanding %}<li>{{ item }}</li>{% endfor %}</ul>
+                    {% else %}
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Ready</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 text-right">
+                    <form method="post" action="{% url 'deactivate_employee' u.employeeid %}"
+                        onsubmit="return confirm({% if row.outstanding %}'{{ u.firstname|escapejs }} {{ u.lastname|escapejs }} still has items outstanding:\n\n{% for item in row.outstanding %}- {{ item|escapejs }}\n{% endfor %}\nDeactivating now locks them out, and the outstanding items will be recorded in the Audit Log. Deactivate anyway?'{% else %}'Deactivate {{ u.firstname|escapejs }} {{ u.lastname|escapejs }}? They will no longer be able to log in.'{% endif %});">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button class="text-xs px-3 py-1 rounded {% if row.outstanding %}bg-orange-100 text-orange-700 hover:bg-orange-200{% else %}bg-red-600 text-white hover:bg-red-700{% endif %}">Deactivate</button>
+                    </form>
+                </td>
+            </tr>
+            {% endwith %}
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>

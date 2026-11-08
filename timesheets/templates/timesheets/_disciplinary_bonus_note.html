@@ -1,0 +1,7 @@
+{% if disciplinary_action_hours or suspension_hours %}
+<div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+    <p class="font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Disciplinary hours this month</p>
+    {% if disciplinary_action_hours %}<p>{{ disciplinary_action_hours }} hrs on Disciplinary Action: paid, but no bonus on these hours.</p>{% endif %}
+    {% if suspension_hours %}<p>{{ suspension_hours }} hrs on Disciplinary Suspension: no pay.</p>{% endif %}
+</div>
+{% endif %}
