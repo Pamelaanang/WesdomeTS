@@ -327,20 +327,16 @@
     function openExit(btn) {
             const isQuit = btn.dataset.action === 'quit_employee';
             const name = btn.dataset.employeeName;
-            if (btn.dataset.fillRequired !== '1' && isQuit) {
-                if (!confirm('Record ' + name + ' as quit today?\n\nTheir account will be deactivated and their seat freed.')) return;
-                document.getElementById('grid-exit-direct-action').value = btn.dataset.action;
-                document.getElementById('grid-exit-direct-employee').value = btn.dataset.employeeId;
-                document.getElementById('grid-exit-direct-form').submit();
-                return;
-            }
+            // Quitting always opens the modal now, so the last day of work can be entered.
 
             const covered = btn.dataset.covered === '1';
             document.getElementById('grid-exit-title').textContent = (isQuit ? 'Record quit: ' : 'Demote: ') + name;
             const fillRequired = btn.dataset.fillRequired === '1';
             document.getElementById('grid-exit-intro').textContent = fillRequired
                 ? name + ' leads a basket with members. Choose who runs it next so their hours can be logged.'
-                : 'Choose the Miner Level they return to. Their contract, if any, is set here.';
+                : (isQuit ? 'Enter their last day of work.' : 'Choose the Miner Level they return to. Their contract, if any, is set here.');
+            document.getElementById('grid-exit-lastday-wrap').classList.toggle('hidden', !isQuit);
+            document.getElementById('grid-exit-last-day').disabled = !isQuit;
             document.getElementById('grid-exit-fill-wrap').classList.toggle('hidden', !fillRequired);
             document.getElementById('grid-exit-demote-wrap').classList.toggle('hidden', isQuit);
             demoteLevelSelect.disabled = isQuit;

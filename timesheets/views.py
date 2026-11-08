@@ -520,7 +520,9 @@ def payroll_unprocessed_dept(request, dept_id):
         return redirect('profile')
 
     dept = get_object_or_404(Department, departmentid=dept_id)
-    employees = User.objects.filter(roleid__departmentid=dept_id, isactive=True)
+    # Not limited to active employees: a final timesheet must stay in the queue
+    # even if its owner has already been deactivated.
+    employees = User.objects.filter(roleid__departmentid=dept_id)
 
     submissions = MainHeader.objects.filter(
         employeeid__in=employees,
@@ -638,7 +640,9 @@ def payroll_business_unprocessed_dept(request, dept_id):
         return redirect('profile')
 
     dept = get_object_or_404(Department, departmentid=dept_id)
-    employees = User.objects.filter(roleid__departmentid=dept_id, isactive=True)
+    # Not limited to active employees: a final timesheet must stay in the queue
+    # even if its owner has already been deactivated.
+    employees = User.objects.filter(roleid__departmentid=dept_id)
 
     submissions = BusinessHeader.objects.filter(
         employeeid__in=employees,
@@ -737,7 +741,7 @@ def payroll_processed_maintenance(request):
 def payroll_processed_maintenance_employee(request, employee_id):
     if request.user.access_level != 7:
         return redirect('profile')
-    employee = get_object_or_404(User, employeeid=employee_id, isactive=True)
+    employee = get_object_or_404(User, employeeid=employee_id)  # inactive too: see Inactive Employees
     months = MainEntry.objects.filter(
         mainheaderid__employeeid=employee,
         mainheaderid__paidat__isnull=False,
@@ -759,7 +763,7 @@ def payroll_processed_maintenance_month(request, employee_id, year, month):
     if request.user.access_level != 7:
         return redirect('profile')
     _valid_date_or_404(year, month)
-    employee = get_object_or_404(User, employeeid=employee_id, isactive=True)
+    employee = get_object_or_404(User, employeeid=employee_id)  # inactive too: see Inactive Employees
     entries = MainEntry.objects.filter(
         mainheaderid__employeeid=employee,
         mainheaderid__paidat__isnull=False,
@@ -828,7 +832,7 @@ def payroll_processed_business_employee(request, dept_id, employee_id):
     if request.user.access_level != 7:
         return redirect('profile')
     dept = get_object_or_404(Department, departmentid=dept_id)
-    employee = get_object_or_404(User, employeeid=employee_id, isactive=True)
+    employee = get_object_or_404(User, employeeid=employee_id)  # inactive too: see Inactive Employees
     months = BusinessEntry.objects.filter(
         businessheaderid__employeeid=employee,
         businessheaderid__paidat__isnull=False,
@@ -852,7 +856,7 @@ def payroll_processed_business_month(request, dept_id, employee_id, year, month)
         return redirect('profile')
     _valid_date_or_404(year, month)
     dept = get_object_or_404(Department, departmentid=dept_id)
-    employee = get_object_or_404(User, employeeid=employee_id, isactive=True)
+    employee = get_object_or_404(User, employeeid=employee_id)  # inactive too: see Inactive Employees
     entries = BusinessEntry.objects.filter(
         businessheaderid__employeeid=employee,
         businessheaderid__paidat__isnull=False,

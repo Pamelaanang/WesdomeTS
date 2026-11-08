@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% load timesheet_extras %}
+{% block content %}
+
+<div class="container mx-auto p-4 bg-white rounded-2xl shadow mb-6">
+    <button onclick="history.back()" class="flex items-center gap-2 text-sm text-[#28348A] hover:underline cursor-pointer mb-2">
+        <i class="fa-solid fa-arrow-left"></i> All Timesheets
+    </button>
+    <h2 class="text-xl font-bold text-center">WESDOME GOLD MINES LIMITED</h2>
+    <h3 class="text-center font-semibold">EAGLE RIVER MINE</h3>
+    <p class="text-center text-sm text-gray-500 mt-1">
+        <span class="font-semibold text-gray-700">
+            {% if kind == 'maintenance' %}MAINTENANCE SHEET{% elif kind == 'business' %}BUSINESS SHEET{% else %}DAILY CREW SHEET{% endif %}:
+        </span>
+        Read-only System Admin view. This visit has been recorded in the Audit Log.
+    </p>
+
+    <div class="flex flex-wrap justify-between items-center mt-4 text-sm gap-y-2 px-4">
+        {% if kind == 'ops' %}
+        <span>Shifter: <span class="font-medium">{{ header.shifterid.firstname }} {{ header.shifterid.lastname }}</span> <span class="text-gray-400">({{ header.shifterid.employeeid }})</span></span>
+        <span>Date: <span class="font-medium">{{ header.shiftdate|date:"M j, Y" }}</span>{% if is_stat %} <span class="ml-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_label }}">Stat</span>{% endif %}</span>
+        <span>Shift: <span class="font-medium">{{ header.shifttype }}</span></span>
+        <span>Crew: <span class="font-medium">{{ header.crewid.crewname }}</span>{% if header.discipline %} · {{ header.discipline.name }}{% endif %}</span>
+        {% else %}
+        <span>Employee: <span class="font-medium">{{ employee.firstname }} {{ employee.lastname }}</span> <span class="text-gray-400">({{ employee.employeeid }})</span></span>
+        <span>Role: <span class="font-medium">{{ employee.roleid.rolename }}</span></span>
+        {% if kind == 'business' %}<span>Period: <span class="font-medium">{{ header.get_periodmonth_display }} {{ header.periodyear }}</span></span>{% endif %}
+        {% endif %}
+        <span>Status:
+            {% if header.overallstatus == 'Completed' %}
+                {% if kind == 'ops' %}{% if all_paid %}<span class="inline-flex bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Paid</span>{% else %}<span class="inline-flex bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full">Approved</span>{% endif %}
+                {% elif header.paidat %}<span class="inline-flex bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Paid {{ header.paidat|date:"M j, Y" }}</span>
+                {% else %}<span class="inline-flex bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full">Approved</span>{% endif %}
+            {% elif header.overallstatus == 'In Progress' %}
+            <span class="inline-flex bg-orange-100 text-orange-700 text-xs font-semibold px-2 py-0.5 rounded-full">Under review</span>
+            {% else %}
+            <span class="inline-flex bg-orange-100 text-orange-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ header.overallstatus }}</span>
+            {% endif %}
+        </span>
+        {% if header.submittedat %}<span class="text-gray-400">Submitted {{ header.submittedat|date:"M j, Y" }}</span>{% endif %}
+    </div>
+    {% if kind != 'ops' %}
+    <div class="mt-2 px-4">
+        {% include 'timesheets/_hours_metrics_block.html' %}
+    </div>
+    {% endif %}
+</div>
+
+<div class="container mx-auto bg-white rounded-2xl shadow mb-6 overflow-hidden">
+    <div class="flex items-center gap-2 px-5 py-3 bg-gray-50 border-b text-sm text-gray-500">
+        <i class="fa-solid fa-lock text-gray-400"></i>
+        <span>Read-only. Nothing on this page can be changed.</span>
+    </div>
+    <div class="overflow-x-auto">
+        {% if kind == 'ops' %}
+        <table class="w-full text-sm min-w-[800px]">
+            <thead class="bg-gray-50 text-gray-600 text-left">
+                <tr>
+                    <th class="px-4 py-3">Payroll ID</th>
+                    <th class="px-4 py-3">Employee</th>
+                    <th class="px-4 py-3">Contract</th>
+                    <th class="px-4 py-3">Account</th>
+                    <th class="px-4 py-3">Category / Leave</th>
+                    <th class="px-4 py-3">Hours</th>
+                    <th class="px-4 py-3">Haulage / Footage</th>
+                    <th class="px-4 py-3">Remarks</th>
+                    <th class="px-4 py-3">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in entries %}
+                <tr class="border-t">
+                    <td class="px-4 py-3">{{ entry.employeeid.employeeid }}</td>
+                    <td class="px-4 py-3">{{ entry.employeeid.firstname }} {{ entry.employeeid.lastname }}</td>
+                    <td class="px-4 py-3">{{ entry.contractid.contractcode }}</td>
+                    <td class="px-4 py-3">{{ entry.accountid.accountcode|default:"—" }}</td>
+                    <td class="px-4 py-3">{% if entry.opscategoryid %}{{ entry.opscategoryid.categoryname }}{% elif entry.leavetypeid %}{{ entry.leavetypeid.leavetypename }}{% else %}—{% endif %}</td>
+                    <td class="px-4 py-3 font-medium">{{ entry.hoursworked }}</td>
+                    <td class="px-4 py-3 text-gray-500">
+                        {% if entry.tonnesorehauled %}Ore: {{ entry.tonnesorehauled }}t &nbsp;{% endif %}
+                        {% if entry.tonneswastehauled %}Waste: {{ entry.tonneswastehauled }}t &nbsp;{% endif %}
+                        {% if entry.tonnesoreskipped %}Skip: {{ entry.tonnesoreskipped }}t &nbsp;{% endif %}
+                        {% if entry.longholefootage %}LH: {{ entry.longholefootage }}ft{% endif %}
+                        {% if not entry.tonnesorehauled and not entry.tonneswastehauled and not entry.tonnesoreskipped and not entry.longholefootage %}—{% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-gray-500">{{ entry.remarks|default:"—" }}</td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                        {% if entry.paidat %}<span class="text-green-600 font-medium">Paid</span><br><span class="text-gray-400 text-xs">{{ entry.paidat|date:"M j, Y" }}</span>
+                        {% elif entry.linestatus == 'Approved' %}<span class="text-green-600 font-medium">Approved</span>
+                        {% elif entry.linestatus == 'Rejected' %}<span class="text-red-500 font-medium">Rejected</span>
+                        {% else %}<span class="text-gray-400">{{ entry.linestatus }}</span>{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="9" class="text-center text-gray-400 py-6">No entries on this sheet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p class="px-5 py-3 text-sm text-gray-700 border-t">Total hours on sheet: <span class="font-bold">{{ total_hours }}</span></p>
+        {% else %}
+        <table class="w-full text-sm min-w-[600px]">
+            <thead class="bg-gray-50 text-gray-600 text-left">
+                <tr>
+                    <th class="px-4 py-3"></th>
+                    <th class="px-4 py-3">Date</th>
+                    <th class="px-4 py-3">Category / Leave</th>
+                    <th class="px-4 py-3">Shift</th>
+                    <th class="px-4 py-3">Hours</th>
+                    {% if kind == 'maintenance' %}<th class="px-4 py-3">Work Order</th>{% endif %}
+                    <th class="px-4 py-3">Description</th>
+                    <th class="px-4 py-3">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in entries %}
+                {% if kind == 'maintenance' %}{% with d=entry.startdate %}
+                <tr class="border-t">
+                    <td class="px-4 py-3 whitespace-nowrap">{% if d in stat_dates %}<span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_labels|get_item:d }}">Stat</span>{% endif %}</td>
+                    <td class="px-4 py-3 whitespace-nowrap">{{ d|date:"M j, Y" }}</td>
+                    <td class="px-4 py-3">{% if entry.workcategoryid %}{{ entry.workcategoryid.categoryname }}{% elif entry.leavetypeid %}{{ entry.leavetypeid.leavetypename }}{% else %}—{% endif %}</td>
+                    <td class="px-4 py-3">{{ entry.shifttype|default:"—" }}</td>
+                    <td class="px-4 py-3 font-medium">{{ entry.hoursworked }} hrs</td>
+                    <td class="px-4 py-3 text-gray-500">{{ entry.sapworkid|default:"—" }}</td>
+                    <td class="px-4 py-3 text-gray-500">{{ entry.entrydescription|default:"—" }}</td>
+                    <td class="px-4 py-3">{% include 'timesheets/_system_line_status.html' %}</td>
+                </tr>
+                {% endwith %}{% else %}{% with d=entry.dateworked %}
+                <tr class="border-t">
+                    <td class="px-4 py-3 whitespace-nowrap">{% if d in stat_dates %}<span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700" title="{{ stat_labels|get_item:d }}">Stat</span>{% endif %}</td>
+                    <td class="px-4 py-3 whitespace-nowrap">{{ d|date:"M j, Y" }}</td>
+                    <td class="px-4 py-3">{% if entry.businesscategoryid %}{{ entry.businesscategoryid.categoryname }}{% elif entry.leavetypeid %}{{ entry.leavetypeid.leavetypename }}{% else %}—{% endif %}</td>
+                    <td class="px-4 py-3">{{ entry.shifttype|default:"—" }}</td>
+                    <td class="px-4 py-3 font-medium">{{ entry.hoursworked }} hrs</td>
+                    <td class="px-4 py-3 text-gray-500">{{ entry.entrydescription|default:"—" }}</td>
+                    <td class="px-4 py-3">{% include 'timesheets/_system_line_status.html' %}</td>
+                </tr>
+                {% endwith %}{% endif %}
+                {% empty %}
+                <tr><td colspan="8" class="text-center text-gray-400 py-6">No entries on this timesheet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock content %}

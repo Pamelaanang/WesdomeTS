@@ -1,0 +1,14 @@
+{% comment %}Optional "they're leaving the company" part of a Replace form. Pass suffix.{% endcomment %}
+<div class="w-full flex flex-col gap-2 border-t border-gray-100 pt-2">
+    <label class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+        <input type="checkbox" name="leaving" value="1"
+            onchange="document.getElementById('replace-leaving-wrap-{{ suffix }}').classList.toggle('hidden', !this.checked)">
+        They're leaving the company
+    </label>
+    <div id="replace-leaving-wrap-{{ suffix }}" class="hidden flex flex-col gap-2">
+        <label class="flex flex-col gap-1 text-xs text-gray-500">Last day of work
+            <input type="date" name="leaving_last_day" value="{% now 'Y-m-d' %}" max="{% now 'Y-m-d' %}" class="border rounded px-2 py-1.5 text-sm w-44">
+        </label>
+        {% include 'users/_leaving_note.html' %}
+    </div>
+</div>

@@ -1,0 +1,4 @@
+{% comment %}Line status cell for system_timesheet_detail.html (Maintenance and Business entries).{% endcomment %}
+{% if entry.linestatus == 'Approved' %}<span class="text-green-600 font-medium">Approved</span>{% if entry.approvedby %}<div class="text-xs text-gray-400">by {{ entry.approvedby.firstname }} {{ entry.approvedby.lastname }}</div>{% endif %}
+{% elif entry.linestatus == 'Rejected' %}<span class="text-red-500 font-medium">Rejected</span>{% if entry.supervisornote %}<div class="text-xs text-gray-400">{{ entry.supervisornote }}</div>{% endif %}
+{% else %}<span class="text-gray-400">{{ entry.linestatus }}</span>{% endif %}

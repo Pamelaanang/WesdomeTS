@@ -24,6 +24,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from calendar import month_name as _month_name
 from timesheets import leave as leave_rules
 from timesheets.audit import log_action
+from users.leaving import fmt_day, is_leaving, outstanding_items, record_leaving_plain, deactivate as deactivate_employee_record
 
 
 def _leave_balance_context(user, year):
@@ -133,8 +134,17 @@ def user_list_view(request):
         for d in Department.objects.filter(isactive=1).order_by('departmentname')
     ]
 
+    # Step 2 of leaving: people with a last day recorded, still active.
+    leaving_list = [
+        {'user': u, 'outstanding': outstanding_items(u)}
+        for u in User.objects.filter(isactive=True, terminationdate__isnull=False)
+        .select_related('roleid__departmentid').order_by('terminationdate', 'lastname')
+    ]
+
     return render(request, 'user_list.html', {
         'users': users,
+        'leaving_list': leaving_list,
+        'today': timezone.localdate(),
         'department_list': department_list,
         'roles': roles,
         'active_supervisors': active_supervisors,
@@ -320,8 +330,8 @@ def profile(request):
 
         # Workforce headcount — active Shifters (al=5, Spare Shifters included)
         # and active Miners (al=8), mine-wide, not scoped to direct reports.
-        total_shifters = User.objects.filter(roleid__accessid__accessid=5, isactive=True).count()
-        total_miners = User.objects.filter(roleid__accessid__accessid=8, isactive=True).count()
+        total_shifters = User.objects.filter(roleid__accessid__accessid=5, isactive=True, terminationdate__isnull=True).count()
+        total_miners = User.objects.filter(roleid__accessid__accessid=8, isactive=True, terminationdate__isnull=True).count()
 
         # My Team — headcount of this Superintendent's own direct reports
         # (Captains, plus everyone else who reports straight to them:
@@ -734,11 +744,64 @@ def edit_employee(request, employeeid):
 
 
 @login_required(login_url='login')
+def record_leaving(request, employeeid):
+    """System Admin: record that anyone, in any department, is leaving (step 1).
+    Shifters and Miners have their seat freed the same way Crew Management does."""
+    if request.user.access_level != 1 or request.method != 'POST':
+        return redirect('profile')
+    target = get_object_or_404(User, employeeid=employeeid, isactive=True)
+    if target.pk == request.user.pk:
+        messages.error(request, "You can't record yourself as leaving.")
+        return redirect('user_list')
+    if target.terminationdate:
+        messages.error(request, f'{target.firstname} {target.lastname} is already recorded as leaving.')
+        return redirect('user_list')
+    last_day, error = _read_last_day(request, target)
+    if not error and target.access_level == 5 and _exit_fill_required(target):
+        error = (f'{target.firstname} {target.lastname} leads a basket with members. Record this from Crew Management, '
+                 f'where you choose who runs the basket next.')
+    if error:
+        messages.error(request, error)
+        return redirect('user_list')
+
+    if target.access_level in (5, 8):
+        _retire_shifter(request.user, target, None, timezone.now().date(), quitting=True, last_day=last_day)
+    else:
+        record_leaving_plain(request.user, target, last_day)
+    messages.success(request, f'{target.firstname} {target.lastname} recorded as leaving, last day {fmt_day(last_day)}. '
+                              f'Their account stays active until you deactivate it below.')
+    reports = User.objects.filter(supervisorid=target, isactive=True).count()
+    if reports:
+        messages.warning(request, f'{target.firstname} {target.lastname} still supervises {reports} '
+                                  f'{"person" if reports == 1 else "people"}. Change their supervisor in Edit, '
+                                  f'since {target.firstname} loses approval access after their last day.')
+    return redirect('user_list')
+
+
+@login_required(login_url='login')
+def deactivate_employee(request, employeeid):
+    """System Admin: step 2, once nothing up to the last day is left to pay.
+    Allowed with outstanding items (the page warns first); the Audit Log
+    records what was outstanding."""
+    if request.user.access_level != 1 or request.method != 'POST':
+        return redirect('profile')
+    target = get_object_or_404(User, employeeid=employeeid, isactive=True, terminationdate__isnull=False)
+    outstanding = deactivate_employee_record(request.user, target)
+    if outstanding:
+        messages.warning(request, f'{target.firstname} {target.lastname} deactivated with {len(outstanding)} '
+                                  f'item{"s" if len(outstanding) != 1 else ""} still outstanding: '
+                                  + '; '.join(outstanding) + '. This was recorded in the Audit Log.')
+    else:
+        messages.success(request, f'{target.firstname} {target.lastname} deactivated.')
+    return redirect('user_list')
+
+
+@login_required(login_url='login')
 def replace_employee(request, employeeid):
     if request.user.access_level != 1:
         return redirect('profile')
 
-    leaving = get_object_or_404(User, employeeid=employeeid)
+    leaving = get_object_or_404(User, employeeid=employeeid, isactive=True)
     subordinates = User.objects.filter(supervisorid=leaving, isactive=True)
     is_shifter = leaving.access_level == 5
     active_crew = CrewAssignment.objects.filter(
@@ -754,10 +817,15 @@ def replace_employee(request, employeeid):
         phone = request.POST.get('phonenumber', '').strip()
         transfer_crew = request.POST.get('transfer_crew') == 'on'
 
+        # Someone already recorded as leaving keeps the last day on record.
+        last_day, last_day_error = ((leaving.terminationdate, None) if leaving.terminationdate
+                                    else _read_last_day(request, leaving))
         if User.objects.filter(employeeid=new_id).exists():
             error = f"Employee ID '{new_id}' already exists."
         elif not all([new_id, firstname, lastname, phone]):
             error = "All fields are required."
+        elif last_day_error:
+            error = last_day_error
         else:
             temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
             new_hire = User(
@@ -774,6 +842,13 @@ def replace_employee(request, employeeid):
                 crewid=leaving.crewid,
             )
             new_hire.set_password(temp_password)
+            if is_shifter:
+                # The leaving shifter stays active until deactivated, so hand their
+                # home basket over first: clearing crew/discipline ends their home
+                # row before the new hire's is created.
+                leaving.crewid = None
+                leaving.shiftertype = None
+                leaving.save(update_fields=['crewid', 'shiftertype', 'discipline'])
             new_hire.save()
 
             print(f"SMS to {phone}: Temp password for {firstname} {lastname} is {temp_password}")
@@ -790,9 +865,12 @@ def replace_employee(request, employeeid):
                     for emp_id in employee_ids
                 ])
 
-            leaving.isactive = False
-            leaving.save()
-
+            # Recorded as leaving, not deactivated: they can still submit their
+            # final timesheet. Deactivate from User Management after their last pay.
+            record_leaving_plain(request.user, leaving, last_day)
+            messages.success(request, f'{new_hire.firstname} {new_hire.lastname} added and temporary password sent. '
+                                      f'{leaving.firstname} {leaving.lastname} recorded as leaving, last day {fmt_day(last_day)}: '
+                                      f'deactivate them below once their last pay is processed.')
             return redirect('user_list')
 
     return render(request, 'replace_employee.html', {
@@ -997,6 +1075,24 @@ def _exit_fill_required(target):
     return result
 
 
+def _read_last_day(request, target, field='last_day'):
+    """Last day of work from a Record-leaving form. Defaults to today; can be
+    earlier, never later (the seat is freed today) and never before their hire date."""
+    raw = request.POST.get(field, '').strip()
+    today = timezone.now().date()
+    if not raw:
+        return today, None
+    try:
+        last_day = date_type.fromisoformat(raw)
+    except ValueError:
+        return None, 'Enter a valid last day of work.'
+    if last_day > today:
+        return None, 'The last day of work can\'t be in the future. Record leaving on or after their last day.'
+    if target.hiredate and last_day < target.hiredate:
+        return None, f'The last day of work can\'t be before their hire date ({fmt_day(target.hiredate)}).'
+    return last_day, None
+
+
 def _read_exit_fill(request, target):
     """Validates the fill choice before anything changes. Returns (fill, error)."""
     required = _exit_fill_required(target)
@@ -1011,16 +1107,16 @@ def _read_exit_fill(request, target):
     fill = {'kind': kind, 'crew': crew, 'shiftertype': shiftertype, 'cov': cov}
     employeeid = request.POST.get('fill_employee_id', '').strip()
     if kind == 'cover_temp':
-        person = User.objects.filter(employeeid=employeeid, roleid__accessid__accessid=8, minerlevel__levelcode__in=['Lead', '1', '2'], isactive=True).first()
+        person = User.objects.filter(employeeid=employeeid, roleid__accessid__accessid=8, minerlevel__levelcode__in=['Lead', '1', '2'], isactive=True, terminationdate__isnull=True).first()
         if not person:
             return None, 'Pick a Lead, 1, or 2 Miner for temporary cover.'
     elif kind == 'promote':
-        person = User.objects.filter(employeeid=employeeid, roleid__accessid__accessid=8, isactive=True).first()
+        person = User.objects.filter(employeeid=employeeid, roleid__accessid__accessid=8, isactive=True, terminationdate__isnull=True).first()
         if not person:
             return None, 'Pick a Miner to promote.'
     elif kind == 'assign':
         homed = BasketShifter.objects.filter(is_home=True, enddate__isnull=True).values_list('shifter_id', flat=True)
-        person = User.objects.filter(employeeid=employeeid, roleid__accessid__accessid=5, isactive=True).exclude(pk__in=homed).exclude(pk=target.pk).first()
+        person = User.objects.filter(employeeid=employeeid, roleid__accessid__accessid=5, isactive=True, terminationdate__isnull=True).exclude(pk__in=homed).exclude(pk=target.pk).first()
         if not person:
             return None, 'Pick a shifter who is not already running a basket.'
     elif kind == 'make_permanent':
@@ -1085,7 +1181,10 @@ def _apply_exit_fill(actor, fill, today):
     ).update(shifter=person)
 
 
-def _retire_shifter(actor, target, fill, today, quitting, minerlevel=None, contract=None):
+def _retire_shifter(actor, target, fill, today, quitting, minerlevel=None, contract=None, last_day=None):
+    # quitting records leaving (see users/leaving.py): the seat is freed today,
+    # terminationdate is set to their last day of work, and the account stays
+    # active until the System Admin deactivates it after their last pay.
     cov_as_home = CrewCoverage.objects.filter(home_shifter=target, enddate__isnull=True).select_related('covering_shifter', 'crewid').first()
     # Saved one by one (not a bulk update) so the basket table follows each lead's end.
     for lead in BasketLead.objects.filter(shifter=target, enddate__isnull=True):
@@ -1098,9 +1197,8 @@ def _retire_shifter(actor, target, fill, today, quitting, minerlevel=None, contr
     target.shiftertype = None
     update_fields = ['crewid', 'shiftertype', 'discipline']
     if quitting:
-        target.isactive = False
-        target.terminationdate = today
-        update_fields += ['isactive', 'terminationdate']
+        target.terminationdate = last_day or today
+        update_fields += ['terminationdate']
     else:
         target.roleid = get_object_or_404(Roles, rolename='Underground Mine Operator')
         target.minerlevel = minerlevel
@@ -1121,8 +1219,10 @@ def _retire_shifter(actor, target, fill, today, quitting, minerlevel=None, contr
     if fill:
         _apply_exit_fill(actor, fill, today)
 
-    action = 'Quit (Immediate)' if quitting else 'Demote to Miner (Permanent)'
+    action = 'Record Leaving' if quitting else 'Demote to Miner (Permanent)'
     new_values = {'isactive': target.isactive, 'roleid': target.roleid_id, 'crewid': None, 'shiftertype': None}
+    if quitting:
+        new_values['terminationdate'] = str(target.terminationdate)
     if not quitting:
         new_values['minerlevel'] = _level_code(minerlevel)
         new_values['contractid'] = contract.contractid if contract else None
@@ -1206,14 +1306,17 @@ def crew_assignments(request):
         return redirect('profile')
 
     if request.method == 'POST' and request.POST.get('action') == 'quit_employee':
-        target = get_object_or_404(User, employeeid=request.POST.get('employee_id', '').strip(), roleid__accessid__accessid__in=[5, 8], isactive=True)
+        target = get_object_or_404(User, employeeid=request.POST.get('employee_id', '').strip(), roleid__accessid__accessid__in=[5, 8], isactive=True, terminationdate__isnull=True)
         today = timezone.now().date()
-        fill, error = _read_exit_fill(request, target)
+        last_day, error = _read_last_day(request, target)
+        if not error:
+            fill, error = _read_exit_fill(request, target)
         if error:
             messages.error(request, error)
         else:
-            _retire_shifter(request.user, target, fill, today, quitting=True)
-            messages.success(request, f'{target.firstname} {target.lastname} recorded as quit as of {today:%b %d, %Y}.')
+            _retire_shifter(request.user, target, fill, today, quitting=True, last_day=last_day)
+            messages.success(request, f'{target.firstname} {target.lastname} recorded as leaving, last day {fmt_day(last_day)}. '
+                                      f'Their seat is freed. Their account stays active until the System Admin deactivates it after their last pay.')
 
         next_url = request.POST.get('next', '').strip()
         if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
@@ -1221,8 +1324,8 @@ def crew_assignments(request):
         return redirect('crew_grid')
 
     if request.method == 'POST' and request.POST.get('action') == 'swap_baskets':
-        a = User.objects.filter(employeeid=request.POST.get('employee_id', '').strip(), roleid__accessid__accessid=5, isactive=True).first()
-        b = User.objects.filter(employeeid=request.POST.get('other_shifter_id', '').strip(), roleid__accessid__accessid=5, isactive=True).first()
+        a = User.objects.filter(employeeid=request.POST.get('employee_id', '').strip(), roleid__accessid__accessid=5, isactive=True, terminationdate__isnull=True).first()
+        b = User.objects.filter(employeeid=request.POST.get('other_shifter_id', '').strip(), roleid__accessid__accessid=5, isactive=True, terminationdate__isnull=True).first()
         if not a or not b or a.pk == b.pk:
             messages.error(request, 'Pick a different shifter to swap baskets with.')
         elif not (_home_basket(a) and _home_basket(b)):
@@ -1362,7 +1465,7 @@ def crew_assignments(request):
         elif not crewid or not shiftertype:
             messages.error(request, 'Select both a crew and a discipline.')
         else:
-            target = get_object_or_404(User, employeeid=shifter_id, roleid__accessid__accessid=5, isactive=True)
+            target = get_object_or_404(User, employeeid=shifter_id, roleid__accessid__accessid=5, isactive=True, terminationdate__isnull=True)
             is_home_free = _home_basket(target) is None
             basket_crew = Crews.objects.get(pk=crewid)
             if not _basket_leaderless(basket_crew, shiftertype):
@@ -1419,7 +1522,7 @@ def crew_assignments(request):
         elif not crewid or not shiftertype:
             messages.error(request, 'Select both a crew and a discipline.')
         else:
-            target = get_object_or_404(User, employeeid=employee_id, roleid__accessid__accessid=8, isactive=True)
+            target = get_object_or_404(User, employeeid=employee_id, roleid__accessid__accessid=8, isactive=True, terminationdate__isnull=True)
             shifter_role = get_object_or_404(Roles, rolename='Shift Coordinator')
             target.roleid = shifter_role
             _leave_member_seats(target)
@@ -1459,7 +1562,7 @@ def crew_assignments(request):
         else:
             target = get_object_or_404(
                 User, employeeid=employee_id,
-                roleid__accessid__accessid=8, minerlevel__levelcode__in=['Lead', '1', '2'], isactive=True,
+                roleid__accessid__accessid=8, minerlevel__levelcode__in=['Lead', '1', '2'], isactive=True, terminationdate__isnull=True,
             )
             _apply_exit_fill(request.user, {'kind': 'cover_temp', 'crew': crew, 'shiftertype': shiftertype, 'employee': target}, timezone.now().date())
             messages.success(request, f'{target.firstname} {target.lastname} is covering Crew {crew.crewname} — {shiftertype} temporarily.')
@@ -1471,7 +1574,7 @@ def crew_assignments(request):
 
     if request.method == 'POST' and request.POST.get('action') == 'make_cover_permanent':
         today = timezone.now().date()
-        target = get_object_or_404(User, employeeid=request.POST.get('employee_id', '').strip(), roleid__accessid__accessid=5, isactive=True)
+        target = get_object_or_404(User, employeeid=request.POST.get('employee_id', '').strip(), roleid__accessid__accessid=5, isactive=True, terminationdate__isnull=True)
         cov = CrewCoverage.objects.filter(covering_shifter=target, enddate__isnull=True).select_related('home_shifter', 'crewid').first()
         if not cov:
             messages.error(request, f'{target.firstname} {target.lastname} is not covering a basket.')
@@ -1537,7 +1640,7 @@ def crew_assignments(request):
         # a promoted Spare Shifter keeps the minerlevel they carried as a
         # Miner (promotion only flips roleid), so the badge/modal need to
         # reach them at their current access level too.
-        target = get_object_or_404(User, employeeid=request.POST.get('employee_id', '').strip(), roleid__accessid__accessid__in=[5, 8], isactive=True)
+        target = get_object_or_404(User, employeeid=request.POST.get('employee_id', '').strip(), roleid__accessid__accessid__in=[5, 8], isactive=True, terminationdate__isnull=True)
         raw_level = request.POST.get('minerlevel', '').strip()
         raw_contractid = request.POST.get('contractid', '').strip()
         minerlevel = _level_from_post(raw_level)
@@ -1582,7 +1685,7 @@ def crew_assignments(request):
         # Grid's drag/assign gestures, which stay scoped to fast, reversible
         # temporary coverage. Open to any Miner — unlike Spare Shifter
         # coverage, this isn't an emergency fill, so no Lead/1/2 floor.
-        target = get_object_or_404(User, employeeid=request.POST.get('employee_id', '').strip(), roleid__accessid__accessid=8, isactive=True)
+        target = get_object_or_404(User, employeeid=request.POST.get('employee_id', '').strip(), roleid__accessid__accessid=8, isactive=True, terminationdate__isnull=True)
         shifter_role = get_object_or_404(Roles, rolename='Shift Coordinator')
         old_values = {'roleid': target.roleid_id, 'minerlevel': _level_code(target.minerlevel)}
         target.roleid = shifter_role
@@ -1602,7 +1705,7 @@ def crew_assignments(request):
         return redirect('crew_grid')
 
     if request.method == 'POST' and request.POST.get('action') == 'demote_to_miner_permanent':
-        target = get_object_or_404(User, employeeid=request.POST.get('employee_id', '').strip(), roleid__accessid__accessid=5, isactive=True)
+        target = get_object_or_404(User, employeeid=request.POST.get('employee_id', '').strip(), roleid__accessid__accessid=5, isactive=True, terminationdate__isnull=True)
         today = timezone.now().date()
         # A demoted person returns as a Miner, so they need a real Miner Level
         # (Staff isn't one). The Contract is optional and must be offered under that Level.
@@ -1878,8 +1981,8 @@ def crew_management(request):
     covering_ids = CrewCoverage.objects.filter(enddate__isnull=True).values_list('covering_shifter_id', flat=True)
     homed_ids = BasketShifter.objects.filter(is_home=True, enddate__isnull=True).values_list('shifter_id', flat=True)
     unassigned = User.objects.exclude(onboarding_status='pending').filter(
-        Q(roleid__accessid__accessid=8, isactive=True) & ~Q(eid__in=rostered_ids)
-        | Q(roleid__accessid__accessid=5, isactive=True) & ~Q(eid__in=homed_ids)
+        Q(roleid__accessid__accessid=8, isactive=True, terminationdate__isnull=True) & ~Q(eid__in=rostered_ids)
+        | Q(roleid__accessid__accessid=5, isactive=True, terminationdate__isnull=True) & ~Q(eid__in=homed_ids)
         & ~Q(eid__in=rostered_ids) & ~Q(eid__in=covering_ids)
     ).select_related('minerlevel', 'contractid', 'roleid').order_by('lastname', 'firstname')
     pending = User.objects.filter(onboarding_status='pending').select_related('roleid', 'crewid', 'onboarding_requested_by').order_by('lastname', 'firstname')
@@ -2080,15 +2183,17 @@ def crew_management_basket(request, crewname, section):
             also_here.append({'employee': a.employee, 'home': _basket_label(a.basket)})
 
     # Quit or moved out: the last 10 roster rows that ended in this basket.
-    # "Quit" means THIS row ended the day they quit outright (_retire_shifter
-    # sets terminationdate to the same date it ends their seat) — not just
-    # "they're inactive today", which would relabel every older remove/replace/
-    # promotion row as a Quit too, the moment they later quit for any reason.
+    # "Quit" means THIS row ended when they left: on or after their last day
+    # of work (recording leaving ends the seat that day, which can be later
+    # than the last day itself). Not just "they've left by now", which would
+    # relabel every older remove/replace/promotion row as a Quit too.
     ended = []
     for a in seats.filter(
         enddate__isnull=False, employee__isnull=False,
     ).select_related('employee').order_by('-enddate')[:10]:
-        ended.append({'employee': a.employee, 'enddate': a.enddate, 'quit': a.enddate == a.employee.terminationdate})
+        # The seat ends the day leaving is recorded, which can be after the last day of work.
+        term = a.employee.terminationdate
+        ended.append({'employee': a.employee, 'enddate': a.enddate, 'quit': bool(term) and a.enddate >= term})
 
     return render(request, 'users/crew_management_basket.html', {
         **grid_action_data(),
@@ -2121,7 +2226,7 @@ def crew_assignment_detail(request, shifter_id):
     if request.user.access_level not in (1, 2):
         return redirect('profile')
 
-    shifter = get_object_or_404(User, employeeid=shifter_id, roleid__accessid__accessid=5, isactive=True)
+    shifter = get_object_or_404(User, employeeid=shifter_id, roleid__accessid__accessid=5, isactive=True, terminationdate__isnull=True)
 
     active_assignments = CrewAssignment.objects.filter(
         shifter=shifter,
@@ -2151,14 +2256,14 @@ def crew_assignment_detail(request, shifter_id):
     # seat, so it doesn't stop someone also being added as a plain member
     # here. Only an existing member seat (CrewAssignment) does that.
     available_employees = User.objects.filter(
-        Q(roleid__accessid__accessid=8) | Q(roleid__rolename='Spare Shifter'), isactive=True,
+        Q(roleid__accessid__accessid=8) | Q(roleid__rolename='Spare Shifter'), isactive=True, terminationdate__isnull=True,
     ).exclude(eid__in=assigned_ids)
 
     # Every active Miner, for the Replace panel — includes people currently
     # assigned elsewhere (picking one moves them: their old assignment ends
     # automatically), labeled with where they currently are so it's clear
     # which selections are a plain fill vs. a move.
-    all_miners = list(User.objects.filter(roleid__accessid__accessid=8, isactive=True).order_by('lastname', 'firstname'))
+    all_miners = list(User.objects.filter(roleid__accessid__accessid=8, isactive=True, terminationdate__isnull=True).order_by('lastname', 'firstname'))
     active_by_employee = {
         a.employee_id: a for a in CrewAssignment.objects.filter(enddate__isnull=True).select_related('basket__crew', 'basket__group', 'basket__discipline')
     }
@@ -2168,7 +2273,7 @@ def crew_assignment_detail(request, shifter_id):
 
     # Other active shifters, for Transfer Basket's "who receives it" picker.
     other_shifters = User.objects.filter(
-        roleid__accessid__accessid=5, isactive=True
+        roleid__accessid__accessid=5, isactive=True, terminationdate__isnull=True
     ).exclude(eid=shifter.eid).order_by('lastname', 'firstname')
 
     # Unclassified positions stay visible as a fallback while the Superintendent
@@ -2230,12 +2335,19 @@ def crew_assignment_detail(request, shifter_id):
             )
             existing_employeeid = request.POST.get('existing_employeeid', '').strip()
 
+            # Optional: the person being replaced is leaving the company.
+            leaving_last_day, leaving_error = None, None
+            if request.POST.get('leaving') == '1':
+                leaving_last_day, leaving_error = _read_last_day(request, old_assignment.employee, field='leaving_last_day')
+
             replacement = None
             moved_from_elsewhere = False
             new_hire_pending = False
-            if existing_employeeid:
+            if leaving_error:
+                messages.error(request, leaving_error)
+            elif existing_employeeid:
                 replacement = get_object_or_404(
-                    User, employeeid=existing_employeeid, roleid__accessid__accessid=8, isactive=True
+                    User, employeeid=existing_employeeid, roleid__accessid__accessid=8, isactive=True, terminationdate__isnull=True
                 )
                 if replacement.eid == old_assignment.employee_id:
                     messages.warning(request, f'{replacement.firstname} {replacement.lastname} is already in that position.')
@@ -2301,6 +2413,11 @@ def crew_assignment_detail(request, shifter_id):
                     messages.success(request, f'{replacement.firstname} {replacement.lastname} moved to {position_label} (their previous assignment was ended).')
                 else:
                     messages.success(request, f'{replacement.firstname} {replacement.lastname} assigned to {position_label}.')
+                if leaving_last_day:
+                    leaver = old_assignment.employee
+                    record_leaving_plain(request.user, leaver, leaving_last_day)
+                    messages.success(request, f'{leaver.firstname} {leaver.lastname} recorded as leaving, last day {fmt_day(leaving_last_day)}. '
+                                              f'Their account stays active until the System Admin deactivates it after their last pay.')
 
         elif action == 'transfer_basket':
             new_shifter_id = request.POST.get('new_shifter_id', '').strip()
@@ -2316,7 +2433,7 @@ def crew_assignment_detail(request, shifter_id):
                 # permanent role fits here; a temporary Spare Shifter fill
                 # belongs to Start Coverage instead, which keeps this shifter
                 # as the basket's nominal owner rather than ending their hold.
-                miner = get_object_or_404(User, employeeid=promote_employee_id, roleid__accessid__accessid=8, isactive=True)
+                miner = get_object_or_404(User, employeeid=promote_employee_id, roleid__accessid__accessid=8, isactive=True, terminationdate__isnull=True)
                 shifter_role = get_object_or_404(Roles, rolename='Shift Coordinator')
                 old_role_values = {'roleid': miner.roleid_id, 'minerlevel': _level_code(miner.minerlevel)}
                 miner.roleid = shifter_role
@@ -2327,7 +2444,7 @@ def crew_assignment_detail(request, shifter_id):
                            old_role_values, {'roleid': shifter_role.roleid, 'minerlevel': 'Staff'})
                 new_shifter = miner
             else:
-                new_shifter = get_object_or_404(User, employeeid=new_shifter_id, roleid__accessid__accessid=5, isactive=True)
+                new_shifter = get_object_or_404(User, employeeid=new_shifter_id, roleid__accessid__accessid=5, isactive=True, terminationdate__isnull=True)
                 if new_shifter.eid == shifter.eid:
                     messages.error(request, 'Pick a different shifter to transfer to.')
                     new_shifter = None
@@ -2413,7 +2530,7 @@ def crew_assignment_detail(request, shifter_id):
                            old_role_values, {'roleid': spare_role.roleid})
                 covering = miner
             else:
-                covering = get_object_or_404(User, employeeid=covering_shifter_id, roleid__accessid__accessid=5, isactive=True)
+                covering = get_object_or_404(User, employeeid=covering_shifter_id, roleid__accessid__accessid=5, isactive=True, terminationdate__isnull=True)
                 if covering.eid == shifter.eid:
                     messages.error(request, 'Pick a different shifter to cover this basket.')
                     covering = None
@@ -2693,7 +2810,7 @@ def grid_action_data():
     # Miners, plus Spare Shifters currently covering another basket (see the
     # same note on crew_assignment_detail's available_employees above).
     available_employees = User.objects.filter(
-        Q(roleid__accessid__accessid=8) | Q(roleid__rolename='Spare Shifter'), isactive=True,
+        Q(roleid__accessid__accessid=8) | Q(roleid__rolename='Spare Shifter'), isactive=True, terminationdate__isnull=True,
     ).exclude(eid__in=assigned_ids).order_by('lastname', 'firstname')
     available_employees_for_modal = [
         {'employeeid': e.employeeid, 'name': f'{e.firstname} {e.lastname}'} for e in available_employees
@@ -2703,7 +2820,7 @@ def grid_action_data():
     for a in active_assignments:
         active_by_employee.setdefault(a.employee_id, a)
     all_miners_for_modal = []
-    for m in User.objects.filter(roleid__accessid__accessid=8, isactive=True).order_by('lastname', 'firstname'):
+    for m in User.objects.filter(roleid__accessid__accessid=8, isactive=True, terminationdate__isnull=True).order_by('lastname', 'firstname'):
         current = active_by_employee.get(m.eid)
         current_label = _basket_label(current.basket) if current and current.basket_id else None
         # minerlevel travels along so the JS can filter to Lead/1/2 for the
@@ -2729,7 +2846,7 @@ def grid_action_data():
             'current_label': _basket_label(home_by_shifter[s.pk]) if s.pk in home_by_shifter else None,
             'busy_cover': s.pk in busy_cover_ids,
         }
-        for s in User.objects.filter(roleid__accessid__accessid=5, isactive=True).order_by('lastname', 'firstname')
+        for s in User.objects.filter(roleid__accessid__accessid=5, isactive=True, terminationdate__isnull=True).order_by('lastname', 'firstname')
     ]
 
     # Contract Code choices for the Edit Level/Contract modal, keyed by Level id.
@@ -2751,6 +2868,8 @@ def grid_action_data():
             return _basket_label(obj.basket)
         if not u.isactive and u.terminationdate:
             status = f"Quit {u.terminationdate:%b %d, %Y}"
+        elif u.terminationdate:
+            status = f"Leaving, last day {u.terminationdate:%b %d, %Y} (pending deactivation)"
         elif u.onboarding_status == 'pending':
             status = 'Pending IT access'
         elif covers:
@@ -2785,7 +2904,9 @@ def grid_action_data():
             'employeeid': u.employeeid,
             'role': u.roleid.rolename,
             'is_shifter': u.access_level == 5,
-            'quit': (not u.isactive) and bool(u.terminationdate),
+            # Leaving people (still active, last day recorded) get the same
+            # read-only panel as people who have quit: no seat actions.
+            'quit': bool(u.terminationdate),
             'status': status,
             'level': _level_code(u.minerlevel) or '—',
             'contract': u.contractid.contractcode if u.contractid else '—',

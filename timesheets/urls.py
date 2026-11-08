@@ -1,5 +1,7 @@
 from django.urls import path 
 from . import views
+from . import search_views
+from . import inactive_views
 
 urlpatterns = [
     path('timesheet/new/', views.new_timesheet, name='new_timesheet'),
@@ -42,6 +44,8 @@ urlpatterns = [
     path('payroll/ops/bonuses/<int:year>/<int:month>/', views.payroll_crew_bonuses_month, name='payroll_crew_bonuses_month'),
     path('payroll/bonuses/', views.payroll_employee_bonuses, name='payroll_employee_bonuses'),
     path('payroll/bonuses/<int:dept_id>/', views.payroll_employee_bonuses_dept, name='payroll_employee_bonuses_dept'),
+    path('payroll/inactive/', inactive_views.payroll_inactive, name='payroll_inactive'),
+    path('payroll/inactive/<int:dept_id>/', inactive_views.payroll_inactive_dept, name='payroll_inactive_dept'),
     path('operations/new/', views.new_ops_sheet, name='new_ops_sheet'),
     path('operations/my-sheets/', views.my_ops_sheets, name='my_ops_sheets'),
     path('operations/my-sheets/approved/', views.my_ops_approvals, name='my_ops_approvals'),
@@ -85,5 +89,7 @@ urlpatterns = [
     path('bonuses/', views.bonus_members, name='bonus_members'),
     path('bonuses/<str:employee_id>/', views.bonus_employee_detail, name='bonus_employee_detail'),
     path('audit-log/', views.audit_log_view, name='audit_log'),
+    path('search/', search_views.timesheet_search, name='timesheet_search'),
+    path('search/view/<str:kind>/<int:pk>/', search_views.system_timesheet_detail, name='system_timesheet_detail'),
     path('settings/', views.settings_page, name='settings_page'),
 ]

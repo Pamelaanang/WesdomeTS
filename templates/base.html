@@ -109,7 +109,7 @@
                 <i class="fa-solid fa-chevron-right accordion-icon transition-transform duration-200"></i>
             </button>
             <div id="menu-trail" class="hidden flex flex-col">
-                <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-file-lines"></i> All Timesheets</a>
+                <a href="{% url 'timesheet_search' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name in 'timesheet_search,system_timesheet_detail' %}font-semibold{% endif %}"><i class="fa-solid fa-file-lines"></i> All Timesheets</a>
                 {# Reports: future work #}
                 {# <a href="#" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700"><i class="fa-solid fa-chart-bar"></i> Reports</a> #}
                 <a href="{% url 'audit_log' %}" class="flex items-center gap-3 pl-10 py-2 text-sm text-gray-700 {% if request.resolver_match.url_name == 'audit_log' %}font-semibold{% endif %}"><i class="fa-solid fa-clipboard-list"></i> Audit Log</a>
@@ -208,7 +208,8 @@
             </div>
             {# Reports: future work #}
             {# <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-chart-bar"></i> Reports</a> #}
-            <a href="#" class="flex items-center gap-3"><i class="fa-solid fa-magnifying-glass"></i> Search</a>
+            <a href="{% url 'timesheet_search' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'timesheet_search' %}active{% endif %}"><i class="fa-solid fa-magnifying-glass"></i> Search</a>
+            <a href="{% url 'payroll_inactive' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name in 'payroll_inactive,payroll_inactive_dept' %}active{% endif %}"><i class="fa-solid fa-user-slash"></i> Inactive Employees</a>
             {% endif %}
             
             <!-- Personal timesheets accordion: Mine Captain (4) -->
@@ -267,6 +268,13 @@
     </nav>
 
     <main class="main-content">  
+        {% if user.is_authenticated and request.user.isactive and request.user.terminationdate %}
+        <div class="container mx-auto mb-4 flex items-start gap-3 text-sm px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800">
+            <i class="fa-solid fa-person-walking-arrow-right mt-0.5"></i>
+            <span>Your last day of work is recorded as <strong>{{ request.user.terminationdate|date:"M j, Y" }}</strong>.
+            Please make sure your final timesheet is submitted. After your last day you can only use your profile and your own timesheets{% if request.user.access_level == 5 %}, plus finishing your own crew sheets up to your last day{% endif %}.</span>
+        </div>
+        {% endif %}
         {% block content %}
         {% endblock content %}      
 

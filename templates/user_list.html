@@ -22,11 +22,59 @@
 {% if messages %}
 <div class="mx-6 mb-4 space-y-2">
     {% for message in messages %}
-    <div class="text-sm px-4 py-3 rounded-lg {% if message.tags == 'error' %}bg-red-50 border border-red-200 text-red-700{% else %}bg-green-50 border border-green-200 text-green-700{% endif %}">
-        <i class="fa-solid {% if message.tags == 'error' %}fa-circle-exclamation{% else %}fa-circle-check{% endif %} mr-1"></i>
+    <div class="text-sm px-4 py-3 rounded-lg {% if message.tags == 'error' %}bg-red-50 border border-red-200 text-red-700{% elif message.tags == 'warning' %}bg-amber-50 border border-amber-200 text-amber-800{% else %}bg-green-50 border border-green-200 text-green-700{% endif %}">
+        <i class="fa-solid {% if message.tags == 'error' %}fa-circle-exclamation{% elif message.tags == 'warning' %}fa-triangle-exclamation{% else %}fa-circle-check{% endif %} mr-1"></i>
         {{ message }}
     </div>
     {% endfor %}
+</div>
+{% endif %}
+
+{% if leaving_list %}
+<div class="mb-6 bg-white rounded-2xl shadow overflow-hidden">
+    <div class="px-5 py-3 bg-amber-50 border-b border-amber-200">
+        <p class="font-semibold text-sm text-gray-800"><i class="fa-solid fa-person-walking-arrow-right mr-1 text-amber-600"></i> Leaving: pending deactivation ({{ leaving_list|length }})</p>
+        <p class="text-xs text-gray-500 mt-0.5">Deactivate once the first pay period after their last day is processed. <strong>Ready</strong> means nothing up to their last day is left to pay. You can still deactivate someone who isn't ready, after a warning.</p>
+    </div>
+    <div class="overflow-x-auto">
+    <table class="w-full min-w-[640px] text-sm">
+        <thead class="bg-gray-50 text-gray-600 uppercase text-xs">
+            <tr>
+                <th class="px-4 py-2 text-left">Employee</th>
+                <th class="px-4 py-2 text-left">Department / Role</th>
+                <th class="px-4 py-2 text-left">Last day</th>
+                <th class="px-4 py-2 text-left">Pay status</th>
+                <th class="px-4 py-2 text-left"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in leaving_list %}
+            {% with u=row.user %}
+            <tr class="border-t border-gray-100 align-top">
+                <td class="px-4 py-3">{{ u.firstname }} {{ u.lastname }}<div class="text-xs text-gray-400">{{ u.employeeid }}</div></td>
+                <td class="px-4 py-3">{{ u.roleid.departmentid.departmentname }}<div class="text-xs text-gray-400">{{ u.roleid.rolename }}</div></td>
+                <td class="px-4 py-3 whitespace-nowrap">{{ u.terminationdate|date:"M j, Y" }}{% if u.terminationdate >= today %}<div class="text-xs text-gray-400">still working today</div>{% endif %}</td>
+                <td class="px-4 py-3">
+                    {% if row.outstanding %}
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">Waiting on</span>
+                    <ul class="mt-1 text-xs text-gray-600 list-disc pl-4">{% for item in row.outstanding %}<li>{{ item }}</li>{% endfor %}</ul>
+                    {% else %}
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Ready</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 text-right">
+                    <form method="post" action="{% url 'deactivate_employee' u.employeeid %}"
+                        onsubmit="return confirm({% if row.outstanding %}'{{ u.firstname|escapejs }} {{ u.lastname|escapejs }} still has items outstanding:\n\n{% for item in row.outstanding %}- {{ item|escapejs }}\n{% endfor %}\nDeactivating now locks them out, and the outstanding items will be recorded in the Audit Log. Deactivate anyway?'{% else %}'Deactivate {{ u.firstname|escapejs }} {{ u.lastname|escapejs }}? They will no longer be able to log in.'{% endif %});">
+                        {% csrf_token %}
+                        <button class="text-xs px-3 py-1 rounded {% if row.outstanding %}bg-orange-100 text-orange-700 hover:bg-orange-200{% else %}bg-red-600 text-white hover:bg-red-700{% endif %}">Deactivate</button>
+                    </form>
+                </td>
+            </tr>
+            {% endwith %}
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
 </div>
 {% endif %}
 
@@ -71,6 +119,8 @@
                     <td class="px-4 py-3">
                         {% if not user.isactive %}
                             <span class="text-xs text-gray-400">Inactive</span>
+                        {% elif user.terminationdate %}
+                            <span class="text-xs text-amber-600">Leaving<br><span class="text-gray-400">last day {{ user.terminationdate|date:"M j, Y" }}</span></span>
                         {% elif user.is_temporary %}
                             <span class="text-xs text-amber-600">Temporary</span>
                         {% else %}
@@ -100,6 +150,12 @@
                             class="bg-red-100 text-red-700 text-xs px-3 py-1 rounded hover:bg-red-200">
                             Replace
                         </a>
+                        {% if not user.terminationdate and user.pk != request.user.pk %}
+                        <button type="button" onclick="openLeavingModal('{{ user.employeeid|escapejs }}', '{{ user.firstname|escapejs }} {{ user.lastname|escapejs }}')"
+                            class="bg-amber-100 text-amber-800 text-xs px-3 py-1 rounded hover:bg-amber-200">
+                            Record leaving
+                        </button>
+                        {% endif %}
                         {% endif %}
                     </td>
                 </tr>
@@ -569,4 +625,33 @@ function toggleDept(id) {
 </script>
 
 <script>window._pageBackLabel = 'Back to Profile';</script>
+<!-- Record leaving modal -->
+<div id="leavingModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-5">
+        <div class="flex items-center justify-between mb-3">
+            <p class="font-semibold text-gray-800 text-sm">Record leaving: <span id="leavingName"></span></p>
+            <button type="button" onclick="document.getElementById('leavingModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" id="leavingForm" class="flex flex-col gap-3">
+            {% csrf_token %}
+            <label class="flex flex-col gap-1 text-xs text-gray-500">Last day of work
+                <input type="date" name="last_day" value="{% now 'Y-m-d' %}" max="{% now 'Y-m-d' %}" class="border rounded px-2 py-1.5 text-sm w-44">
+            </label>
+            <p class="text-[11px] leading-snug text-gray-500 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
+                <i class="fa-solid fa-circle-info text-amber-500 mr-1"></i>Use this when someone quits or leaves. Shifters and Miners have their crew seat freed now.
+                Their account stays active so they can submit their final timesheet and be paid. After their last day they can only see their own timesheets and profile.
+                They then appear under <strong>Leaving: pending deactivation</strong> at the top of this page. Deactivate them there once the first pay period after their last day is processed.
+            </p>
+            <button type="submit" class="self-end bg-amber-600 text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">Record leaving</button>
+        </form>
+    </div>
+</div>
+<script>
+    const leavingUrlTemplate = "{% url 'record_leaving' 'PLACEHOLDER' %}";
+    function openLeavingModal(employeeid, name) {
+        document.getElementById('leavingForm').action = leavingUrlTemplate.replace('PLACEHOLDER', encodeURIComponent(employeeid));
+        document.getElementById('leavingName').textContent = name;
+        document.getElementById('leavingModal').classList.remove('hidden');
+    }
+</script>
 {% endblock content %}
